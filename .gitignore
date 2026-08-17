@@ -1,0 +1,29 @@
+# Rust build artifacts
+target/
+**/target/
+src-tauri/target/
+src-tauri/target_check/
+
+# Node dependencies
+node_modules/
+.pnpm-store/
+
+# Vite production build
+dist/
+
+# Compiled executables & binaries
+*.exe
+
+# OS and logs
+*.log
+crash.log
+Thumbs.db
+.DS_Store
+
+# Local caches and external/reference directories
+.xwin-cache/
+MangoDisk-main/
+w-soft/
+
+# Local machine-specific toolchain configuration
+.cargo/config.toml
