@@ -1,0 +1,27 @@
+[workspace]
+members = [
+    "src-tauri",
+    "src-tauri/crates/freemydisk-core",
+    "src-tauri/crates/freemydisk-platform",
+    "src-tauri/crates/freemydisk-cli",
+    "src-tauri/helpers/freemydisk-elevated",
+]
+resolver = "2"
+
+[workspace.package]
+version = "1.0.0"
+edition = "2021"
+rust-version = "1.85.0"
+authors = ["Foysal Zihak <fzihak>"]
+license = "GPL-3.0-only"
+repository = "https://github.com/fzihak/FreeMyDisk"
+homepage = "https://freemydisk.app"
+
+[profile.dev.package.freemydisk-core]
+opt-level = 2
+
+[profile.dev.package.freemydisk-platform]
+opt-level = 2
+
+[profile.dev.package.blake3]
+opt-level = 3
