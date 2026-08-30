@@ -1,0 +1,26 @@
+[rule]
+id = "windows_ai_chatgpt_desktop_cache"
+name = "ChatGPT Desktop App Cache"
+category = "ai"
+risk = "safe"
+verified_rebuildable = true
+verified_at = "2026-10-06"
+author = "FreeMyDisk Team"
+description = "Electron GPU and Chromium web engine caches from OpenAI ChatGPT desktop app"
+platform = "windows"
+
+[applicability]
+conditions = [
+    { type = "path_exists", path = "${app_data}/ChatGPT" }
+]
+
+[targets]
+paths = [
+    { path = "${app_data}/ChatGPT/Cache/*", matcher = "glob" },
+    { path = "${app_data}/ChatGPT/Code Cache/*", matcher = "glob" },
+    { path = "${app_data}/ChatGPT/GPUCache/*", matcher = "glob" }
+]
+
+[disposal]
+default_action = "permanent"
+protect_subpaths = ["*/Cookies*", "*/Login Data*"]
