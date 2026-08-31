@@ -1,0 +1,25 @@
+[rule]
+id = "windows_ai_codex_cli_cache"
+name = "OpenAI Codex CLI History & Cache"
+category = "ai"
+risk = "safe"
+verified_rebuildable = true
+verified_at = "2026-10-06"
+author = "FreeMyDisk Team"
+description = "Archived command history and cached responses from OpenAI Codex tools"
+platform = "windows"
+
+[applicability]
+conditions = [
+    { type = "path_exists", path = "${user_profile}/.codex" }
+]
+
+[targets]
+paths = [
+    { path = "${user_profile}/.codex/sessions/archived/*", matcher = "glob" },
+    { path = "${local_app_data}/codex/cache/*", matcher = "glob" }
+]
+
+[disposal]
+default_action = "trash"
+protect_subpaths = ["*/credentials*", "*/auth.json"]
