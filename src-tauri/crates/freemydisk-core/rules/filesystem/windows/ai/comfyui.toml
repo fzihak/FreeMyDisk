@@ -1,0 +1,24 @@
+[rule]
+id = "windows_ai_comfyui_temp"
+name = "ComfyUI Temporary Output & Staging"
+category = "ai"
+risk = "safe"
+verified_rebuildable = true
+verified_at = "2026-10-06"
+author = "FreeMyDisk Team"
+description = "Temporary generated image previews and model download staging in ComfyUI"
+platform = "windows"
+
+[applicability]
+conditions = [
+    { type = "path_exists", path = "${user_profile}/ComfyUI" }
+]
+
+[targets]
+paths = [
+    { path = "${user_profile}/ComfyUI/temp/*", matcher = "glob" }
+]
+
+[disposal]
+default_action = "trash"
+protect_subpaths = ["*/models/*", "*/custom_nodes/*"]
