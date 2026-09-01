@@ -1,0 +1,24 @@
+[rule]
+id = "windows_ai_huggingface_cache"
+name = "HuggingFace Hub Cache"
+category = "ai"
+risk = "safe"
+verified_rebuildable = true
+verified_at = "2026-08-15"
+author = "FreeMyDisk Team"
+description = "Cached model weights, tokenizers, and datasets downloaded via HuggingFace Hub"
+platform = "windows"
+
+[applicability]
+conditions = [
+    { type = "path_exists", path = "${home}/.cache/huggingface/hub" }
+]
+
+[targets]
+paths = [
+    { path = "${home}/.cache/huggingface/hub/*", matcher = "glob" }
+]
+
+[disposal]
+default_action = "permanent"
+protect_subpaths = []
