@@ -1,0 +1,26 @@
+[rule]
+id = "windows_ai_ollama_cache"
+name = "Ollama Models & Blobs"
+category = "ai"
+risk = "safe"
+verified_rebuildable = true
+verified_at = "2026-08-15"
+author = "FreeMyDisk Team"
+description = "Cached model layer blobs and manifests managed by Ollama"
+platform = "windows"
+
+[applicability]
+conditions = [
+    { type = "path_exists", path = "${home}/.ollama/models" }
+]
+
+[targets]
+paths = [
+    { path = "${home}/.ollama/models/blobs/*", matcher = "glob" }
+]
+
+[disposal]
+default_action = "trash"
+protect_subpaths = [
+    "*/manifests/*"
+]
