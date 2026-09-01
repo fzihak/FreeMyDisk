@@ -1,0 +1,32 @@
+[rule]
+id = "windows_ai_gemini"
+name = "AI Assistant Logs & Browser Recordings"
+category = "ai"
+risk = "safe"
+verified_rebuildable = true
+verified_at = "2026-09-09"
+author = "FreeMyDisk Team"
+description = "Large agent execution transcripts, browser session WebP recordings, and transient scratch files (3GB-8GB)"
+platform = "windows"
+
+[applicability]
+conditions = [
+    { type = "path_exists", path = "${home}/.gemini" }
+]
+
+[targets]
+paths = [
+    { path = "${home}/.gemini/logs/*", matcher = "glob" },
+    { path = "${home}/.gemini/tmp/*", matcher = "glob" },
+    { path = "${home}/.gemini/browser_recordings/*", matcher = "glob" },
+    { path = "${home}/.gemini/crash reports/*", matcher = "glob" },
+    { path = "${home}/.gemini/antigravity-ide/brain/*/scratch/*", matcher = "glob" }
+]
+
+[disposal]
+default_action = "trash"
+protect_subpaths = [
+    "config",
+    "auth",
+    "projects"
+]
