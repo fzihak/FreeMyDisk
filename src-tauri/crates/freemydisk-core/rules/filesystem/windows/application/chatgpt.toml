@@ -1,0 +1,26 @@
+[rule]
+id = "windows_app_chatgpt_cache"
+name = "ChatGPT Desktop Cache"
+category = "application"
+risk = "safe"
+verified_rebuildable = true
+verified_at = "2026-10-01"
+author = "FreeMyDisk Team"
+description = "Cached sessions, GPU shaders and temporary web data from ChatGPT"
+platform = "windows"
+
+[applicability]
+conditions = [
+    { type = "path_exists", path = "${app_data}/ChatGPT/Cache" }
+]
+
+[targets]
+paths = [
+    { path = "${app_data}/ChatGPT/Cache/*", matcher = "glob" },
+    { path = "${app_data}/ChatGPT/Code Cache/*", matcher = "glob" },
+    { path = "${app_data}/ChatGPT/GPUCache/*", matcher = "glob" }
+]
+
+[disposal]
+default_action = "permanent"
+protect_subpaths = []
