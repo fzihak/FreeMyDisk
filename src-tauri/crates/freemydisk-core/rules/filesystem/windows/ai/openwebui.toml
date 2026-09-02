@@ -1,0 +1,24 @@
+[rule]
+id = "windows_ai_openwebui_cache"
+name = "Open WebUI Cache"
+category = "ai"
+risk = "safe"
+verified_rebuildable = true
+verified_at = "2026-10-06"
+author = "FreeMyDisk Team"
+description = "Vector database staging and web cache from local Open WebUI instances"
+platform = "windows"
+
+[applicability]
+conditions = [
+    { type = "path_exists", path = "${local_app_data}/OpenWebUI" }
+]
+
+[targets]
+paths = [
+    { path = "${local_app_data}/OpenWebUI/cache/*", matcher = "glob" }
+]
+
+[disposal]
+default_action = "permanent"
+protect_subpaths = ["*/webui.db"]
