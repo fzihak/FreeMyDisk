@@ -1,0 +1,29 @@
+[rule]
+id = "windows_application_discord_cache"
+name = "Discord Cache & Media Storage"
+category = "application"
+risk = "safe"
+verified_rebuildable = true
+verified_at = "2026-08-15"
+author = "FreeMyDisk Team"
+description = "Cached channel images, avatars, emojis, and code caches from Discord"
+platform = "windows"
+
+[applicability]
+conditions = [
+    { type = "path_exists", path = "${app_data}/discord/Cache" }
+]
+
+[targets]
+paths = [
+    { path = "${app_data}/discord/Cache/*", matcher = "glob" },
+    { path = "${app_data}/discord/Code Cache/*", matcher = "glob" },
+    { path = "${app_data}/discord/GPUCache/*", matcher = "glob" }
+]
+
+[disposal]
+default_action = "permanent"
+protect_subpaths = [
+    "*/Local Storage/*",
+    "*/Session Storage/*"
+]
