@@ -1,0 +1,25 @@
+[rule]
+id = "windows_app_steam_web_cache"
+name = "Steam Embedded Web Rendering Cache"
+category = "application"
+risk = "safe"
+verified_rebuildable = true
+verified_at = "2026-10-01"
+author = "FreeMyDisk Team"
+description = "Chromium CEF web rendering and store thumbnail caches accumulated by Steam"
+platform = "windows"
+
+[applicability]
+conditions = [
+    { type = "path_exists", path = "${local_app_data}/Steam/htmlcache" }
+]
+
+[targets]
+paths = [
+    { path = "${local_app_data}/Steam/htmlcache/*", matcher = "glob" },
+    { path = "${local_app_data}/Steam/appcache/*", matcher = "glob" }
+]
+
+[disposal]
+default_action = "permanent"
+protect_subpaths = []
