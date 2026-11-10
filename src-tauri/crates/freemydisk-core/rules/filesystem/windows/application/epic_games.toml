@@ -1,0 +1,26 @@
+[rule]
+id = "windows_app_epic_games_cache"
+name = "Epic Games Launcher Web Cache"
+category = "application"
+risk = "safe"
+verified_rebuildable = true
+verified_at = "2026-10-06"
+author = "FreeMyDisk Team"
+description = "Embedded web engine cache and log files from Epic Games Launcher"
+platform = "windows"
+
+[applicability]
+conditions = [
+    { type = "path_exists", path = "${local_app_data}/EpicGamesLauncher" }
+]
+
+[targets]
+paths = [
+    { path = "${local_app_data}/EpicGamesLauncher/Saved/webcache/*", matcher = "glob" },
+    { path = "${local_app_data}/EpicGamesLauncher/Saved/webcache_4147/*", matcher = "glob" },
+    { path = "${local_app_data}/EpicGamesLauncher/Saved/Logs/*", matcher = "glob" }
+]
+
+[disposal]
+default_action = "permanent"
+protect_subpaths = ["*/Manifests/*"]
