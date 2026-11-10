@@ -1,0 +1,26 @@
+[rule]
+id = "windows_application_spotify_cache"
+name = "Spotify Media & Storage Cache"
+category = "application"
+risk = "safe"
+verified_rebuildable = true
+verified_at = "2026-08-15"
+author = "FreeMyDisk Team"
+description = "Cached streamed audio chunks and offline artwork stored by Spotify"
+platform = "windows"
+
+[applicability]
+conditions = [
+    { type = "path_exists", path = "${local_app_data}/Spotify/Data" }
+]
+
+[targets]
+paths = [
+    { path = "${local_app_data}/Spotify/Data/*", matcher = "glob" }
+]
+
+[disposal]
+default_action = "permanent"
+protect_subpaths = [
+    "*/Users/*"
+]
