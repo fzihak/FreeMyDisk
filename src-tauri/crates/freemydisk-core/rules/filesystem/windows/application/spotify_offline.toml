@@ -1,0 +1,24 @@
+[rule]
+id = "windows_app_spotify_storage"
+name = "Spotify Stream & Track Storage"
+category = "application"
+risk = "moderate"
+verified_rebuildable = true
+verified_at = "2026-10-06"
+author = "FreeMyDisk Team"
+description = "Cached offline audio files and track buffers from Spotify (re-downloads on demand)"
+platform = "windows"
+
+[applicability]
+conditions = [
+    { type = "path_exists", path = "${local_app_data}/Spotify/Storage" }
+]
+
+[targets]
+paths = [
+    { path = "${local_app_data}/Spotify/Storage/*", matcher = "glob" }
+]
+
+[disposal]
+default_action = "permanent"
+protect_subpaths = ["*/prefs"]
