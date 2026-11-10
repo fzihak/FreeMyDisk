@@ -1,0 +1,26 @@
+[rule]
+id = "windows_app_notion_cache"
+name = "Notion Desktop Cache"
+category = "application"
+risk = "safe"
+verified_rebuildable = true
+verified_at = "2026-10-01"
+author = "FreeMyDisk Team"
+description = "Local media and document renderer cache from Notion desktop"
+platform = "windows"
+
+[applicability]
+conditions = [
+    { type = "path_exists", path = "${app_data}/Notion/Cache" }
+]
+
+[targets]
+paths = [
+    { path = "${app_data}/Notion/Cache/*", matcher = "glob" },
+    { path = "${app_data}/Notion/Code Cache/*", matcher = "glob" },
+    { path = "${app_data}/Notion/GPUCache/*", matcher = "glob" }
+]
+
+[disposal]
+default_action = "permanent"
+protect_subpaths = []
