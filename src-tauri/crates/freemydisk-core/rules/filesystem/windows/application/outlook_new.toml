@@ -1,0 +1,26 @@
+[rule]
+id = "windows_app_outlook_new_cache"
+name = "Outlook for Windows (New) Cache"
+category = "application"
+risk = "safe"
+verified_rebuildable = true
+verified_at = "2026-10-06"
+author = "FreeMyDisk Team"
+description = "WebView2 and web app cache from the new Outlook for Windows client"
+platform = "windows"
+
+[applicability]
+conditions = [
+    { type = "path_exists", path = "${local_app_data}/Microsoft/Olk" }
+]
+
+[targets]
+paths = [
+    { path = "${local_app_data}/Microsoft/Olk/Cache/*", matcher = "glob" },
+    { path = "${local_app_data}/Microsoft/Olk/Code Cache/*", matcher = "glob" },
+    { path = "${local_app_data}/Microsoft/Olk/GPUCache/*", matcher = "glob" }
+]
+
+[disposal]
+default_action = "permanent"
+protect_subpaths = []
