@@ -1,0 +1,25 @@
+[rule]
+id = "windows_app_twitch_cache"
+name = "Twitch Desktop Cache"
+category = "application"
+risk = "safe"
+verified_rebuildable = true
+verified_at = "2026-10-06"
+author = "FreeMyDisk Team"
+description = "Web cache, stream buffers, and GPU cache from Twitch client"
+platform = "windows"
+
+[applicability]
+conditions = [
+    { type = "path_exists", path = "${app_data}/Twitch" }
+]
+
+[targets]
+paths = [
+    { path = "${app_data}/Twitch/Cache/*", matcher = "glob" },
+    { path = "${app_data}/Twitch/GPUCache/*", matcher = "glob" }
+]
+
+[disposal]
+default_action = "permanent"
+protect_subpaths = []
