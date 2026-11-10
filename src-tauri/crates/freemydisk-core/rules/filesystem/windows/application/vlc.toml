@@ -1,0 +1,25 @@
+[rule]
+id = "windows_app_vlc_cache"
+name = "VLC Media Player Art Cache"
+category = "application"
+risk = "safe"
+verified_rebuildable = true
+verified_at = "2026-10-06"
+author = "FreeMyDisk Team"
+description = "Downloaded album art and thumbnail caches from VLC Media Player"
+platform = "windows"
+
+[applicability]
+conditions = [
+    { type = "path_exists", path = "${app_data}/vlc" }
+]
+
+[targets]
+paths = [
+    { path = "${app_data}/vlc/art/*", matcher = "glob" },
+    { path = "${local_app_data}/vlc/cache/*", matcher = "glob" }
+]
+
+[disposal]
+default_action = "permanent"
+protect_subpaths = ["*/vlcrc"]
