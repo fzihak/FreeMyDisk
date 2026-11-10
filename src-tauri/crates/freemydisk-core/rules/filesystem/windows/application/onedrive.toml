@@ -1,0 +1,25 @@
+[rule]
+id = "windows_app_onedrive_logs"
+name = "Microsoft OneDrive Sync Logs"
+category = "application"
+risk = "safe"
+verified_rebuildable = true
+verified_at = "2026-10-06"
+author = "FreeMyDisk Team"
+description = "Historical sync telemetry and setup logs from Microsoft OneDrive"
+platform = "windows"
+
+[applicability]
+conditions = [
+    { type = "path_exists", path = "${local_app_data}/Microsoft/OneDrive" }
+]
+
+[targets]
+paths = [
+    { path = "${local_app_data}/Microsoft/OneDrive/logs/*", matcher = "glob" },
+    { path = "${local_app_data}/Microsoft/OneDrive/setup/logs/*", matcher = "glob" }
+]
+
+[disposal]
+default_action = "trash"
+protect_subpaths = ["*.oddb", "*.dat"]
