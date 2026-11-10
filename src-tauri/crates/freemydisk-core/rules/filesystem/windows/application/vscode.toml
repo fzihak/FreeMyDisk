@@ -1,0 +1,24 @@
+[rule]
+id = "windows_app_vscode_workspace_storage"
+name = "Visual Studio Code Workspace Storage"
+category = "application"
+risk = "recoverable"
+verified_rebuildable = false
+verified_at = "2026-08-15"
+author = "FreeMyDisk Team"
+description = "Cached editor workspace metadata and extension state from Visual Studio Code"
+platform = "windows"
+
+[applicability]
+conditions = [
+    { type = "path_exists", path = "${app_data}/Code/User/workspaceStorage" }
+]
+
+[targets]
+paths = [
+    { path = "${app_data}/Code/User/workspaceStorage/*", matcher = "glob" }
+]
+
+[disposal]
+default_action = "trash"
+protect_subpaths = []
