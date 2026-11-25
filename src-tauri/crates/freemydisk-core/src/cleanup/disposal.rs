@@ -180,7 +180,13 @@ impl DisposalEngine {
             }
 
             if route_is_permanent {
-                let (freed, err) = execute_tolerant_permanent_delete(path, cancel);
+                let (freed, err) = delete_through_staging(
+                    path,
+                    staging_path.as_deref(),
+                    journal,
+                    journal_id,
+                    cancel,
+                );
                 if freed > 0 || err.is_none() {
                     let actual_freed = if freed > 0 { freed } else { item.size_bytes };
                     let _ = journal.mark_completed(journal_id);
@@ -299,7 +305,8 @@ impl DisposalEngine {
             journal.write_intent(&session_id, path, Some(&staging_path), "permanent")?;
 
         let cancel = CancellationToken::new();
-        let (freed, err) = execute_tolerant_permanent_delete(path, &cancel);
+        let (freed, err) =
+            delete_through_staging(path, Some(&staging_path), journal, journal_id, &cancel);
         if freed > 0 || err.is_none() {
             let actual_freed = if freed > 0 { freed } else { size };
             let _ = journal.mark_completed(journal_id);
@@ -378,6 +385,39 @@ fn measure_size(path: &Path) -> u64 {
     } else {
         path.symlink_metadata().map(|m| m.len()).unwrap_or(0)
     }
+}
+
+/// Renames `path` to its staging name before deleting it, so a crash leaves a
+/// restorable copy that the journal can put back. Whatever cannot be deleted is
+/// restored to the original location. When the rename is refused (for example,
+/// a folder with open files), the item is deleted in place.
+fn delete_through_staging(
+    path: &Path,
+    staging: Option<&Path>,
+    journal: &CrashRecoveryJournal,
+    journal_id: i64,
+    cancel: &CancellationToken,
+) -> (u64, Option<String>) {
+    let Some(staged) = staging.filter(|s| fs::rename(path, s).is_ok()) else {
+        let _ = journal.clear_staging(journal_id);
+        return execute_tolerant_permanent_delete(path, cancel);
+    };
+
+    let (freed, err) = execute_tolerant_permanent_delete(staged, cancel);
+    if staged.exists() {
+        if let Err(e) = fs::rename(staged, path) {
+            log::error!(
+                "Could not restore partially deleted '{}' from staging: {}",
+                path.display(),
+                e
+            );
+        } else {
+            let _ = journal.clear_staging(journal_id);
+        }
+        let reason = err.unwrap_or_else(|| "Some files could not be deleted".to_string());
+        return (freed, Some(reason));
+    }
+    (freed, err)
 }
 
 fn generate_staging_path(target: &Path) -> PathBuf {
