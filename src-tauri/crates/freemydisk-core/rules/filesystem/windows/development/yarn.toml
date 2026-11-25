@@ -1,0 +1,24 @@
+[rule]
+id = "windows_dev_yarn_cache"
+name = "Yarn Package Manager Cache"
+category = "development"
+risk = "safe"
+verified_rebuildable = true
+verified_at = "2026-10-01"
+author = "FreeMyDisk Team"
+description = "Cached tarballs and git repositories downloaded by Yarn"
+platform = "windows"
+
+[applicability]
+conditions = [
+    { type = "path_exists", path = "${local_app_data}/Yarn/Cache" }
+]
+
+[targets]
+paths = [
+    { path = "${local_app_data}/Yarn/Cache/*", matcher = "glob" }
+]
+
+[disposal]
+default_action = "permanent"
+protect_subpaths = []

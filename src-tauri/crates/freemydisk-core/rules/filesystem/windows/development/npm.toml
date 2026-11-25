@@ -1,0 +1,24 @@
+[rule]
+id = "windows_dev_npm_cache"
+name = "Node Package Manager (npm) Cache"
+category = "development"
+risk = "safe"
+verified_rebuildable = true
+verified_at = "2026-08-15"
+author = "FreeMyDisk Team"
+description = "Cached tarballs and metadata from npm package installations"
+platform = "windows"
+
+[applicability]
+conditions = [
+    { type = "path_exists", path = "${local_app_data}/npm-cache" }
+]
+
+[targets]
+paths = [
+    { path = "${local_app_data}/npm-cache/*", matcher = "glob" }
+]
+
+[disposal]
+default_action = "permanent"
+protect_subpaths = []

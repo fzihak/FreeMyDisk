@@ -1,0 +1,25 @@
+[rule]
+id = "windows_dev_playwright"
+name = "Playwright & Puppeteer Browser Binaries"
+category = "development"
+risk = "medium"
+verified_rebuildable = true
+verified_at = "2026-09-09"
+author = "FreeMyDisk Team"
+description = "Cached Chromium, Firefox, and WebKit browser builds used by Playwright and headless testing (3GB-8GB)"
+platform = "windows"
+
+[applicability]
+conditions = [
+    { type = "path_exists", path = "${local_app_data}/ms-playwright" }
+]
+
+[targets]
+paths = [
+    { path = "${local_app_data}/ms-playwright/*", matcher = "glob" },
+    { path = "${local_app_data}/ms-playwright-go/*", matcher = "glob" }
+]
+
+[disposal]
+default_action = "trash"
+protect_subpaths = []
