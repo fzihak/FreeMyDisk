@@ -2349,6 +2349,33 @@ async fn clean_conda_cache() -> Result<u64, String> {
     .map_err(|e| e.to_string())?
 }
 
+/// Hides the window, cancels running scans and disposals, waits for them to stop
+/// at an item boundary, flushes the journal and exits.
+fn shut_down_gracefully(app: &AppHandle) {
+    static SHUTTING_DOWN: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+    if SHUTTING_DOWN.swap(true, std::sync::atomic::Ordering::SeqCst) {
+        return;
+    }
+
+    for window in app.webview_windows().values() {
+        let _ = window.hide();
+    }
+    let ops = app.state::<OperationRegistry>().inner().clone();
+    ops.cancel(None);
+
+    let app = app.clone();
+    std::thread::spawn(move || {
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(60);
+        while ops.active_count() > 0 && std::time::Instant::now() < deadline {
+            std::thread::sleep(std::time::Duration::from_millis(100));
+        }
+        if let Ok(journal) = get_journal(&app) {
+            let _ = journal.checkpoint_wal();
+        }
+        app.exit(0);
+    });
+}
+
 pub fn run() {
     // 0. Install Global Panic Hook for Crash Recovery and symbolicated diagnostics (§12.1)
     let default_hook = std::panic::take_hook();
@@ -2447,10 +2474,12 @@ pub fn run() {
                 let _ = window.show();
                 let _ = window.set_focus();
 
-                // Handle window close cleanly & auto-trim working set on window blur (focus lost)
-                window.on_window_event(|event| match event {
-                    tauri::WindowEvent::CloseRequested { .. } => {
-                        std::process::exit(0);
+                // Close stops running work cleanly; blur trims the working set.
+                let handle = app.handle().clone();
+                window.on_window_event(move |event| match event {
+                    tauri::WindowEvent::CloseRequested { api, .. } => {
+                        api.prevent_close();
+                        shut_down_gracefully(&handle);
                     }
                     tauri::WindowEvent::Focused(false) => {
                         trim_process_working_set();

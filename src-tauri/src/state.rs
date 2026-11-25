@@ -53,6 +53,9 @@ impl OperationRegistry {
         count
     }
 
+    pub fn active_count(&self) -> usize {
+        lock(&self.running).len()
+    }
 }
 
 pub struct OperationGuard {
@@ -93,6 +96,7 @@ mod tests {
         let first = ops.begin("storage");
         let second = ops.begin("storage");
         drop(first);
+        assert_eq!(ops.active_count(), 1);
         assert_eq!(ops.cancel(Some("storage")), 1);
         assert!(second.token().is_cancelled());
     }
