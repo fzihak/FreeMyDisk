@@ -116,25 +116,6 @@ impl DisposalEngine {
                 continue;
             }
 
-            // Disk Space Exhaustion Circuit Breaker (§12.4):
-            // Blocks staging mutations if the volume free space is dangerously low (< 500 MB)
-            if let Err(e) = CrashRecoveryJournal::check_disk_space_guard(path, 0) {
-                log::warn!(
-                    "Disk space circuit breaker engaged for {}: {}",
-                    path.display(),
-                    e
-                );
-                results.push(DisposalItemResult {
-                    path: path.clone(),
-                    success: false,
-                    bytes_freed: 0,
-                    route_used: "aborted_low_space".to_string(),
-                    error: Some(e.to_string()),
-                });
-                failed_items += 1;
-                continue;
-            }
-
             // Step 2: Classify disposal route
             let route_is_permanent = !always_trash_override
                 && item.verified_rebuildable
