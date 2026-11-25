@@ -64,7 +64,10 @@ impl PrivacyService {
         self.scan_privacy_items_with_progress(|_| {})
     }
 
-    pub fn scan_privacy_items_with_progress<F>(&self, mut on_progress: F) -> Result<PrivacyScanResult, String>
+    pub fn scan_privacy_items_with_progress<F>(
+        &self,
+        mut on_progress: F,
+    ) -> Result<PrivacyScanResult, String>
     where
         F: FnMut(crate::shared::progress::AppScanProgress),
     {
@@ -91,7 +94,10 @@ impl PrivacyService {
             let pct = (5 + ((idx as f32 / total_profiles.max(1) as f32) * 80.0) as u8).min(85);
             on_progress(crate::shared::progress::AppScanProgress {
                 scan_type: "privacy".to_string(),
-                stage: format!("Analyzing {} profile ({})", prof.browser_name, prof.profile_name),
+                stage: format!(
+                    "Analyzing {} profile ({})",
+                    prof.browser_name, prof.profile_name
+                ),
                 percent: pct,
                 items_scanned: items.len() as u64,
                 current_path: prof.profile_path.to_string_lossy().to_string(),
