@@ -23,50 +23,41 @@ pub struct ElevatedResponse {
 pub struct ElevatedClient;
 
 impl ElevatedClient {
-    /// Discovers the path to the freemydisk-elevated executable
+    /// Locates freemydisk-elevated.exe next to the running app or in its bundled
+    /// resources folder. Release builds look nowhere else, so a planted binary in the
+    /// working directory or an environment variable can never be launched with the
+    /// app's own elevation prompt. Debug builds also check the cargo target folders.
     pub fn find_helper_executable() -> Option<PathBuf> {
-        // 0. Explicit environment variable override (for automation, CI, and custom installations)
-        if let Ok(custom_path) = std::env::var("FREEMYDISK_HELPER_PATH") {
-            let p = PathBuf::from(custom_path);
-            if p.exists() {
-                return Some(dunce::canonicalize(&p).unwrap_or(p));
-            }
-        }
+        const HELPER: &str = "freemydisk-elevated.exe";
 
-        // 1. Same directory as current executable or bundled resources folder (Production NSIS)
-        if let Ok(cur_exe) = std::env::current_exe() {
-            if let Some(parent) = cur_exe.parent() {
-                let candidate = parent.join("freemydisk-elevated.exe");
-                if candidate.exists() {
+        if let Some(dir) = std::env::current_exe()
+            .ok()
+            .and_then(|e| e.parent().map(PathBuf::from))
+        {
+            for candidate in [dir.join(HELPER), dir.join("resources").join(HELPER)] {
+                if candidate.is_file() {
                     return Some(candidate);
                 }
-                let resource_candidate = parent.join("resources").join("freemydisk-elevated.exe");
-                if resource_candidate.exists() {
-                    return Some(resource_candidate);
-                }
             }
         }
 
-        // 2. Relative cargo target and dev resources directories for dev/testing
-        let dev_candidates = [
-            PathBuf::from("src-tauri/resources/freemydisk-elevated.exe"),
-            PathBuf::from("resources/freemydisk-elevated.exe"),
-            PathBuf::from("../resources/freemydisk-elevated.exe"),
-            PathBuf::from("target/release/freemydisk-elevated.exe"),
-            PathBuf::from("target/debug/freemydisk-elevated.exe"),
-            PathBuf::from("../target/release/freemydisk-elevated.exe"),
-            PathBuf::from("../target/debug/freemydisk-elevated.exe"),
-            PathBuf::from("../../target/release/freemydisk-elevated.exe"),
-            PathBuf::from("../../target/debug/freemydisk-elevated.exe"),
-            PathBuf::from("src-tauri/target/release/freemydisk-elevated.exe"),
-            PathBuf::from("src-tauri/target/debug/freemydisk-elevated.exe"),
-            PathBuf::from("helpers/freemydisk-elevated/target/release/freemydisk-elevated.exe"),
-            PathBuf::from("helpers/freemydisk-elevated/target/debug/freemydisk-elevated.exe"),
-        ];
-
-        for c in &dev_candidates {
-            if c.exists() {
-                return Some(dunce::canonicalize(c).unwrap_or_else(|_| c.clone()));
+        #[cfg(debug_assertions)]
+        {
+            let dev_candidates = [
+                "src-tauri/resources",
+                "resources",
+                "../resources",
+                "target/debug",
+                "../target/debug",
+                "../../target/debug",
+                "target/release",
+                "../target/release",
+            ];
+            for dir in dev_candidates {
+                let candidate = PathBuf::from(dir).join(HELPER);
+                if candidate.is_file() {
+                    return Some(dunce::canonicalize(&candidate).unwrap_or(candidate));
+                }
             }
         }
 
