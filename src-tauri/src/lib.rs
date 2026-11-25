@@ -683,7 +683,9 @@ async fn scan_cleanup_rules(app: AppHandle) -> Result<Vec<RuleScanSummary>, Stri
                             risk: "safe".to_string(),
                             verified_rebuildable: true,
                             default_action: "permanent".to_string(),
-                            default_selected: true,
+                            // Emptying the Recycle Bin destroys files the user deleted
+                            // earlier, so it is never selected automatically.
+                            default_selected: false,
                             total_bytes: bin_bytes,
                             total_items: bin_count as usize,
                             candidates: Vec::new(),
@@ -950,32 +952,11 @@ async fn execute_cleanup_rules(
             }
         }
 
-        let mut recycle_bin_result = None;
-        #[cfg(target_os = "windows")]
-        if empty_recycle_bin {
-            use freemydisk_platform::windows::maintenance::WindowsSystemMaintenanceHandler;
-            let initial = WindowsSystemMaintenanceHandler::query_recycle_bin()
-                .map(|(b, _)| b)
-                .unwrap_or(0);
-            unsafe {
-                use windows_sys::Win32::UI::Shell::{
-                    SHEmptyRecycleBinW, SHERB_NOCONFIRMATION, SHERB_NOPROGRESSUI, SHERB_NOSOUND,
-                };
-                let flags = SHERB_NOCONFIRMATION | SHERB_NOPROGRESSUI | SHERB_NOSOUND;
-                let _ = SHEmptyRecycleBinW(std::ptr::null_mut(), std::ptr::null(), flags);
-            }
-            let after = WindowsSystemMaintenanceHandler::query_recycle_bin()
-                .map(|(b, _)| b)
-                .unwrap_or(0);
-            let freed = initial.saturating_sub(after);
-            recycle_bin_result = Some(DisposalItemResult {
-                path: recycle_bin_path(),
-                success: true,
-                bytes_freed: if freed > 0 { freed } else { initial },
-                route_used: "permanent".to_string(),
-                error: None,
-            });
-        }
+        let recycle_bin_result = if empty_recycle_bin {
+            empty_recycle_bin_journaled(&journal)
+        } else {
+            None
+        };
 
         let plan = CleanupPlan::from_candidates(candidates);
         let app_emit_cb = app.clone();
@@ -1047,6 +1028,54 @@ async fn execute_cleanup_rules(
 fn recycle_bin_path() -> PathBuf {
     let drive = std::env::var("SystemDrive").unwrap_or_else(|_| "C:".to_string());
     PathBuf::from(format!(r"{}\$Recycle.Bin", drive.trim_end_matches('\\')))
+}
+
+/// Empties the Recycle Bin, records it in the journal and reports only the bytes
+/// that actually left the bin.
+#[cfg(target_os = "windows")]
+fn empty_recycle_bin_journaled(journal: &CrashRecoveryJournal) -> Option<DisposalItemResult> {
+    use freemydisk_platform::windows::maintenance::WindowsSystemMaintenanceHandler;
+    use windows_sys::Win32::UI::Shell::{
+        SHEmptyRecycleBinW, SHERB_NOCONFIRMATION, SHERB_NOPROGRESSUI, SHERB_NOSOUND,
+    };
+
+    let path = recycle_bin_path();
+    let session_id = format!("recycle-bin-{}", uuid::Uuid::new_v4());
+    let journal_id = journal
+        .write_intent(&session_id, &path, None, "empty_recycle_bin")
+        .ok();
+
+    let before = WindowsSystemMaintenanceHandler::query_recycle_bin()
+        .map(|(b, _)| b)
+        .unwrap_or(0);
+    let flags = SHERB_NOCONFIRMATION | SHERB_NOPROGRESSUI | SHERB_NOSOUND;
+    let hresult = unsafe { SHEmptyRecycleBinW(std::ptr::null_mut(), std::ptr::null(), flags) };
+    let after = WindowsSystemMaintenanceHandler::query_recycle_bin()
+        .map(|(b, _)| b)
+        .unwrap_or(before);
+    let freed = before.saturating_sub(after);
+    let success = hresult >= 0;
+
+    if let Some(id) = journal_id {
+        let _ = if success {
+            journal.mark_completed(id)
+        } else {
+            journal.mark_failed(id, &format!("hresult_0x{:08X}", hresult as u32))
+        };
+    }
+
+    Some(DisposalItemResult {
+        path,
+        success,
+        bytes_freed: freed,
+        route_used: "permanent".to_string(),
+        error: (!success).then(|| "The Recycle Bin could not be emptied.".to_string()),
+    })
+}
+
+#[cfg(not(target_os = "windows"))]
+fn empty_recycle_bin_journaled(_journal: &CrashRecoveryJournal) -> Option<DisposalItemResult> {
+    None
 }
 
 #[tauri::command]
