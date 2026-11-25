@@ -402,7 +402,8 @@ impl CrashRecoveryJournal {
 
     /// Issues an emergency SQLite WAL checkpoint to ensure all journal data is synchronized to disk before shutdown or panic.
     pub fn emergency_flush(&self) -> Result<(), CoreError> {
-        if let Ok(conn) = self.conn.lock() {
+        // try_lock: the panicking thread may already hold the connection.
+        if let Ok(conn) = self.conn.try_lock() {
             let _ = conn.execute("PRAGMA wal_checkpoint(FULL);", []);
         }
         Ok(())

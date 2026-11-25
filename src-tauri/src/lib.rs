@@ -30,7 +30,7 @@ use tauri::{AppHandle, Emitter, Manager, State};
 mod services;
 mod state;
 use services::application_icon::{ApplicationIcon, ApplicationIconService};
-use state::JournalState;
+use state::{JournalState, PANIC_JOURNAL};
 
 /// Trims the physical memory working set for both FreeMyDisk and any child processes
 /// (such as WebView2 renderer/GPU processes), purging inactive pages back to Windows.
@@ -2401,16 +2401,9 @@ pub fn run() {
             .map(|l| format!("{}:{}:{}", l.file(), l.line(), l.column()))
             .unwrap_or_else(|| "unknown location".to_string());
 
-        // 1. Emergency flush of WAL journal to disk
-        if let Ok(local_app_data) = std::env::var("LOCALAPPDATA") {
-            let journal_path = std::path::PathBuf::from(&local_app_data)
-                .join("FreeMyDisk")
-                .join("journal.db");
-            if journal_path.exists() {
-                if let Ok(journal) = CrashRecoveryJournal::open(&journal_path) {
-                    let _ = journal.emergency_flush();
-                }
-            }
+        // 1. Emergency flush of the WAL journal the app is actually using
+        if let Some(journal) = PANIC_JOURNAL.get() {
+            let _ = journal.emergency_flush();
         }
 
         // 2. Save structured symbolicated crash dump report to %LOCALAPPDATA%\FreeMyDisk\crash_reports
@@ -2462,8 +2455,11 @@ pub fn run() {
                 .and_then(|dir| {
                     CrashRecoveryJournal::open(&dir.join("journal.db")).map_err(|e| e.to_string())
                 });
-            if let Err(e) = &journal {
-                log::error!("Crash recovery journal unavailable: {}", e);
+            match &journal {
+                Ok(j) => {
+                    let _ = PANIC_JOURNAL.set(j.clone());
+                }
+                Err(e) => log::error!("Crash recovery journal unavailable: {}", e),
             }
             app.manage(JournalState(journal));
 
