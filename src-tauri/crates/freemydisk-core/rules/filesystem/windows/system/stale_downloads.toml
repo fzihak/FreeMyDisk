@@ -1,0 +1,27 @@
+[rule]
+id = "windows_system_stale_downloads"
+name = "Incomplete & Stale Browser Downloads"
+category = "system"
+risk = "safe"
+verified_rebuildable = true
+verified_at = "2026-10-01"
+author = "FreeMyDisk Team"
+description = "Abandoned and incomplete download files (.crdownload, .part, .partial) in the user Downloads folder"
+platform = "windows"
+
+[applicability]
+conditions = [
+    { type = "path_exists", path = "${user_profile}/Downloads" }
+]
+
+[targets]
+paths = [
+    { path = "${user_profile}/Downloads/*.crdownload", matcher = "glob" },
+    { path = "${user_profile}/Downloads/*.part", matcher = "glob" },
+    { path = "${user_profile}/Downloads/*.partial", matcher = "glob" },
+    { path = "${user_profile}/Downloads/*.download", matcher = "glob" }
+]
+
+[disposal]
+default_action = "trash"
+protect_subpaths = []
