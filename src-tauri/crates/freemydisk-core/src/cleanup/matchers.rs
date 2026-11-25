@@ -89,6 +89,19 @@ pub fn is_subpath_protected(path: &Path, protect_patterns: &[String]) -> bool {
     })
 }
 
+/// True when `dir` contains at least one entry protected by `protect_patterns`.
+pub fn contains_protected_subpath(dir: &Path, protect_patterns: &[String]) -> bool {
+    if protect_patterns.is_empty() || !dir.is_dir() {
+        return false;
+    }
+    walkdir::WalkDir::new(dir)
+        .min_depth(1)
+        .follow_links(false)
+        .into_iter()
+        .filter_map(Result::ok)
+        .any(|entry| is_subpath_protected(entry.path(), protect_patterns))
+}
+
 /// Hard filter: strictly excises any candidate path matching protect_subpaths before disposal.
 pub fn filter_protected_subpaths(
     candidates: Vec<PathBuf>,

@@ -1,4 +1,4 @@
-use crate::cleanup::matchers::is_subpath_protected;
+use crate::cleanup::matchers::{contains_protected_subpath, is_subpath_protected};
 use crate::cleanup::plan::CleanupPlanItem;
 use crate::cleanup::protected_paths::ProtectedPathRegistry;
 use crate::filesystem::journal::CrashRecoveryJournal;
@@ -83,6 +83,8 @@ impl DisposalEngine {
                 CoreError::LockBusy
             })?;
 
+        let plan_items = expand_protected_dirs(plan_items);
+
         let mut results = Vec::new();
         let mut failed_trash = Vec::new();
         let mut total_freed_bytes = 0u64;
@@ -98,11 +100,6 @@ impl DisposalEngine {
 
             // Step 1: Re-validate path and hard-filter protected subpaths
             if !path.exists() {
-                continue;
-            }
-
-            if is_subpath_protected(path, &item.protect_subpaths) {
-                log::warn!("Protected subpath hard filter excised: {}", path.display());
                 continue;
             }
 
@@ -343,6 +340,62 @@ impl DisposalEngine {
                 error: Some(err_msg),
             })
         }
+    }
+}
+
+/// Splits folder items that contain entries matching `protect_subpaths` into their
+/// unprotected children, so protected entries stay on disk. Items that are
+/// protected themselves are dropped.
+fn expand_protected_dirs(items: &[CleanupPlanItem]) -> Vec<CleanupPlanItem> {
+    let mut out = Vec::with_capacity(items.len());
+    for item in items {
+        push_unprotected(item, &item.original_path, &mut out);
+    }
+    out
+}
+
+fn push_unprotected(template: &CleanupPlanItem, path: &Path, out: &mut Vec<CleanupPlanItem>) {
+    if is_subpath_protected(path, &template.protect_subpaths) {
+        log::info!("Keeping protected path: {}", path.display());
+        return;
+    }
+
+    let splittable = path.is_dir()
+        && !ProtectedPathRegistry::is_reparse_point(path)
+        && contains_protected_subpath(path, &template.protect_subpaths);
+    if !splittable {
+        if path == template.original_path {
+            out.push(template.clone());
+        } else {
+            out.push(CleanupPlanItem {
+                original_path: path.to_path_buf(),
+                canonical_path: crate::shared::paths::normalize_path(path),
+                size_bytes: measure_size(path),
+                is_dir: path.is_dir(),
+                ..template.clone()
+            });
+        }
+        return;
+    }
+
+    if let Ok(entries) = fs::read_dir(path) {
+        for entry in entries.flatten() {
+            push_unprotected(template, &entry.path(), out);
+        }
+    }
+}
+
+fn measure_size(path: &Path) -> u64 {
+    if path.is_dir() {
+        walkdir::WalkDir::new(path)
+            .min_depth(1)
+            .into_iter()
+            .filter_map(Result::ok)
+            .filter(|e| e.file_type().is_file())
+            .filter_map(|e| e.metadata().ok().map(|m| m.len()))
+            .sum()
+    } else {
+        path.symlink_metadata().map(|m| m.len()).unwrap_or(0)
     }
 }
 

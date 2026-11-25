@@ -241,3 +241,41 @@ fn test_extra_safe_override_forces_trash_route() {
         "Always Trash override did not force trash route!"
     );
 }
+
+#[test]
+fn test_protected_entries_inside_a_matched_folder_are_kept() {
+    let temp = tempdir().unwrap();
+    let profile = temp.path().join("Default");
+    fs::create_dir_all(profile.join("Cache")).unwrap();
+    fs::write(profile.join("Cache").join("f_001"), b"cache").unwrap();
+    fs::write(profile.join("Cookies"), b"session cookies").unwrap();
+
+    let journal = CrashRecoveryJournal::open(&temp.path().join("journal.db")).unwrap();
+    let lock_dir = temp.path().join("locks");
+    let platform = MockDisposalPlatform::new(false);
+    let cancel = CancellationToken::new();
+
+    let plan_item = CleanupPlanItem {
+        original_path: profile.clone(),
+        canonical_path: profile.clone(),
+        size_bytes: 20,
+        is_dir: true,
+        matched_rules: vec!["browser_rule".to_string()],
+        default_action: "trash".to_string(),
+        verified_rebuildable: true,
+        protect_subpaths: vec!["*/Cookies*".to_string()],
+        risk: "safe".to_string(),
+    };
+
+    DisposalEngine::execute_plan(&[plan_item], &platform, &journal, &lock_dir, true, &cancel)
+        .unwrap();
+
+    assert!(
+        profile.join("Cookies").exists(),
+        "Protected file was removed"
+    );
+    assert!(
+        !profile.join("Cache").exists(),
+        "Unprotected sibling was kept"
+    );
+}
