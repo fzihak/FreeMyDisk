@@ -1,0 +1,24 @@
+[rule]
+id = "windows_system_search_index_temp"
+name = "Windows Search Indexer Temp Files"
+category = "system"
+risk = "safe"
+verified_rebuildable = true
+verified_at = "2026-10-06"
+author = "FreeMyDisk Team"
+description = "Temporary scratch databases created by Windows Search Indexer service"
+platform = "windows"
+
+[applicability]
+conditions = [
+    { type = "path_exists", path = "${program_data}/Microsoft/Search" }
+]
+
+[targets]
+paths = [
+    { path = "${program_data}/Microsoft/Search/Data/Temp/*", matcher = "glob" }
+]
+
+[disposal]
+default_action = "permanent"
+protect_subpaths = ["*.edb"]
