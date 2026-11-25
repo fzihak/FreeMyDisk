@@ -45,13 +45,17 @@ fn test_safe_user_paths_are_not_protected() {
 
 #[test]
 fn test_self_preservation_blocks_internal_assets() {
-    let self_db = Path::new(r"C:\Users\test\AppData\Roaming\FreeMyDisk\freemydisk.db");
-    assert!(ProtectedPathRegistry::is_self_asset(self_db));
-    assert!(ProtectedPathRegistry::assert_safe_for_disposal(self_db).is_err());
+    let data_dir = freemydisk_core::shared::paths::app_data_dir().expect("app data dir");
+    let journal_db = data_dir.join("journal.db");
+    assert!(ProtectedPathRegistry::is_self_asset(&journal_db));
+    assert!(ProtectedPathRegistry::assert_safe_for_disposal(&journal_db).is_err());
+    assert!(ProtectedPathRegistry::is_self_asset(
+        &data_dir.join("hash_cache.db")
+    ));
 
-    let journal_db = Path::new(r"C:\Users\test\AppData\Roaming\FreeMyDisk\journal.db");
-    assert!(ProtectedPathRegistry::is_self_asset(journal_db));
-    assert!(ProtectedPathRegistry::assert_safe_for_disposal(journal_db).is_err());
+    // A user file that only shares a name with the app's journal is not protected.
+    let user_file = std::env::temp_dir().join("project").join("journal.db");
+    assert!(!ProtectedPathRegistry::is_self_asset(&user_file));
 
     let exe = Path::new(r"C:\Program Files\FreeMyDisk\freemydisk.exe");
     assert!(ProtectedPathRegistry::is_self_asset(exe));

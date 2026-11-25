@@ -117,25 +117,27 @@ fn test_comprehensive_critical_system_paths_blacklisted() {
 
 #[test]
 fn test_dynamic_self_preservation_registration() {
-    // Internal files
+    // Internal files: everything in the app's data folder, plus its binaries anywhere
+    let data_dir = freemydisk_core::shared::paths::app_data_dir().expect("app data dir");
     let internal_files = [
-        r"C:\Users\User\AppData\Local\FreeMyDisk\freemydisk.db",
-        r"C:\Users\User\AppData\Local\FreeMyDisk\freemydisk.db-wal",
-        r"C:\Users\User\AppData\Local\FreeMyDisk\journal.db",
-        r"C:\Program Files\FreeMyDisk\freemydisk.exe",
-        r"C:\Program Files\FreeMyDisk\freemydisk-elevated.exe",
-        r"C:\Program Files\FreeMyDisk\freemydisk_lib.dll",
-        r"C:\Users\User\AppData\Local\FreeMyDisk\freemydisk_disposal.lock",
+        data_dir.join("journal.db"),
+        data_dir.join("journal.db-wal"),
+        data_dir.join("hash_cache.db"),
+        data_dir.join("locks").join("freemydisk_disposal.lock"),
+        std::path::PathBuf::from(r"C:\Program Files\FreeMyDisk\freemydisk.exe"),
+        std::path::PathBuf::from(r"C:\Program Files\FreeMyDisk\freemydisk-elevated.exe"),
+        std::path::PathBuf::from(r"C:\Program Files\FreeMyDisk\freemydisk_lib.dll"),
     ];
 
-    for f in internal_files {
-        let p = Path::new(f);
+    for f in &internal_files {
+        let p = f.as_path();
         assert!(ProtectedPathRegistry::is_self_asset(p));
         match ProtectedPathRegistry::assert_safe_for_disposal(p) {
             Err(CoreError::SelfPreservationViolation(_)) => {}
             other => panic!(
                 "Expected SelfPreservationViolation for '{}', got {:?}",
-                f, other
+                f.display(),
+                other
             ),
         }
     }
@@ -224,8 +226,10 @@ fn test_shredder_refuses_protected_system_paths() {
         "Shredder must refuse critical system directory"
     );
 
-    let self_asset = Path::new(r"C:\Users\test\AppData\Roaming\FreeMyDisk\freemydisk.db");
-    let res2 = secure_shred_file(self_asset, None);
+    let self_asset = freemydisk_core::shared::paths::app_data_dir()
+        .expect("app data dir")
+        .join("journal.db");
+    let res2 = secure_shred_file(&self_asset, None);
     assert!(res2.is_err(), "Shredder must refuse FreeMyDisk database");
 }
 

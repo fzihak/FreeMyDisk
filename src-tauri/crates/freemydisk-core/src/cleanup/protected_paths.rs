@@ -317,14 +317,8 @@ impl ProtectedPathRegistry {
     pub fn is_self_asset(path: &Path) -> bool {
         let path_str = path.to_string_lossy().to_ascii_uppercase();
 
-        // 1. Critical internal file signatures
-        if path_str.ends_with("FREEMYDISK.DB")
-            || path_str.ends_with("FREEMYDISK.DB-WAL")
-            || path_str.ends_with("FREEMYDISK.DB-SHM")
-            || path_str.ends_with("JOURNAL.DB")
-            || path_str.ends_with("JOURNAL.DB-WAL")
-            || path_str.ends_with("JOURNAL.DB-SHM")
-            || path_str.ends_with("FREEMYDISK.EXE")
+        // 1. The app's own binaries and in-progress staging folders, wherever they are
+        if path_str.ends_with("FREEMYDISK.EXE")
             || path_str.ends_with("FREEMYDISK-ELEVATED.EXE")
             || path_str.ends_with("FREEMYDISK_LIB.DLL")
             || path_str.ends_with("FREEMYDISK_DISPOSAL.LOCK")
@@ -342,14 +336,14 @@ impl ProtectedPathRegistry {
             }
         }
 
-        // 3. User appdata / localappdata / programdata FreeMyDisk directories
-        for env_var in &["APPDATA", "LOCALAPPDATA", "PROGRAMDATA"] {
-            if let Ok(val) = std::env::var(env_var) {
-                let fmd_dir = PathBuf::from(val).join("FreeMyDisk");
-                let fmd_upper = fmd_dir.to_string_lossy().to_ascii_uppercase();
-                if path_str == fmd_upper || path_str.starts_with(&format!(r"{}\", fmd_upper)) {
-                    return true;
-                }
+        // 3. The app's data folder (journal, locks, caches) and its log/crash folder
+        let own_dirs = crate::shared::paths::app_data_dir()
+            .into_iter()
+            .chain(std::env::var_os("LOCALAPPDATA").map(|v| PathBuf::from(v).join("FreeMyDisk")));
+        for dir in own_dirs {
+            let dir_upper = dir.to_string_lossy().to_ascii_uppercase();
+            if path_str == dir_upper || path_str.starts_with(&format!(r"{}\", dir_upper)) {
+                return true;
             }
         }
 
