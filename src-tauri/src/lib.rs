@@ -128,21 +128,20 @@ async fn compact_wsl_distribution(
     tauri::async_runtime::spawn_blocking(move || {
         let _bg_guard = freemydisk_platform::io_priority::BackgroundExecutionGuard::enter();
         freemydisk_core::virtualization::WslManager::compact_distribution(name.trim())
-            .map_err(|e| e.to_string())
+            .map_err(ipc_error)
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(ipc_error)?
 }
 
 #[tauri::command]
 async fn docker_prune(prune_type: String) -> Result<u64, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let _bg_guard = freemydisk_platform::io_priority::BackgroundExecutionGuard::enter();
-        freemydisk_core::virtualization::DockerManager::prune(&prune_type)
-            .map_err(|e| e.to_string())
+        freemydisk_core::virtualization::DockerManager::prune(&prune_type).map_err(ipc_error)
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(ipc_error)?
 }
 
 /// Leftover paths and registry keys returned by leftover scans in this session.
@@ -224,6 +223,18 @@ pub struct RecoveryStatus {
     pub interrupted_count: usize,
 }
 
+/// Converts an internal error into the message the UI shows. The full text goes to
+/// the log; the user's name, profile path and machine name are removed from what is
+/// returned, and crashes inside a task are reported without internal details.
+fn ipc_error(e: impl std::fmt::Display) -> String {
+    let raw = e.to_string();
+    log::warn!("Command failed: {}", raw);
+    if raw.starts_with("task ") && (raw.contains("panicked") || raw.contains("cancelled")) {
+        return "An unexpected error occurred. Details were written to the log.".to_string();
+    }
+    freemydisk_core::filesystem::crash_report::sanitize_diagnostic_text(&raw)
+}
+
 fn get_journal(app: &AppHandle) -> Result<CrashRecoveryJournal, String> {
     app.state::<JournalState>().0.clone()
 }
@@ -233,7 +244,7 @@ fn begin_operation(app: &AppHandle, kind: &str) -> OperationGuard {
 }
 
 fn get_lock_dir(app: &AppHandle) -> Result<PathBuf, String> {
-    let app_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let app_dir = app.path().app_data_dir().map_err(ipc_error)?;
     let lock_dir = app_dir.join("locks");
     let _ = std::fs::create_dir_all(&lock_dir);
     Ok(lock_dir)
@@ -242,7 +253,7 @@ fn get_lock_dir(app: &AppHandle) -> Result<PathBuf, String> {
 #[tauri::command]
 fn get_recovery_status(app: AppHandle) -> Result<RecoveryStatus, String> {
     let journal = get_journal(&app)?;
-    let in_flight = journal.list_in_flight().map_err(|e| e.to_string())?;
+    let in_flight = journal.list_in_flight().map_err(ipc_error)?;
 
     Ok(RecoveryStatus {
         has_interrupted: !in_flight.is_empty(),
@@ -253,7 +264,7 @@ fn get_recovery_status(app: AppHandle) -> Result<RecoveryStatus, String> {
 #[tauri::command]
 fn acknowledge_recovery_banner(app: AppHandle) -> Result<(), String> {
     let journal = get_journal(&app)?;
-    journal.acknowledge_in_flight().map_err(|e| e.to_string())?;
+    journal.acknowledge_in_flight().map_err(ipc_error)?;
     Ok(())
 }
 
@@ -266,18 +277,18 @@ async fn get_cleanup_history(
     tauri::async_runtime::spawn_blocking(move || {
         journal
             .list_recent_history(limit.unwrap_or(100))
-            .map_err(|e| e.to_string())
+            .map_err(ipc_error)
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(ipc_error)?
 }
 
 #[tauri::command]
 async fn clear_cleanup_history(app: AppHandle) -> Result<usize, String> {
     let journal = get_journal(&app)?;
-    tauri::async_runtime::spawn_blocking(move || journal.clear_history().map_err(|e| e.to_string()))
+    tauri::async_runtime::spawn_blocking(move || journal.clear_history().map_err(ipc_error))
         .await
-        .map_err(|e| e.to_string())?
+        .map_err(ipc_error)?
 }
 
 #[tauri::command]
@@ -311,25 +322,23 @@ async fn remediate_interrupted_session(
 ) -> Result<Vec<freemydisk_core::filesystem::journal::RemediationResult>, String> {
     let journal = get_journal(&app)?;
     tauri::async_runtime::spawn_blocking(move || {
-        journal
-            .remediate_staged_crashes()
-            .map_err(|e| e.to_string())
+        journal.remediate_staged_crashes().map_err(ipc_error)
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(ipc_error)?
 }
 
 fn list_pending_reboot_deletions(
 ) -> Result<Vec<freemydisk_platform::traits::PendingRebootDeletion>, String> {
     let platform = get_platform();
-    platform.list_pending_deletions().map_err(|e| e.to_string())
+    platform.list_pending_deletions().map_err(ipc_error)
 }
 
 fn cancel_pending_reboot_deletion(path: String) -> Result<(), String> {
     let platform = get_platform();
     platform
         .cancel_pending_deletion(&PathBuf::from(path))
-        .map_err(|e| e.to_string())
+        .map_err(ipc_error)
 }
 
 #[tauri::command]
@@ -337,7 +346,7 @@ async fn scan_cleanup_rules(app: AppHandle) -> Result<Vec<RuleScanSummary>, Stri
     let operation = begin_operation(&app, "cleanup");
     let cancel = operation.token();
     let scan_cache = app.state::<RuleScanCache>().inner().clone();
-    let app_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let app_dir = app.path().app_data_dir().map_err(ipc_error)?;
     let app_emitter = app.clone();
     tauri::async_runtime::spawn_blocking(move || {
         let _bg_guard = freemydisk_platform::io_priority::BackgroundExecutionGuard::enter();
@@ -362,7 +371,7 @@ async fn scan_cleanup_rules(app: AppHandle) -> Result<Vec<RuleScanSummary>, Stri
                     },
                 );
             })
-            .map_err(|e| e.to_string())?;
+            .map_err(ipc_error)?;
 
         // 1. Incorporate Windows Recycle Bin directly as a first-class system cleanup rule
         #[cfg(target_os = "windows")]
@@ -438,7 +447,7 @@ async fn scan_cleanup_rules(app: AppHandle) -> Result<Vec<RuleScanSummary>, Stri
         Ok(summaries)
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(ipc_error)?
 }
 
 #[tauri::command]
@@ -468,7 +477,7 @@ async fn close_locking_process(
         }
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(ipc_error)?
 }
 
 #[tauri::command]
@@ -497,7 +506,7 @@ async fn close_all_locking_processes(
         }
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(ipc_error)?
 }
 
 #[derive(Debug, Deserialize)]
@@ -694,7 +703,7 @@ async fn execute_cleanup_rules(
                 );
             },
         )
-        .map_err(|e| e.to_string())?;
+        .map_err(ipc_error)?;
 
         if let Some(result) = recycle_bin_result {
             summary.total_freed_bytes += result.bytes_freed;
@@ -729,7 +738,7 @@ async fn execute_cleanup_rules(
         Ok(summary)
     })
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(ipc_error)?;
     if let Ok(ref r) = res {
         failed_trash.record_summary(r);
     }
@@ -817,7 +826,7 @@ async fn retry_failed_trash(app: AppHandle, path: String) -> Result<DisposalItem
 
         let summary =
             DisposalEngine::execute_plan(&[item], &platform, &journal, &lock_dir, true, &cancel)
-                .map_err(|e| e.to_string())?;
+                .map_err(ipc_error)?;
 
         summary
             .results
@@ -826,7 +835,7 @@ async fn retry_failed_trash(app: AppHandle, path: String) -> Result<DisposalItem
             .ok_or_else(|| "Failed to execute retry".to_string())
     })
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(ipc_error)?;
     if let Ok(ref r) = res {
         failed_trash.record_item(r);
     }
@@ -854,10 +863,10 @@ async fn force_delete_permanently(
         let platform = get_platform();
 
         DisposalEngine::execute_manual_permanent_delete(&pb, &journal, &platform, &lock_dir)
-            .map_err(|e| e.to_string())
+            .map_err(ipc_error)
     })
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(ipc_error)?;
     if let Ok(ref r) = res {
         failed_trash.record_item(r);
     }
@@ -879,7 +888,7 @@ fn cancel_active_scan(ops: State<'_, OperationRegistry>, kind: Option<String>) -
 async fn get_application_icons(paths: Vec<String>) -> Result<Vec<ApplicationIcon>, String> {
     tauri::async_runtime::spawn_blocking(move || ApplicationIconService::load_icons(paths))
         .await
-        .map_err(|e| e.to_string())
+        .map_err(ipc_error)
 }
 
 #[allow(non_snake_case)]
@@ -913,10 +922,10 @@ async fn scan_storage_tree(
         let platform = get_platform();
         let pb = PathBuf::from(path_clone);
         StorageAnalyzer::scan_directory(&pb, effective_depth, &platform, &cancel_for_task)
-            .map_err(|e| e.to_string())
+            .map_err(ipc_error)
     })
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(ipc_error)?;
 
     if let Ok(ref tree) = res {
         let _ = app.emit(
@@ -989,10 +998,10 @@ async fn scan_heavy_folders(
                 );
             },
         )
-        .map_err(|e| e.to_string())
+        .map_err(ipc_error)
     })
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(ipc_error)?;
 
     if let Ok(ref result) = res {
         let _ = app.emit(
@@ -1063,10 +1072,10 @@ async fn scan_large_files(
                 );
             },
         )
-        .map_err(|e| e.to_string())
+        .map_err(ipc_error)
     })
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(ipc_error)?;
 
     if let Ok(ref result) = res {
         let _ = app.emit(
@@ -1096,11 +1105,10 @@ async fn trash_large_file(app: AppHandle, path: String) -> Result<DisposalItemRe
     let res = tauri::async_runtime::spawn_blocking(move || {
         let platform = get_platform();
         let pb = PathBuf::from(path);
-        LargeFilesScanner::trash_large_file(&pb, &platform, &journal, &lock_dir)
-            .map_err(|e| e.to_string())
+        LargeFilesScanner::trash_large_file(&pb, &platform, &journal, &lock_dir).map_err(ipc_error)
     })
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(ipc_error)?;
     if let Ok(ref r) = res {
         failed_trash.record_item(r);
     }
@@ -1149,10 +1157,10 @@ async fn trash_large_files(
                 );
             },
         )
-        .map_err(|e| e.to_string())
+        .map_err(ipc_error)
     })
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(ipc_error)?;
     if let Ok(ref r) = res {
         failed_trash.record_summary(r);
     }
@@ -1216,10 +1224,10 @@ async fn scan_duplicate_files(
                 );
             },
         )
-        .map_err(|e| e.to_string())
+        .map_err(ipc_error)
     })
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(ipc_error)?;
 
     if let Ok(ref result) = res {
         let _ = app.emit(
@@ -1261,10 +1269,10 @@ async fn trash_duplicate_folders(
         DuplicateDetector::batch_trash_duplicate_folders(
             &pbs, &platform, &journal, &lock_dir, &cancel,
         )
-        .map_err(|e| e.to_string())
+        .map_err(ipc_error)
     })
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(ipc_error)?;
     if let Ok(ref r) = res {
         failed_trash.record_summary(r);
     }
@@ -1310,10 +1318,10 @@ async fn scan_project_artifacts(
             effective_min,
             &cancel_for_task,
         )
-        .map_err(|e| e.to_string())
+        .map_err(ipc_error)
     })
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(ipc_error)?;
 
     if let Ok(ref result) = res {
         let _ = app.emit(
@@ -1355,10 +1363,10 @@ async fn clean_project_artifacts(
         freemydisk_core::cleanup::project_artifacts::ProjectArtifactScanner::clean_artifacts(
             &path_bufs, &platform, &journal, &lock_dir, &cancel,
         )
-        .map_err(|e| e.to_string())
+        .map_err(ipc_error)
     })
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(ipc_error)?;
     if let Ok(ref r) = res {
         failed_trash.record_summary(r);
     }
@@ -1378,10 +1386,10 @@ async fn trash_duplicate_files(
     let res = tauri::async_runtime::spawn_blocking(move || {
         let platform = get_platform();
         DuplicateDetector::batch_trash_duplicates(&groups, &platform, &journal, &lock_dir, &cancel)
-            .map_err(|e| e.to_string())
+            .map_err(ipc_error)
     })
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(ipc_error)?;
     if let Ok(ref r) = res {
         failed_trash.record_summary(r);
     }
@@ -1411,7 +1419,7 @@ async fn toggle_startup_item(
             .map(|_| true)
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(ipc_error)?
 }
 
 #[tauri::command]
@@ -1431,14 +1439,14 @@ async fn delete_startup_item(
             .map(|_| true)
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(ipc_error)?
 }
 
 #[tauri::command]
 async fn get_installed_applications() -> Result<Vec<InstalledAppInfo>, String> {
     tauri::async_runtime::spawn_blocking(|| ApplicationService::new().list_applications())
         .await
-        .map_err(|e| e.to_string())?
+        .map_err(ipc_error)?
 }
 
 #[tauri::command]
@@ -1449,14 +1457,14 @@ async fn launch_uninstaller(app_id: Option<String>, appId: Option<String>) -> Re
         .ok_or_else(|| "Missing application id".to_string())?;
     tauri::async_runtime::spawn_blocking(move || ApplicationService::new().launch_uninstaller(&id))
         .await
-        .map_err(|e| e.to_string())?
+        .map_err(ipc_error)?
 }
 
 #[tauri::command]
 async fn get_uwp_applications() -> Result<Vec<freemydisk_core::applications::UwpAppInfo>, String> {
     tauri::async_runtime::spawn_blocking(|| ApplicationService::new().list_uwp_applications())
         .await
-        .map_err(|e| e.to_string())?
+        .map_err(ipc_error)?
 }
 
 #[tauri::command]
@@ -1472,7 +1480,7 @@ async fn uninstall_uwp_application(
         ApplicationService::new().uninstall_uwp_application(&pkg_name)
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(ipc_error)?
     .map(|_| true)
 }
 
@@ -1486,7 +1494,7 @@ async fn scan_deep_leftovers(
         ApplicationService::new().scan_deep_leftovers()
     })
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(ipc_error)?;
     if let Ok(ref groups) = res {
         scanned.record_groups(groups);
     }
@@ -1526,7 +1534,7 @@ async fn clean_leftovers_safe(
         )
     })
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(ipc_error)?;
     if let Ok(ref summary) = res {
         let failed: HashSet<String> = summary.failed.iter().map(|f| f.to_lowercase()).collect();
         scanned.forget(paths.iter().filter(|p| !failed.contains(&p.to_lowercase())));
@@ -1546,7 +1554,7 @@ async fn terminate_app_processes(
         .ok_or_else(|| "Missing application id".to_string())?;
     tauri::async_runtime::spawn_blocking(move || ApplicationService::new().terminate_app(&id))
         .await
-        .map_err(|e| e.to_string())?
+        .map_err(ipc_error)?
 }
 
 #[tauri::command]
@@ -1564,7 +1572,7 @@ async fn uninstall_and_scan(
         ApplicationService::new().uninstall_and_scan(&target)
     })
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(ipc_error)?;
     if let Ok(freemydisk_core::applications::UninstallResult {
         leftovers: Some(ref group),
         ..
@@ -1618,7 +1626,7 @@ async fn execute_emergency_rescue(
 ) -> Result<freemydisk_core::system_maintenance::EmergencyRescueResult, String> {
     tauri::async_runtime::spawn_blocking(|| MaintenanceService::new().execute_emergency_rescue())
         .await
-        .map_err(|e| e.to_string())?
+        .map_err(ipc_error)?
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1656,7 +1664,7 @@ async fn get_recycle_bin_status(
         }
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(ipc_error)?
 }
 
 #[tauri::command]
@@ -1671,7 +1679,7 @@ async fn empty_recycle_bin(
         {
             use freemydisk_platform::windows::maintenance::WindowsSystemMaintenanceHandler;
             WindowsSystemMaintenanceHandler::empty_recycle_bin_for_drive(target.as_deref())
-                .map_err(|e| e.to_string())
+                .map_err(ipc_error)
         }
         #[cfg(not(target_os = "windows"))]
         {
@@ -1680,7 +1688,7 @@ async fn empty_recycle_bin(
         }
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(ipc_error)?
 }
 
 #[tauri::command]
@@ -1692,7 +1700,7 @@ async fn scan_privacy_data(app: tauri::AppHandle) -> Result<PrivacyScanResult, S
         })
     })
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(ipc_error)?;
     trim_process_working_set();
     res
 }
@@ -1715,7 +1723,7 @@ async fn clean_privacy_data(
         })
     })
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(ipc_error)?;
     trim_process_working_set();
     res
 }
@@ -1754,7 +1762,7 @@ async fn close_running_browsers() -> Result<usize, String> {
         }
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(ipc_error)?
 }
 
 #[tauri::command]
@@ -1766,7 +1774,7 @@ fn get_optimization_overview() -> Result<OptimizationOverview, String> {
 async fn toggle_hibernation(enable: bool) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || OptimizationService::new().set_hibernation(enable))
         .await
-        .map_err(|e| e.to_string())?
+        .map_err(ipc_error)?
 }
 
 #[tauri::command]
@@ -1775,14 +1783,14 @@ async fn toggle_storage_sense(enable: bool) -> Result<(), String> {
         OptimizationService::new().set_storage_sense(enable)
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(ipc_error)?
 }
 
 #[tauri::command]
 async fn clean_delivery_cache() -> Result<u64, String> {
     tauri::async_runtime::spawn_blocking(|| OptimizationService::new().clean_delivery_cache())
         .await
-        .map_err(|e| e.to_string())?
+        .map_err(ipc_error)?
 }
 
 #[tauri::command]
@@ -1799,20 +1807,20 @@ async fn set_explorer_setting(
         OptimizationService::new().set_explorer_setting(&key, enable)
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(ipc_error)?
 }
 
 #[tauri::command]
 fn get_system_vitals() -> Result<freemydisk_platform::traits::SystemVitals, String> {
     let platform = get_platform();
-    platform.get_system_vitals().map_err(|e| e.to_string())
+    platform.get_system_vitals().map_err(ipc_error)
 }
 
 #[tauri::command]
 async fn scan_ai_models() -> Result<Vec<AiModelInfo>, String> {
     let res = tauri::async_runtime::spawn_blocking(AiModelAnalyzer::scan)
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(ipc_error)?;
     trim_process_working_set();
     Ok(res)
 }
@@ -1821,18 +1829,18 @@ async fn scan_ai_models() -> Result<Vec<AiModelInfo>, String> {
 async fn clean_ai_model(path: String) -> Result<u64, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let platform = get_platform();
-        AiModelAnalyzer::clean_model(&path, &platform).map_err(|e| e.to_string())
+        AiModelAnalyzer::clean_model(&path, &platform).map_err(ipc_error)
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(ipc_error)?
 }
 
 #[tauri::command]
 async fn scan_rust_toolchains() -> Result<RustToolchainScanResult, String> {
     let res = tauri::async_runtime::spawn_blocking(RustToolchainCleaner::scan)
         .await
-        .map_err(|e| e.to_string())?
-        .map_err(|e| e.to_string())?;
+        .map_err(ipc_error)?
+        .map_err(ipc_error)?;
     trim_process_working_set();
     Ok(res)
 }
@@ -1843,17 +1851,17 @@ async fn clean_rust_toolchain(toolchain: String, force: Option<bool>) -> Result<
         let platform = get_platform();
         let force_active = force.unwrap_or(false);
         RustToolchainCleaner::clean_toolchain(&toolchain, force_active, &platform)
-            .map_err(|e| e.to_string())
+            .map_err(ipc_error)
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(ipc_error)?
 }
 
 #[tauri::command]
 async fn scan_conda_cache() -> Result<CondaCacheInfo, String> {
     let res = tauri::async_runtime::spawn_blocking(CondaCleaner::scan)
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(ipc_error)?;
     trim_process_working_set();
     Ok(res)
 }
@@ -1862,10 +1870,10 @@ async fn scan_conda_cache() -> Result<CondaCacheInfo, String> {
 async fn clean_conda_cache() -> Result<u64, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let platform = get_platform();
-        CondaCleaner::clean_cache(&platform).map_err(|e| e.to_string())
+        CondaCleaner::clean_cache(&platform).map_err(ipc_error)
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(ipc_error)?
 }
 
 /// Hides the window, cancels running scans and disposals, waits for them to stop
@@ -1962,9 +1970,9 @@ pub fn run() {
             let journal = app
                 .path()
                 .app_data_dir()
-                .map_err(|e| e.to_string())
+                .map_err(ipc_error)
                 .and_then(|dir| {
-                    CrashRecoveryJournal::open(&dir.join("journal.db")).map_err(|e| e.to_string())
+                    CrashRecoveryJournal::open(&dir.join("journal.db")).map_err(ipc_error)
                 });
             match &journal {
                 Ok(j) => {

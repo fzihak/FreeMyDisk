@@ -115,7 +115,9 @@ pub fn sanitize_diagnostic_text(raw: &str) -> String {
 
     // 4. Scrub common bearer tokens and keys
     for secret_marker in &["sk-proj-", "ghp_", "bearer ", "password=", "secret="] {
-        if let Some(idx) = sanitized.to_lowercase().find(secret_marker) {
+        // ASCII lowercasing keeps byte offsets identical to `sanitized`, so the index
+        // is safe to slice with even when the text contains non-ASCII characters.
+        if let Some(idx) = sanitized.to_ascii_lowercase().find(secret_marker) {
             let end_idx = sanitized[idx..]
                 .find(|c: char| c.is_whitespace() || c == '"' || c == '\n')
                 .map(|offset| idx + offset)
