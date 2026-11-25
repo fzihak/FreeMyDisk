@@ -50,6 +50,9 @@ impl CrashRecoveryJournal {
         }
 
         let conn = Connection::open(db_path)?;
+        // The GUI, CLI and background tasks share this file; wait for locks instead
+        // of failing with "database is locked".
+        conn.busy_timeout(std::time::Duration::from_secs(5))?;
         conn.pragma_update(None, "journal_mode", "WAL")?;
         conn.pragma_update(None, "synchronous", "NORMAL")?;
 
