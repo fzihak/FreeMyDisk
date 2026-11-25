@@ -1,0 +1,14 @@
+[project]
+id = "project_v_lang"
+name = "V Language Projects"
+description = "V compiler cache and build temporary objects"
+icon = "vlang"
+
+[[detection]]
+marker_file = "v.mod"
+
+[[artifacts]]
+relative_path = ".v_cache"
+category = "cache"
+risk = "safe"
+verified_rebuildable = true

@@ -1,0 +1,25 @@
+[rule]
+id = "windows_dev_composer"
+name = "PHP Composer Repository Cache"
+category = "development"
+risk = "low"
+verified_rebuildable = true
+verified_at = "2026-09-09"
+author = "FreeMyDisk Team"
+description = "Cached git archives and repository metadata downloaded by Composer (2GB-5GB)"
+platform = "windows"
+
+[applicability]
+conditions = [
+    { type = "path_exists", path = "${local_app_data}/Composer/repo" }
+]
+
+[targets]
+paths = [
+    { path = "${local_app_data}/Composer/repo/*", matcher = "glob" },
+    { path = "${local_app_data}/Composer/files/*", matcher = "glob" }
+]
+
+[disposal]
+default_action = "trash"
+protect_subpaths = []

@@ -1,0 +1,27 @@
+[rule]
+id = "windows_dev_android"
+name = "Android SDK & Emulator Caches"
+category = "development"
+risk = "medium"
+verified_rebuildable = true
+verified_at = "2026-09-09"
+author = "FreeMyDisk Team"
+description = "Android Virtual Device (AVD) cache images, build snapshots, and temporary emulator logs (5GB-15GB)"
+platform = "windows"
+
+[applicability]
+conditions = [
+    { type = "path_exists", path = "${home}/.android" }
+]
+
+[targets]
+paths = [
+    { path = "${home}/.android/cache/*", matcher = "glob" },
+    { path = "${home}/.android/build-cache/*", matcher = "glob" },
+    { path = "${home}/.android/avd/*.avd/cache.img", matcher = "glob" },
+    { path = "${local_app_data}/Android/Sdk/.temp/*", matcher = "glob" }
+]
+
+[disposal]
+default_action = "trash"
+protect_subpaths = []

@@ -1,0 +1,25 @@
+[rule]
+id = "windows_dev_pnpm"
+name = "pnpm Store Cache"
+category = "development"
+risk = "low"
+verified_rebuildable = true
+verified_at = "2026-09-09"
+author = "FreeMyDisk Team"
+description = "Cached pnpm package binaries and download staging directories"
+platform = "windows"
+
+[applicability]
+conditions = [
+    { type = "path_exists", path = "${local_app_data}/pnpm/store" }
+]
+
+[targets]
+paths = [
+    { path = "${local_app_data}/pnpm/store/*", matcher = "glob" },
+    { path = "${local_app_data}/pnpm-cache/*", matcher = "glob" }
+]
+
+[disposal]
+default_action = "trash"
+protect_subpaths = []

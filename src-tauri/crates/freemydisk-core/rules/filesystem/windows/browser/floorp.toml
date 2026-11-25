@@ -1,0 +1,25 @@
+[rule]
+id = "windows_browser_floorp_cache"
+name = "Floorp Browser Cache"
+category = "browser"
+risk = "safe"
+verified_rebuildable = true
+verified_at = "2026-10-06"
+author = "FreeMyDisk Team"
+description = "Web cache from Floorp (Firefox fork) browser"
+platform = "windows"
+
+[applicability]
+conditions = [
+    { type = "path_exists", path = "${local_app_data}/Floorp" }
+]
+
+[targets]
+paths = [
+    { path = "${local_app_data}/Floorp/Profiles/*/cache2/*", matcher = "glob" },
+    { path = "${local_app_data}/Floorp/Profiles/*/startupCache/*", matcher = "glob" }
+]
+
+[disposal]
+default_action = "permanent"
+protect_subpaths = ["*/cookies.sqlite*", "*/places.sqlite*"]

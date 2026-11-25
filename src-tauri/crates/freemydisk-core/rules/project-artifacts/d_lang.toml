@@ -1,0 +1,18 @@
+[project]
+id = "project_d_lang"
+name = "D Language Projects"
+description = "DUB build cache and compilation outputs"
+icon = "dlang"
+
+[[detection]]
+marker_file = "dub.json"
+
+[[detection]]
+marker_file = "dub.sdl"
+
+[[artifacts]]
+relative_path = ".dub"
+category = "cache"
+risk = "safe"
+verified_rebuildable = true
+rebuild_command = "dub build"

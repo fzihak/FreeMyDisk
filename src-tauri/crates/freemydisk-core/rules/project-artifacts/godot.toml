@@ -1,0 +1,20 @@
+[project]
+id = "project_godot"
+name = "Godot Engine Projects"
+description = "Godot editor import cache, shaders, and temporary project data"
+icon = "godot"
+
+[[detection]]
+marker_file = "project.godot"
+
+[[artifacts]]
+relative_path = ".godot"
+category = "cache"
+risk = "safe"
+verified_rebuildable = true
+
+[[artifacts]]
+relative_path = ".import"
+category = "cache"
+risk = "safe"
+verified_rebuildable = true

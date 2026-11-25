@@ -1,0 +1,42 @@
+[project]
+id = "project_gradle"
+name = "Gradle / Android Projects"
+description = "Gradle build caches, wrapper caches, and Android app build directories"
+icon = "gradle"
+
+[[detection]]
+marker_file = "build.gradle"
+
+[[detection]]
+marker_file = "build.gradle.kts"
+
+[[detection]]
+marker_file = "settings.gradle"
+
+[[detection]]
+marker_file = "settings.gradle.kts"
+
+[[artifacts]]
+relative_path = "build"
+category = "build_output"
+risk = "safe"
+verified_rebuildable = true
+rebuild_command = "gradle build"
+
+[[artifacts]]
+relative_path = ".gradle"
+category = "cache"
+risk = "safe"
+verified_rebuildable = true
+
+[[artifacts]]
+relative_path = "app/build"
+category = "build_output"
+risk = "safe"
+verified_rebuildable = true
+
+[[artifacts]]
+relative_path = ".cxx"
+category = "build_output"
+risk = "safe"
+verified_rebuildable = true

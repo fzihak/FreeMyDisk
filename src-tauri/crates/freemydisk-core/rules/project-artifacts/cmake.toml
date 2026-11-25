@@ -1,0 +1,27 @@
+[project]
+id = "project_cmake"
+name = "CMake C/C++ Projects"
+description = "CMake generated build directories and compiler intermediate files"
+icon = "cmake"
+
+[[detection]]
+marker_file = "CMakeLists.txt"
+
+[[artifacts]]
+relative_path = "build"
+category = "build_output"
+risk = "safe"
+verified_rebuildable = true
+rebuild_command = "cmake --build build"
+
+[[artifacts]]
+relative_path = "cmake-build-debug"
+category = "build_output"
+risk = "safe"
+verified_rebuildable = true
+
+[[artifacts]]
+relative_path = "cmake-build-release"
+category = "build_output"
+risk = "safe"
+verified_rebuildable = true

@@ -1,0 +1,24 @@
+[rule]
+id = "windows_system_font_cache"
+name = "Windows Font Cache"
+category = "system"
+risk = "safe"
+verified_rebuildable = true
+verified_at = "2026-10-06"
+author = "FreeMyDisk Team"
+description = "Rendered system font glyph caches (rebuilt automatically by Windows on reboot)"
+platform = "windows"
+
+[applicability]
+conditions = [
+    { type = "path_exists", path = "${local_app_data}/Microsoft/FontCache" }
+]
+
+[targets]
+paths = [
+    { path = "${local_app_data}/Microsoft/FontCache/*", matcher = "glob" }
+]
+
+[disposal]
+default_action = "permanent"
+protect_subpaths = []

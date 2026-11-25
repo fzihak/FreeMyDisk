@@ -1,0 +1,27 @@
+[project]
+id = "project_ruby"
+name = "Ruby / Rails Projects"
+description = "Bundler vendored gems and tmp caches"
+icon = "ruby"
+
+[[detection]]
+marker_file = "Gemfile"
+
+[[artifacts]]
+relative_path = "vendor/bundle"
+category = "dependencies"
+risk = "safe"
+verified_rebuildable = true
+rebuild_command = "bundle install"
+
+[[artifacts]]
+relative_path = ".bundle"
+category = "cache"
+risk = "safe"
+verified_rebuildable = true
+
+[[artifacts]]
+relative_path = "tmp/cache"
+category = "cache"
+risk = "safe"
+verified_rebuildable = true

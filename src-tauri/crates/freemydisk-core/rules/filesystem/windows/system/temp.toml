@@ -1,0 +1,24 @@
+[rule]
+id = "windows_system_temp"
+name = "Windows User Temporary Files"
+category = "system"
+risk = "safe"
+verified_rebuildable = true
+verified_at = "2026-08-15"
+author = "FreeMyDisk Team"
+description = "Temporary application files and logs accumulated in the user Temp directory"
+platform = "windows"
+
+[applicability]
+conditions = [
+    { type = "path_exists", path = "${local_app_data}/Temp" }
+]
+
+[targets]
+paths = [
+    { path = "${local_app_data}/Temp/*", matcher = "glob" }
+]
+
+[disposal]
+default_action = "permanent"
+protect_subpaths = []

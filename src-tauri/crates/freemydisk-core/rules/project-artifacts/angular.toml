@@ -1,0 +1,21 @@
+[project]
+id = "project_angular"
+name = "Angular CLI Projects"
+description = "Angular build cache and distribution artifacts"
+icon = "angular"
+
+[[detection]]
+marker_file = "angular.json"
+
+[[artifacts]]
+relative_path = ".angular/cache"
+category = "cache"
+risk = "safe"
+verified_rebuildable = true
+
+[[artifacts]]
+relative_path = "dist"
+category = "build_output"
+risk = "moderate"
+verified_rebuildable = true
+rebuild_command = "ng build"

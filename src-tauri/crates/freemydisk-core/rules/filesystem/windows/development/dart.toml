@@ -1,0 +1,25 @@
+[rule]
+id = "windows_dev_dart_cache"
+name = "Dart Analysis Server & Pub Cache"
+category = "development"
+risk = "safe"
+verified_rebuildable = true
+verified_at = "2026-10-06"
+author = "FreeMyDisk Team"
+description = "Dart analysis server caches and temporary git dependencies"
+platform = "windows"
+
+[applicability]
+conditions = [
+    { type = "path_exists", path = "${local_app_data}/Pub/Cache" }
+]
+
+[targets]
+paths = [
+    { path = "${local_app_data}/Pub/Cache/git/cache/*", matcher = "glob" },
+    { path = "${local_app_data}/Pub/Cache/_temp/*", matcher = "glob" }
+]
+
+[disposal]
+default_action = "permanent"
+protect_subpaths = []

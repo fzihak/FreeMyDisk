@@ -1,0 +1,14 @@
+[project]
+id = "project_nim"
+name = "Nim Language Projects"
+description = "Nim compiler cache directories"
+icon = "nim"
+
+[[detection]]
+marker_extension = "nimble"
+
+[[artifacts]]
+relative_path = "nimcache"
+category = "cache"
+risk = "safe"
+verified_rebuildable = true

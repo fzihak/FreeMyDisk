@@ -1,0 +1,27 @@
+[project]
+id = "project_scala"
+name = "Scala / sbt Projects"
+description = "sbt compiled targets and intermediate project caches"
+icon = "scala"
+
+[[detection]]
+marker_file = "build.sbt"
+
+[[artifacts]]
+relative_path = "target"
+category = "build_output"
+risk = "safe"
+verified_rebuildable = true
+rebuild_command = "sbt compile"
+
+[[artifacts]]
+relative_path = "project/target"
+category = "build_output"
+risk = "safe"
+verified_rebuildable = true
+
+[[artifacts]]
+relative_path = "project/project/target"
+category = "build_output"
+risk = "safe"
+verified_rebuildable = true

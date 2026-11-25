@@ -1,0 +1,36 @@
+[rule]
+id = "windows_browser_chrome_cache"
+name = "Google Chrome Cache"
+category = "browser"
+risk = "safe"
+verified_rebuildable = true
+verified_at = "2026-08-15"
+author = "FreeMyDisk Team"
+description = "Cached web images, scripts, and compiled code cache from Google Chrome"
+platform = "windows"
+
+[applicability]
+conditions = [
+    { type = "path_exists", path = "${local_app_data}/Google/Chrome/User Data" }
+]
+
+[targets]
+paths = [
+    { path = "${local_app_data}/Google/Chrome/User Data/*/Cache/*", matcher = "glob" },
+    { path = "${local_app_data}/Google/Chrome/User Data/*/Code Cache/*", matcher = "glob" },
+    { path = "${local_app_data}/Google/Chrome/User Data/*/GPUCache/*", matcher = "glob" },
+    { path = "${local_app_data}/Google/Chrome/User Data/*/DawnCache/*", matcher = "glob" },
+    { path = "${local_app_data}/Google/Chrome/User Data/*/ShaderCache/*", matcher = "glob" },
+    { path = "${local_app_data}/Google/Chrome/User Data/*/GrShaderCache/*", matcher = "glob" },
+    { path = "${local_app_data}/Google/Chrome/User Data/*/Media Cache/*", matcher = "glob" }
+]
+
+[disposal]
+default_action = "permanent"
+protect_subpaths = [
+    "*/cookies*",
+    "*/history*",
+    "*/Sessions/*",
+    "*/Login Data*",
+    "*/Web Data*"
+]

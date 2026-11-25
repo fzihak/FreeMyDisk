@@ -1,0 +1,26 @@
+[rule]
+id = "windows_system_crash_dumps"
+name = "Crash Dumps & Minidumps"
+category = "system"
+risk = "safe"
+verified_rebuildable = true
+verified_at = "2026-08-15"
+author = "FreeMyDisk Team"
+description = "Application crash memory dump files collected after program failures"
+platform = "windows"
+
+[applicability]
+conditions = [
+    { type = "path_exists", path = "${local_app_data}/CrashDumps" }
+]
+
+[targets]
+paths = [
+    { path = "${local_app_data}/CrashDumps/*", matcher = "glob" },
+    { path = "${win_dir}/Minidump/*", matcher = "glob" },
+    { path = "${win_dir}/MEMORY.DMP", matcher = "exact" }
+]
+
+[disposal]
+default_action = "permanent"
+protect_subpaths = []

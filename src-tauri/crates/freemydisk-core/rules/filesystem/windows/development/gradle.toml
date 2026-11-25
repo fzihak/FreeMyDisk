@@ -1,0 +1,24 @@
+[rule]
+id = "windows_development_gradle_cache"
+name = "Gradle Build Cache"
+category = "development"
+risk = "safe"
+verified_rebuildable = true
+verified_at = "2026-08-15"
+author = "FreeMyDisk Team"
+description = "Cached downloaded dependencies, jars, and transformed artifacts in .gradle"
+platform = "windows"
+
+[applicability]
+conditions = [
+    { type = "path_exists", path = "${home}/.gradle/caches" }
+]
+
+[targets]
+paths = [
+    { path = "${home}/.gradle/caches/*", matcher = "glob" }
+]
+
+[disposal]
+default_action = "permanent"
+protect_subpaths = []

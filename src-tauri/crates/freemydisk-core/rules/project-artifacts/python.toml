@@ -1,0 +1,76 @@
+[project]
+id = "project_python"
+name = "Python Projects"
+description = "Python virtual environments, bytecode caches (__pycache__), and build wheels"
+icon = "python"
+
+[[detection]]
+marker_file = "pyproject.toml"
+
+[[detection]]
+marker_file = "requirements.txt"
+
+[[detection]]
+marker_file = "setup.py"
+
+[[detection]]
+marker_file = "Pipfile"
+
+[[detection]]
+marker_file = "environment.yml"
+
+[[artifacts]]
+relative_path = "__pycache__"
+category = "cache"
+risk = "safe"
+verified_rebuildable = true
+
+[[artifacts]]
+relative_path = ".pytest_cache"
+category = "cache"
+risk = "safe"
+verified_rebuildable = true
+
+[[artifacts]]
+relative_path = ".mypy_cache"
+category = "cache"
+risk = "safe"
+verified_rebuildable = true
+
+[[artifacts]]
+relative_path = ".ruff_cache"
+category = "cache"
+risk = "safe"
+verified_rebuildable = true
+
+[[artifacts]]
+relative_path = ".venv"
+category = "dependencies"
+risk = "moderate"
+verified_rebuildable = true
+rebuild_command = "python -m venv .venv"
+
+[[artifacts]]
+relative_path = "venv"
+category = "dependencies"
+risk = "moderate"
+verified_rebuildable = true
+rebuild_command = "python -m venv venv"
+
+[[artifacts]]
+relative_path = "dist"
+category = "build_output"
+risk = "moderate"
+verified_rebuildable = true
+
+[[artifacts]]
+relative_path = "build"
+category = "build_output"
+risk = "moderate"
+verified_rebuildable = true
+
+[[artifacts]]
+relative_path = ".tox"
+category = "cache"
+risk = "safe"
+verified_rebuildable = true

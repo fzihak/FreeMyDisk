@@ -1,0 +1,25 @@
+[rule]
+id = "windows_system_wer"
+name = "Windows Error Reporting"
+category = "system"
+risk = "safe"
+verified_rebuildable = true
+verified_at = "2026-08-15"
+author = "FreeMyDisk Team"
+description = "Queued and archived Windows Error Reporting reports and crash data"
+platform = "windows"
+
+[applicability]
+conditions = [
+    { type = "path_exists", path = "${local_app_data}/Microsoft/Windows/WER" }
+]
+
+[targets]
+paths = [
+    { path = "${local_app_data}/Microsoft/Windows/WER/ReportArchive/*", matcher = "glob" },
+    { path = "${local_app_data}/Microsoft/Windows/WER/ReportQueue/*", matcher = "glob" }
+]
+
+[disposal]
+default_action = "permanent"
+protect_subpaths = []

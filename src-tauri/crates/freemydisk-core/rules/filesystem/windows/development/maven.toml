@@ -1,0 +1,24 @@
+[rule]
+id = "windows_development_maven_cache"
+name = "Apache Maven Repository Cache"
+category = "development"
+risk = "safe"
+verified_rebuildable = true
+verified_at = "2026-08-15"
+author = "FreeMyDisk Team"
+description = "Cached downloaded POMs, JARs, and repository metadata in .m2/repository"
+platform = "windows"
+
+[applicability]
+conditions = [
+    { type = "path_exists", path = "${home}/.m2/repository" }
+]
+
+[targets]
+paths = [
+    { path = "${home}/.m2/repository/*", matcher = "glob" }
+]
+
+[disposal]
+default_action = "permanent"
+protect_subpaths = []

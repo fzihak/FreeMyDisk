@@ -1,0 +1,28 @@
+[project]
+id = "project_flutter"
+name = "Flutter Projects"
+description = "Flutter build outputs, dart_tool cache, and ephemeral artifacts"
+icon = "flutter"
+
+[[detection]]
+marker_file = "pubspec.yaml"
+
+[[artifacts]]
+relative_path = "build"
+category = "build_output"
+risk = "safe"
+verified_rebuildable = true
+rebuild_command = "flutter build"
+
+[[artifacts]]
+relative_path = ".dart_tool"
+category = "cache"
+risk = "safe"
+verified_rebuildable = true
+rebuild_command = "flutter pub get"
+
+[[artifacts]]
+relative_path = ".flutter-plugins-dependencies"
+category = "cache"
+risk = "safe"
+verified_rebuildable = true

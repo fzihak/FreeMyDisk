@@ -1,0 +1,24 @@
+[rule]
+id = "windows_development_pip_cache"
+name = "Python pip Wheel & Package Cache"
+category = "development"
+risk = "safe"
+verified_rebuildable = true
+verified_at = "2026-08-15"
+author = "FreeMyDisk Team"
+description = "Cached wheels and downloaded HTTP archives from pip"
+platform = "windows"
+
+[applicability]
+conditions = [
+    { type = "path_exists", path = "${local_app_data}/pip/cache" }
+]
+
+[targets]
+paths = [
+    { path = "${local_app_data}/pip/cache/*", matcher = "glob" }
+]
+
+[disposal]
+default_action = "permanent"
+protect_subpaths = []

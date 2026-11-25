@@ -1,0 +1,24 @@
+[rule]
+id = "windows_dev_visual_studio_cache"
+name = "Visual Studio Component & MEF Cache"
+category = "development"
+risk = "safe"
+verified_rebuildable = true
+verified_at = "2026-10-01"
+author = "FreeMyDisk Team"
+description = "Rebuildable ComponentModelCache MEF catalogs from Visual Studio"
+platform = "windows"
+
+[applicability]
+conditions = [
+    { type = "path_exists", path = "${local_app_data}/Microsoft/VisualStudio" }
+]
+
+[targets]
+paths = [
+    { path = "${local_app_data}/Microsoft/VisualStudio/*/ComponentModelCache/*", matcher = "glob" }
+]
+
+[disposal]
+default_action = "permanent"
+protect_subpaths = []

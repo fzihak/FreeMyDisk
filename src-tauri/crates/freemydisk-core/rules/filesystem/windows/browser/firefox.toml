@@ -1,0 +1,31 @@
+[rule]
+id = "windows_browser_firefox_cache"
+name = "Mozilla Firefox Cache"
+category = "browser"
+risk = "safe"
+verified_rebuildable = true
+verified_at = "2026-08-15"
+author = "FreeMyDisk Team"
+description = "Cached web pages, media, and script caches from Mozilla Firefox"
+platform = "windows"
+
+[applicability]
+conditions = [
+    { type = "path_exists", path = "${local_app_data}/Mozilla/Firefox/Profiles" }
+]
+
+[targets]
+paths = [
+    { path = "${local_app_data}/Mozilla/Firefox/Profiles/*/cache2/*", matcher = "glob" },
+    { path = "${local_app_data}/Mozilla/Firefox/Profiles/*/startupCache/*", matcher = "glob" }
+]
+
+[disposal]
+default_action = "permanent"
+protect_subpaths = [
+    "*/cookies.sqlite*",
+    "*/places.sqlite*",
+    "*/logins.json*",
+    "*/key4.db*",
+    "*/sessionstore*"
+]

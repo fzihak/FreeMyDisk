@@ -1,0 +1,26 @@
+[rule]
+id = "windows_system_shader_cache"
+name = "DirectX & Graphics Shader Cache"
+category = "system"
+risk = "safe"
+verified_rebuildable = true
+verified_at = "2026-08-15"
+author = "FreeMyDisk Team"
+description = "Compiled graphics shader bytecode recreated automatically by GPU drivers"
+platform = "windows"
+
+[applicability]
+conditions = [
+    { type = "path_exists", path = "${local_app_data}/D3DSCache" }
+]
+
+[targets]
+paths = [
+    { path = "${local_app_data}/D3DSCache/*", matcher = "glob" },
+    { path = "${local_app_data}/NVIDIA/DXCache/*", matcher = "glob" },
+    { path = "${local_app_data}/AMD/DxCache/*", matcher = "glob" }
+]
+
+[disposal]
+default_action = "permanent"
+protect_subpaths = []

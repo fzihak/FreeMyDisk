@@ -1,0 +1,14 @@
+[project]
+id = "project_jupyter"
+name = "Jupyter Notebooks"
+description = "Jupyter checkpoints and autosaved draft snapshots"
+icon = "jupyter"
+
+[[detection]]
+marker_extension = "ipynb"
+
+[[artifacts]]
+relative_path = ".ipynb_checkpoints"
+category = "cache"
+risk = "safe"
+verified_rebuildable = true

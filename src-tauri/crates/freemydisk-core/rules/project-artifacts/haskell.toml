@@ -1,0 +1,25 @@
+[project]
+id = "project_haskell"
+name = "Haskell Projects"
+description = "Stack work directories and Cabal dist-newstyle artifacts"
+icon = "haskell"
+
+[[detection]]
+marker_file = "stack.yaml"
+
+[[detection]]
+marker_extension = "cabal"
+
+[[artifacts]]
+relative_path = ".stack-work"
+category = "build_output"
+risk = "safe"
+verified_rebuildable = true
+rebuild_command = "stack build"
+
+[[artifacts]]
+relative_path = "dist-newstyle"
+category = "build_output"
+risk = "safe"
+verified_rebuildable = true
+rebuild_command = "cabal build"

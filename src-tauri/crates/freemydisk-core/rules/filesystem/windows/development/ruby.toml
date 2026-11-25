@@ -1,0 +1,25 @@
+[rule]
+id = "windows_dev_ruby_gem_cache"
+name = "Ruby Gem Cache"
+category = "development"
+risk = "safe"
+verified_rebuildable = true
+verified_at = "2026-10-06"
+author = "FreeMyDisk Team"
+description = "Downloaded .gem archive files cached by RubyGems and Bundler"
+platform = "windows"
+
+[applicability]
+conditions = [
+    { type = "path_exists", path = "${local_app_data}/gem" }
+]
+
+[targets]
+paths = [
+    { path = "${local_app_data}/gem/cache/*.gem", matcher = "glob" },
+    { path = "${user_profile}/.bundle/cache/*.gem", matcher = "glob" }
+]
+
+[disposal]
+default_action = "permanent"
+protect_subpaths = []

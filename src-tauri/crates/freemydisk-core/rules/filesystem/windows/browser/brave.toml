@@ -1,0 +1,35 @@
+[rule]
+id = "windows_browser_brave_cache"
+name = "Brave Browser Cache"
+category = "browser"
+risk = "safe"
+verified_rebuildable = true
+verified_at = "2026-08-15"
+author = "FreeMyDisk Team"
+description = "Cached web data and shader cache from Brave Browser"
+platform = "windows"
+
+[applicability]
+conditions = [
+    { type = "path_exists", path = "${local_app_data}/BraveSoftware/Brave-Browser/User Data" }
+]
+
+[targets]
+paths = [
+    { path = "${local_app_data}/BraveSoftware/Brave-Browser/User Data/*/Cache/*", matcher = "glob" },
+    { path = "${local_app_data}/BraveSoftware/Brave-Browser/User Data/*/Code Cache/*", matcher = "glob" },
+    { path = "${local_app_data}/BraveSoftware/Brave-Browser/User Data/*/GPUCache/*", matcher = "glob" },
+    { path = "${local_app_data}/BraveSoftware/Brave-Browser/User Data/*/DawnCache/*", matcher = "glob" },
+    { path = "${local_app_data}/BraveSoftware/Brave-Browser/User Data/*/ShaderCache/*", matcher = "glob" },
+    { path = "${local_app_data}/BraveSoftware/Brave-Browser/User Data/*/GrShaderCache/*", matcher = "glob" }
+]
+
+[disposal]
+default_action = "permanent"
+protect_subpaths = [
+    "*/cookies*",
+    "*/history*",
+    "*/Sessions/*",
+    "*/Login Data*",
+    "*/Web Data*"
+]

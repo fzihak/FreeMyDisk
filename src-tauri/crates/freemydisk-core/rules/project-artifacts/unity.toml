@@ -1,0 +1,35 @@
+[project]
+id = "project_unity"
+name = "Unity Engine Projects"
+description = "Unity Library cache, Temp compilation data, obj files, and logs"
+icon = "unity"
+
+[[detection]]
+marker_file = "ProjectSettings/ProjectVersion.txt"
+
+[[detection]]
+marker_dir = "Assets"
+
+[[artifacts]]
+relative_path = "Library"
+category = "cache"
+risk = "safe"
+verified_rebuildable = true
+
+[[artifacts]]
+relative_path = "Temp"
+category = "cache"
+risk = "safe"
+verified_rebuildable = true
+
+[[artifacts]]
+relative_path = "Logs"
+category = "logs"
+risk = "safe"
+verified_rebuildable = true
+
+[[artifacts]]
+relative_path = "obj"
+category = "build_output"
+risk = "safe"
+verified_rebuildable = true
