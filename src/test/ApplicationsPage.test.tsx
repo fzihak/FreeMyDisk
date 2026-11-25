@@ -96,7 +96,7 @@ describe("ApplicationsPage", () => {
         return mockApps;
       }
       if (cmd === "terminate_app_processes") {
-        expect(args.appName).toBe("Discord");
+        expect(args.appId).toBe("app-discord");
         return 1;
       }
       return [];
@@ -113,7 +113,7 @@ describe("ApplicationsPage", () => {
 
     await waitFor(() => {
       expect(invoke).toHaveBeenCalledWith("terminate_app_processes", {
-        appName: "Discord",
+        appId: "app-discord",
       });
     });
   });

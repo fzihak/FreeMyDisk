@@ -8,6 +8,7 @@ verified_at = "2026-10-06"
 author = "FreeMyDisk Team"
 description = "Crash logs, diagnostic logs, and temporary sync fragments from Google Drive"
 platform = "windows"
+locking_processes = ["googledrivefs.exe"]
 
 [applicability]
 conditions = [

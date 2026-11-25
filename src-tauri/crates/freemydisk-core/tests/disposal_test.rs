@@ -319,3 +319,52 @@ fn test_permanent_route_goes_through_staging_and_leaves_nothing_behind() {
     assert!(leftovers.is_empty(), "Staging folder was left behind");
     assert!(journal.list_in_flight().unwrap().is_empty());
 }
+
+#[test]
+fn test_summary_separates_recycled_and_skipped_items() {
+    let temp = tempdir().unwrap();
+    let present = temp.path().join("present.bin");
+    let vanished = temp.path().join("vanished.bin");
+    fs::write(&present, vec![0u8; 100]).unwrap();
+
+    let journal = CrashRecoveryJournal::open(&temp.path().join("journal.db")).unwrap();
+    let lock_dir = temp.path().join("locks");
+    let platform = MockDisposalPlatform::new(false);
+    let cancel = CancellationToken::new();
+
+    let item = |path: &Path| CleanupPlanItem {
+        original_path: path.to_path_buf(),
+        canonical_path: path.to_path_buf(),
+        size_bytes: 100,
+        is_dir: false,
+        matched_rules: vec!["rule".to_string()],
+        default_action: "trash".to_string(),
+        verified_rebuildable: false,
+        protect_subpaths: Vec::new(),
+        risk: "safe".to_string(),
+    };
+
+    let mut progress_calls = 0;
+    let summary = DisposalEngine::execute_plan_with_progress(
+        &[item(&present), item(&vanished)],
+        &platform,
+        &journal,
+        &lock_dir,
+        true,
+        &cancel,
+        |_, _, _, _| progress_calls += 1,
+    )
+    .unwrap();
+
+    assert_eq!(summary.successful_items, 1);
+    assert_eq!(summary.skipped_items, 1);
+    assert_eq!(summary.recycled_bytes, 100);
+    assert_eq!(
+        summary.total_freed_bytes, 0,
+        "the Recycle Bin is on the same disk"
+    );
+    assert_eq!(
+        progress_calls, 2,
+        "every item reports progress, also skipped ones"
+    );
+}

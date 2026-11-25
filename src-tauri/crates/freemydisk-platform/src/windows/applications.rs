@@ -22,6 +22,27 @@ pub enum InstallerEngine {
     Generic,
 }
 
+/// Full executable path of a running process, when the caller may query it.
+fn process_image_path(pid: u32) -> Option<String> {
+    use windows_sys::Win32::Foundation::CloseHandle;
+    use windows_sys::Win32::System::Threading::{
+        OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_WIN32,
+        PROCESS_QUERY_LIMITED_INFORMATION,
+    };
+
+    let handle = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid) };
+    if handle.is_null() {
+        return None;
+    }
+    let mut buffer = vec![0u16; 1024];
+    let mut len = buffer.len() as u32;
+    let ok = unsafe {
+        QueryFullProcessImageNameW(handle, PROCESS_NAME_WIN32, buffer.as_mut_ptr(), &mut len)
+    };
+    unsafe { CloseHandle(handle) };
+    (ok != 0).then(|| String::from_utf16_lossy(&buffer[..len as usize]))
+}
+
 fn hidden_cmd(prog: &str) -> std::process::Command {
     let mut cmd = std::process::Command::new(prog);
     cmd.creation_flags(CREATE_NO_WINDOW);
@@ -490,7 +511,7 @@ impl PlatformApplications for WindowsApplicationsHandler {
                 procs.push(RawRunningProcess {
                     pid: entry.th32ProcessID,
                     name,
-                    exe_path: None,
+                    exe_path: process_image_path(entry.th32ProcessID),
                 });
 
                 if unsafe { Process32NextW(snapshot, &mut entry) } == 0 {

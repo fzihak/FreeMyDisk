@@ -336,3 +336,53 @@ fn test_trash_duplicates_never_removes_every_copy_or_changed_files() {
     let rejected = summary.results.iter().find(|r| !r.success).unwrap();
     assert_eq!(rejected.path, c);
 }
+
+struct NoIdentityPlatform;
+
+impl PlatformFilesystem for NoIdentityPlatform {
+    fn trash_path(&self, _path: &Path) -> Result<(), PlatformError> {
+        Ok(())
+    }
+
+    fn is_cloud_placeholder(&self, _path: &Path) -> Result<bool, PlatformError> {
+        Ok(false)
+    }
+
+    fn get_file_identity(&self, _path: &Path) -> Result<FileIdentity, PlatformError> {
+        Err(PlatformError::OperationFailed(
+            "identity unavailable".to_string(),
+        ))
+    }
+
+    fn acquire_cross_process_lock(
+        &self,
+        _lock_path: &Path,
+    ) -> Result<Box<dyn std::any::Any + Send + Sync>, PlatformError> {
+        Ok(Box::new(()))
+    }
+
+    fn list_volumes(&self) -> Result<Vec<StorageVolumeInfo>, PlatformError> {
+        Ok(Vec::new())
+    }
+}
+
+#[test]
+fn test_unknown_file_identity_never_merges_distinct_files() {
+    let dir = tempdir().unwrap();
+    let a = dir.path().join("a.bin");
+    let b = dir.path().join("b.bin");
+    fs::write(&a, vec![7u8; 4096]).unwrap();
+    fs::write(&b, vec![7u8; 4096]).unwrap();
+
+    let result = DuplicateDetector::scan_duplicates(
+        &[dir.path().to_path_buf()],
+        1,
+        &NoIdentityPlatform,
+        &CancellationToken::new(),
+    )
+    .unwrap();
+
+    let group = &result.groups[0];
+    assert_eq!(group.potential_savings_bytes, 4096);
+    assert!(group.files.iter().all(|f| !f.is_hardlink_or_clone));
+}

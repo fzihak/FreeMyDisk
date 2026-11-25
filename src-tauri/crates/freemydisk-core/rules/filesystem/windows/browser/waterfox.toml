@@ -8,6 +8,7 @@ verified_at = "2026-10-06"
 author = "FreeMyDisk Team"
 description = "HTTP cache and startup cache from Waterfox browser"
 platform = "windows"
+locking_processes = ["waterfox.exe"]
 
 [applicability]
 conditions = [

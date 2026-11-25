@@ -8,6 +8,7 @@ verified_at = "2026-10-01"
 author = "FreeMyDisk Team"
 description = "Rebuildable ComponentModelCache MEF catalogs from Visual Studio"
 platform = "windows"
+locking_processes = ["devenv.exe"]
 
 [applicability]
 conditions = [

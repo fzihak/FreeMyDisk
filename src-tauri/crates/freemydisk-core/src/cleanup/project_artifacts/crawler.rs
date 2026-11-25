@@ -43,7 +43,8 @@ impl ProjectCrawler {
             return Err(CoreError::Cancelled);
         }
 
-        if ProtectedPathRegistry::is_protected(dir) || ProtectedPathRegistry::is_reparse_point(dir)
+        if ProtectedPathRegistry::is_protected_lexical(dir)
+            || ProtectedPathRegistry::is_reparse_point(dir)
         {
             return Ok(());
         }

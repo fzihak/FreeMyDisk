@@ -8,6 +8,7 @@ verified_at = "2026-10-06"
 author = "FreeMyDisk Team"
 description = "Web cache, stream buffers, and GPU cache from Twitch client"
 platform = "windows"
+locking_processes = ["twitch.exe"]
 
 [applicability]
 conditions = [

@@ -251,9 +251,7 @@ export const ApplicationsPage: React.FC = () => {
   const handleCloseApp = async (app: InstalledAppInfo) => {
     setClosingAppId(app.id);
     try {
-      const count = await invoke<number>("terminate_app_processes", {
-        appName: app.name,
-      });
+      const count = await invoke<number>("terminate_app_processes", { appId: app.id });
       if (count > 0) {
         toast.success(t.applications.closeApp, t.applications.appClosedSuccess);
         setApps((prev) =>

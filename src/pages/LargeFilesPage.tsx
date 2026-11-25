@@ -24,6 +24,7 @@ import {
   FolderOpen20Regular,
   Folder20Regular,
 } from "@fluentui/react-icons";
+import { describeDisposal } from "@/utils/disposal";
 
 interface StorageVolumeInfo {
   mount_point: string;
@@ -63,6 +64,7 @@ interface DisposalSummary {
   successful_items: number;
   failed_items: number;
   total_freed_bytes: number;
+  recycled_bytes?: number;
   failed_trash_paths: string[];
 }
 
@@ -209,7 +211,7 @@ export const LargeFilesPage: React.FC = () => {
       if (summary.successful_items > 0) {
         toast.success(
           "Files Recycled",
-          `Safely moved ${summary.successful_items} large file(s) to Recycle Bin (${formatBytes(summary.total_freed_bytes)} reclaimed).`
+          `${summary.successful_items} ${t.common.files} · ${describeDisposal(summary, t, formatBytes)}`
         );
       }
       if (summary.failed_items > 0) {

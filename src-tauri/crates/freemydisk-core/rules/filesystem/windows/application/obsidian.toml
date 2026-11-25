@@ -8,6 +8,7 @@ verified_at = "2026-10-06"
 author = "FreeMyDisk Team"
 description = "Electron GPU cache, indexing cache, and logs from Obsidian (does NOT touch vaults)"
 platform = "windows"
+locking_processes = ["obsidian.exe"]
 
 [applicability]
 conditions = [

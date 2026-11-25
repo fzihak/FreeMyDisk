@@ -8,6 +8,7 @@ verified_at = "2026-10-01"
 author = "FreeMyDisk Team"
 description = "Chromium CEF web rendering and store thumbnail caches accumulated by Steam"
 platform = "windows"
+locking_processes = ["steam.exe"]
 
 [applicability]
 conditions = [

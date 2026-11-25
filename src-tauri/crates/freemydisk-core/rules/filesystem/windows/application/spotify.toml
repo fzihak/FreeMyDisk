@@ -8,6 +8,7 @@ verified_at = "2026-08-15"
 author = "FreeMyDisk Team"
 description = "Cached streamed audio chunks and offline artwork stored by Spotify"
 platform = "windows"
+locking_processes = ["spotify.exe"]
 
 [applicability]
 conditions = [

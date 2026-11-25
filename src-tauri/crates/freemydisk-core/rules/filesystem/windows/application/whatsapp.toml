@@ -8,6 +8,7 @@ verified_at = "2026-10-01"
 author = "FreeMyDisk Team"
 description = "Temporary cached media and code caches from WhatsApp Desktop"
 platform = "windows"
+locking_processes = ["whatsapp.exe"]
 
 [applicability]
 conditions = [

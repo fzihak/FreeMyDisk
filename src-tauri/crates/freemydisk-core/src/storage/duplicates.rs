@@ -116,6 +116,7 @@ impl DuplicateDetector {
         let _bg_guard = freemydisk_platform::io_priority::BackgroundExecutionGuard::enter();
         let start_time = Instant::now();
         let mut cache_hits = 0usize;
+        let mut unknown_identities = 0u64;
         let mut items_scanned = 0u64;
         let mut last_emit = Instant::now();
 
@@ -149,7 +150,7 @@ impl DuplicateDetector {
                             last_emit = Instant::now();
                         }
 
-                        if ProtectedPathRegistry::is_protected(entry_path) {
+                        if ProtectedPathRegistry::is_protected_lexical(entry_path) {
                             return false;
                         }
                         if !is_dir && size >= min_size && size > 0 {
@@ -204,14 +205,14 @@ impl DuplicateDetector {
                     }
 
                     if entry.file_type().is_dir() {
-                        if ProtectedPathRegistry::is_protected(path) {
+                        if ProtectedPathRegistry::is_protected_lexical(path) {
                             it.skip_current_dir();
                         }
                         continue;
                     }
 
                     if entry.file_type().is_file() {
-                        if ProtectedPathRegistry::is_protected(path) {
+                        if ProtectedPathRegistry::is_protected_lexical(path) {
                             continue;
                         }
 
@@ -235,6 +236,7 @@ impl DuplicateDetector {
             path: PathBuf,
             size: u64,
             modified_at: u64,
+            cache_stamp: u64,
             identity: FileIdentity,
             sample_hash: String,
             cached_full_hash: Option<String>,
@@ -268,21 +270,27 @@ impl DuplicateDetector {
                     continue;
                 }
 
-                let identity = platform.get_file_identity(&path).unwrap_or(FileIdentity {
-                    device_id: 0,
-                    file_index: 0,
-                    link_count: 1,
-                    is_reparse_or_symlink: false,
+                // An unknown identity must never make two different files look like one
+                // physical file, so each gets a key no real file can share.
+                let identity = platform.get_file_identity(&path).unwrap_or_else(|_| {
+                    unknown_identities += 1;
+                    FileIdentity {
+                        device_id: u64::MAX,
+                        file_index: unknown_identities,
+                        link_count: 1,
+                        is_reparse_or_symlink: false,
+                    }
                 });
 
-                let modified_at = std::fs::metadata(&path)
+                let modified = std::fs::metadata(&path)
                     .and_then(|m| m.modified())
                     .ok()
                     .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-                    .map(|d| d.as_secs())
-                    .unwrap_or(0);
+                    .unwrap_or_default();
+                let modified_at = modified.as_secs();
+                let cache_stamp = u64::try_from(modified.as_nanos()).unwrap_or(u64::MAX);
 
-                let cached_entry = cache.and_then(|c| c.lookup(&path, size, modified_at));
+                let cached_entry = cache.and_then(|c| c.lookup(&path, size, cache_stamp));
                 let (partial_hash, cached_full_hash) = if let Some(cached) = cached_entry {
                     cache_hits += 1;
                     (cached.sample_hash, Some(cached.full_hash))
@@ -301,6 +309,7 @@ impl DuplicateDetector {
                         path,
                         size,
                         modified_at,
+                        cache_stamp,
                         identity,
                         sample_hash: partial_hash,
                         cached_full_hash,
@@ -351,7 +360,7 @@ impl DuplicateDetector {
                                 c.store(
                                     &cand.path,
                                     cand.size,
-                                    cand.modified_at,
+                                    cand.cache_stamp,
                                     &cand.sample_hash,
                                     &fh,
                                 );
@@ -683,33 +692,12 @@ fn compute_partial_hash(path: &Path, size: u64) -> Result<String, std::io::Error
     Ok(hasher.finalize().to_hex().to_string())
 }
 
+/// Streams the file through BLAKE3 with buffered reads. Memory-mapping is avoided:
+/// if another process truncates a mapped file, Windows raises an in-page error
+/// that would crash the app.
 fn compute_full_hash(path: &Path) -> Result<String, std::io::Error> {
     let file = File::open(path)?;
-    let metadata = file.metadata()?;
-    let len = metadata.len();
-
     let mut hasher = blake3::Hasher::new();
-
-    // Memory-mapped fast path for files between 64KB and 1GB:
-    // Hashes directly from OS page cache with zero kernel-to-user buffer copying
-    if (65536..=1_073_741_824).contains(&len) {
-        if let Ok(mmap) = unsafe { memmap2::Mmap::map(&file) } {
-            hasher.update(&mmap[..]);
-            return Ok(hasher.finalize().to_hex().to_string());
-        }
-    }
-
-    // High-throughput streaming fallback with 256KB buffer
-    let mut file = file;
-    let mut buffer = [0u8; 262144];
-
-    loop {
-        let bytes_read = file.read(&mut buffer)?;
-        if bytes_read == 0 {
-            break;
-        }
-        hasher.update(&buffer[..bytes_read]);
-    }
-
+    hasher.update_reader(std::io::BufReader::with_capacity(1 << 20, file))?;
     Ok(hasher.finalize().to_hex().to_string())
 }

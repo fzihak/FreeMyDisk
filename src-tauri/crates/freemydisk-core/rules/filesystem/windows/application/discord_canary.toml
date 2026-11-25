@@ -8,6 +8,7 @@ verified_at = "2026-10-06"
 author = "FreeMyDisk Team"
 description = "Web cache and GPU shader cache from Discord Canary client"
 platform = "windows"
+locking_processes = ["discordcanary.exe"]
 
 [applicability]
 conditions = [

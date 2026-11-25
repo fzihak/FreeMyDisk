@@ -8,6 +8,7 @@ verified_at = "2026-08-15"
 author = "FreeMyDisk Team"
 description = "Cached editor workspace metadata and extension state from Visual Studio Code"
 platform = "windows"
+locking_processes = ["code.exe"]
 
 [applicability]
 conditions = [

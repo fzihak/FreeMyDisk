@@ -157,7 +157,9 @@ fn test_large_files_batch_trash() {
     assert_eq!(summary.total_requested_items, 3);
     assert_eq!(summary.successful_items, 3);
     assert_eq!(summary.failed_items, 0);
-    assert_eq!(summary.total_freed_bytes, 450_000);
+    // Moved to the Recycle Bin: still on the volume, so reported separately.
+    assert_eq!(summary.recycled_bytes, 450_000);
+    assert_eq!(summary.total_freed_bytes, 0);
     assert!(!file1.exists());
     assert!(!file2.exists());
     assert!(!file3.exists());

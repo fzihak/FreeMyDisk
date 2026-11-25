@@ -120,6 +120,7 @@ export const de: TranslationSchema = {
     "installedAppsCategory": "Installierte Apps & Features",
     "systemReservedCategory": "System- & reservierter Speicher",
     "tempFilesCategory": "Temporäre Dateien & Caches",
+    "usedSpaceCategory": "Belegt",
     "freeSpaceCategory": "Freier Speicher"
   },
   "cleanup": {
@@ -150,6 +151,7 @@ export const de: TranslationSchema = {
     "cleaningProgress": "Bereinigung läuft...",
     "cleanComplete": "Bereinigung abgeschlossen",
     "reclaimedSpace": "Freigegebener Speicherplatz",
+    "movedToRecycleBin": "In den Papierkorb verschoben",
     "filesCleaned": "Bereinigte Dateien",
     "failedTrash": "Fehlgeschlagene Papierkorb-Verschiebungen",
     "allCleanTitle": "Alles sauber!",

@@ -147,6 +147,7 @@ export interface TranslationSchema {
     installedAppsCategory: string;
     systemReservedCategory: string;
     tempFilesCategory: string;
+    usedSpaceCategory: string;
     freeSpaceCategory: string;
   };
   cleanup: {
@@ -177,6 +178,7 @@ export interface TranslationSchema {
     cleaningProgress: string;
     cleanComplete: string;
     reclaimedSpace: string;
+    movedToRecycleBin: string;
     filesCleaned: string;
     failedTrash: string;
     allCleanTitle: string;

@@ -8,6 +8,7 @@ verified_at = "2026-10-06"
 author = "FreeMyDisk Team"
 description = "WebView2 and web app cache from the new Outlook for Windows client"
 platform = "windows"
+locking_processes = ["olk.exe"]
 
 [applicability]
 conditions = [

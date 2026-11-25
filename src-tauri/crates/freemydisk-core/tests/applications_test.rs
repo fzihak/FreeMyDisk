@@ -51,3 +51,48 @@ fn test_application_service_discovery() {
     let deep = service.scan_deep_leftovers().unwrap();
     println!("Discovered {} leftover groups", deep.len());
 }
+
+#[test]
+fn test_app_processes_are_matched_by_install_folder() {
+    use freemydisk_core::applications::process_control::{app_folders, runs_from};
+    use freemydisk_platform::RawRunningProcess;
+
+    let dir = tempfile::tempdir().unwrap();
+    let install = dir.path().join("Vendor").join("Editor");
+    std::fs::create_dir_all(&install).unwrap();
+
+    let dirs = app_folders(Some(install.to_str().unwrap()), None);
+    assert_eq!(dirs.len(), 1);
+
+    let proc = |exe: &str| RawRunningProcess {
+        pid: 1,
+        name: "x.exe".to_string(),
+        exe_path: Some(exe.to_string()),
+    };
+    let inside = install.join("bin").join("editor.exe");
+    assert!(runs_from(
+        &proc(&inside.to_string_lossy().to_uppercase()),
+        &dirs
+    ));
+    let sibling = format!("{}-helper\\other.exe", install.to_string_lossy());
+    assert!(
+        !runs_from(&proc(&sibling), &dirs),
+        "prefix of another folder must not match"
+    );
+    assert!(!runs_from(
+        &RawRunningProcess {
+            pid: 2,
+            name: "editor.exe".to_string(),
+            exe_path: None
+        },
+        &dirs
+    ));
+
+    // Shared and system folders never identify an app.
+    if let Ok(pf) = std::env::var("ProgramFiles") {
+        assert!(app_folders(Some(&pf), None).is_empty());
+    }
+    if let Ok(win) = std::env::var("SystemRoot") {
+        assert!(app_folders(None, Some(&format!(r"{}\System32\msiexec.exe,0", win))).is_empty());
+    }
+}

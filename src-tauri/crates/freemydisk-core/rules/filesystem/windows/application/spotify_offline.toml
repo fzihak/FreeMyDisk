@@ -8,6 +8,7 @@ verified_at = "2026-10-06"
 author = "FreeMyDisk Team"
 description = "Cached offline audio files and track buffers from Spotify (re-downloads on demand)"
 platform = "windows"
+locking_processes = ["spotify.exe"]
 
 [applicability]
 conditions = [

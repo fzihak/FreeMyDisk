@@ -120,6 +120,7 @@ export const bn: TranslationSchema = {
     "installedAppsCategory": "ইনস্টল করা অ্যাপ ও ফিচার",
     "systemReservedCategory": "সিস্টেম ও সংরক্ষিত স্পেস",
     "tempFilesCategory": "অস্থায়ী ফাইল ও ক্যাশ",
+    "usedSpaceCategory": "ব্যবহৃত",
     "freeSpaceCategory": "খালি জায়গা"
   },
   "cleanup": {
@@ -150,6 +151,7 @@ export const bn: TranslationSchema = {
     "cleaningProgress": "পরিষ্কার প্রক্রিয়া চলছে...",
     "cleanComplete": "ক্লিনআপ সম্পন্ন হয়েছে",
     "reclaimedSpace": "উদ্ধারকৃত ডিস্ক স্পেস",
+    "movedToRecycleBin": "রিসাইকেল বিনে সরানো হয়েছে",
     "filesCleaned": "পরিষ্কারকৃত ফাইলের সংখ্যা",
     "failedTrash": "রিসাইকেল বিনে পাঠাতে ব্যর্থ",
     "allCleanTitle": "সবকিছু পরিষ্কার ও নিরাপদ!",

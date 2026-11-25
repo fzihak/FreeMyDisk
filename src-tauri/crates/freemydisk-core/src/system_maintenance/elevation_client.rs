@@ -23,50 +23,41 @@ pub struct ElevatedResponse {
 pub struct ElevatedClient;
 
 impl ElevatedClient {
-    /// Discovers the path to the freemydisk-elevated executable
+    /// Locates freemydisk-elevated.exe next to the running app or in its bundled
+    /// resources folder. Release builds look nowhere else, so a planted binary in the
+    /// working directory or an environment variable can never be launched with the
+    /// app's own elevation prompt. Debug builds also check the cargo target folders.
     pub fn find_helper_executable() -> Option<PathBuf> {
-        // 0. Explicit environment variable override (for automation, CI, and custom installations)
-        if let Ok(custom_path) = std::env::var("FREEMYDISK_HELPER_PATH") {
-            let p = PathBuf::from(custom_path);
-            if p.exists() {
-                return Some(dunce::canonicalize(&p).unwrap_or(p));
-            }
-        }
+        const HELPER: &str = "freemydisk-elevated.exe";
 
-        // 1. Same directory as current executable or bundled resources folder (Production NSIS)
-        if let Ok(cur_exe) = std::env::current_exe() {
-            if let Some(parent) = cur_exe.parent() {
-                let candidate = parent.join("freemydisk-elevated.exe");
-                if candidate.exists() {
+        if let Some(dir) = std::env::current_exe()
+            .ok()
+            .and_then(|e| e.parent().map(PathBuf::from))
+        {
+            for candidate in [dir.join(HELPER), dir.join("resources").join(HELPER)] {
+                if candidate.is_file() {
                     return Some(candidate);
                 }
-                let resource_candidate = parent.join("resources").join("freemydisk-elevated.exe");
-                if resource_candidate.exists() {
-                    return Some(resource_candidate);
-                }
             }
         }
 
-        // 2. Relative cargo target and dev resources directories for dev/testing
-        let dev_candidates = [
-            PathBuf::from("src-tauri/resources/freemydisk-elevated.exe"),
-            PathBuf::from("resources/freemydisk-elevated.exe"),
-            PathBuf::from("../resources/freemydisk-elevated.exe"),
-            PathBuf::from("target/release/freemydisk-elevated.exe"),
-            PathBuf::from("target/debug/freemydisk-elevated.exe"),
-            PathBuf::from("../target/release/freemydisk-elevated.exe"),
-            PathBuf::from("../target/debug/freemydisk-elevated.exe"),
-            PathBuf::from("../../target/release/freemydisk-elevated.exe"),
-            PathBuf::from("../../target/debug/freemydisk-elevated.exe"),
-            PathBuf::from("src-tauri/target/release/freemydisk-elevated.exe"),
-            PathBuf::from("src-tauri/target/debug/freemydisk-elevated.exe"),
-            PathBuf::from("helpers/freemydisk-elevated/target/release/freemydisk-elevated.exe"),
-            PathBuf::from("helpers/freemydisk-elevated/target/debug/freemydisk-elevated.exe"),
-        ];
-
-        for c in &dev_candidates {
-            if c.exists() {
-                return Some(dunce::canonicalize(c).unwrap_or_else(|_| c.clone()));
+        #[cfg(debug_assertions)]
+        {
+            let dev_candidates = [
+                "src-tauri/resources",
+                "resources",
+                "../resources",
+                "target/debug",
+                "../target/debug",
+                "../../target/debug",
+                "target/release",
+                "../target/release",
+            ];
+            for dir in dev_candidates {
+                let candidate = PathBuf::from(dir).join(HELPER);
+                if candidate.is_file() {
+                    return Some(dunce::canonicalize(&candidate).unwrap_or(candidate));
+                }
             }
         }
 
@@ -124,24 +115,25 @@ impl ElevatedClient {
             return Ok(resp);
         }
 
-        // Unelevated: Request elevation via PowerShell Start-Process -Verb RunAs with temporary token files
+        // Unelevated: request elevation with Start-Process -Verb RunAs. The request is
+        // passed on the helper's command line (hex encoded), which other processes
+        // cannot change once the elevated helper has started, unlike a file in %TEMP%.
         let token = session_token;
-        let temp_dir = std::env::temp_dir();
-        let req_file = temp_dir.join(format!("fmd_elev_req_{}.json", token));
-        let resp_file = temp_dir.join(format!("fmd_elev_resp_{}.json", token));
-
-        serde_json::to_writer(std::fs::File::create(&req_file)?, &req)?;
+        let resp_file = std::env::temp_dir().join(format!("fmd_elev_resp_{}.json", token));
+        let request_hex: String = serde_json::to_vec(&req)?
+            .iter()
+            .map(|b| format!("{:02x}", b))
+            .collect();
 
         #[cfg(target_os = "windows")]
         {
             use std::os::windows::process::CommandExt;
             let helper_str = helper_path.to_string_lossy().replace('\'', "''");
-            let req_str = req_file.to_string_lossy().replace('\'', "''");
             let resp_str = resp_file.to_string_lossy().replace('\'', "''");
 
             let ps_args = format!(
-                "Start-Process -FilePath '{}' -ArgumentList '--token \"{}\" --file \"{}\" \"{}\"' -Verb RunAs -WindowStyle Hidden -Wait",
-                helper_str, token, req_str, resp_str
+                "Start-Process -FilePath '{}' -ArgumentList '--token \"{}\" --request-hex {} --response \"{}\"' -Verb RunAs -WindowStyle Hidden -Wait",
+                helper_str, token, request_hex, resp_str
             );
 
             let mut cmd = Command::new("powershell");
@@ -149,7 +141,6 @@ impl ElevatedClient {
             cmd.args(["-NoProfile", "-NonInteractive", "-Command", &ps_args]);
 
             let status = cmd.status()?;
-            let _ = std::fs::remove_file(&req_file);
 
             if !status.success() {
                 let _ = std::fs::remove_file(&resp_file);
@@ -163,7 +154,7 @@ impl ElevatedClient {
 
         #[cfg(not(target_os = "windows"))]
         {
-            let _ = std::fs::remove_file(&req_file);
+            let _ = (&request_hex, &helper_path);
             let _ = std::fs::remove_file(&resp_file);
             return Err(CoreError::Platform(
                 freemydisk_platform::traits::PlatformError::Unsupported(

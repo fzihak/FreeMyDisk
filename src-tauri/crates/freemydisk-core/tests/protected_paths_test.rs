@@ -45,13 +45,17 @@ fn test_safe_user_paths_are_not_protected() {
 
 #[test]
 fn test_self_preservation_blocks_internal_assets() {
-    let self_db = Path::new(r"C:\Users\test\AppData\Roaming\FreeMyDisk\freemydisk.db");
-    assert!(ProtectedPathRegistry::is_self_asset(self_db));
-    assert!(ProtectedPathRegistry::assert_safe_for_disposal(self_db).is_err());
+    let data_dir = freemydisk_core::shared::paths::app_data_dir().expect("app data dir");
+    let journal_db = data_dir.join("journal.db");
+    assert!(ProtectedPathRegistry::is_self_asset(&journal_db));
+    assert!(ProtectedPathRegistry::assert_safe_for_disposal(&journal_db).is_err());
+    assert!(ProtectedPathRegistry::is_self_asset(
+        &data_dir.join("hash_cache.db")
+    ));
 
-    let journal_db = Path::new(r"C:\Users\test\AppData\Roaming\FreeMyDisk\journal.db");
-    assert!(ProtectedPathRegistry::is_self_asset(journal_db));
-    assert!(ProtectedPathRegistry::assert_safe_for_disposal(journal_db).is_err());
+    // A user file that only shares a name with the app's journal is not protected.
+    let user_file = std::env::temp_dir().join("project").join("journal.db");
+    assert!(!ProtectedPathRegistry::is_self_asset(&user_file));
 
     let exe = Path::new(r"C:\Program Files\FreeMyDisk\freemydisk.exe");
     assert!(ProtectedPathRegistry::is_self_asset(exe));
@@ -126,5 +130,33 @@ fn test_rule_approved_system_caches_are_disposable_but_their_folders_are_not() {
     ));
     assert!(ProtectedPathRegistry::is_protected(
         &download.join(r"..\..\System32")
+    ));
+}
+
+#[cfg(unix)]
+#[test]
+fn test_unix_system_and_home_folders_are_protected() {
+    use std::path::PathBuf;
+
+    for p in [
+        "/",
+        "/usr",
+        "/usr/bin/ls",
+        "/System/Library",
+        "/etc/hosts",
+        "/Applications",
+    ] {
+        assert!(
+            ProtectedPathRegistry::is_protected(Path::new(p)),
+            "{} must be protected",
+            p
+        );
+    }
+
+    let home = PathBuf::from(std::env::var("HOME").expect("HOME"));
+    assert!(ProtectedPathRegistry::is_protected(&home));
+    assert!(ProtectedPathRegistry::is_protected(&home.join("Documents")));
+    assert!(!ProtectedPathRegistry::is_protected(
+        &home.join("Documents").join("old-report.pdf")
     ));
 }

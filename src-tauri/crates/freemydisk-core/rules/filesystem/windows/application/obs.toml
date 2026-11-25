@@ -8,6 +8,7 @@ verified_at = "2026-10-06"
 author = "FreeMyDisk Team"
 description = "Diagnostic session logs and crash dumps from OBS Studio"
 platform = "windows"
+locking_processes = ["obs64.exe"]
 
 [applicability]
 conditions = [

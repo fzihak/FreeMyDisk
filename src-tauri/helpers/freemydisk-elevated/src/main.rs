@@ -664,44 +664,57 @@ fn handle_request(req: ElevatedRequest, expected_token: Option<&str>) -> Elevate
     }
 }
 
+fn decode_hex(hex: &str) -> Result<Vec<u8>, String> {
+    if hex.len() % 2 != 0 || !hex.is_ascii() {
+        return Err("malformed hex".to_string());
+    }
+    (0..hex.len())
+        .step_by(2)
+        .map(|i| u8::from_str_radix(&hex[i..i + 2], 16).map_err(|e| e.to_string()))
+        .collect()
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().collect();
 
-    // Parse command line arguments:
-    // Optional --token <expected_token>
-    // Optional --file <input_path> <output_path>
+    // Arguments:
+    //   --token <token>          session token the request must carry
+    //   --request-hex <hex>      request JSON, hex encoded (used through the UAC prompt;
+    //                            the command line cannot be changed after launch)
+    //   --response <path>        where to write the response when using --request-hex
     let mut expected_token: Option<String> = None;
-    let mut input_file: Option<String> = None;
-    let mut output_file: Option<String> = None;
+    let mut request_hex: Option<String> = None;
+    let mut response_file: Option<String> = None;
 
     let mut i = 1;
     while i < args.len() {
-        if args[i] == "--token" && i + 1 < args.len() {
-            expected_token = Some(args[i + 1].clone());
-            i += 2;
-        } else if args[i] == "--file" && i + 2 < args.len() {
-            input_file = Some(args[i + 1].clone());
-            output_file = Some(args[i + 2].clone());
-            i += 3;
-        } else {
-            i += 1;
+        let value = args.get(i + 1).cloned();
+        match (args[i].as_str(), value) {
+            ("--token", Some(v)) => expected_token = Some(v),
+            ("--request-hex", Some(v)) => request_hex = Some(v),
+            ("--response", Some(v)) => response_file = Some(v),
+            _ => {
+                i += 1;
+                continue;
+            }
         }
+        i += 2;
     }
 
-    if let (Some(input_path), Some(output_path)) = (input_file, output_file) {
-        if let Ok(content) = std::fs::read_to_string(&input_path) {
-            let resp = match serde_json::from_str::<ElevatedRequest>(&content) {
-                Ok(req) => handle_request(req, expected_token.as_deref()),
-                Err(e) => ElevatedResponse {
-                    success: false,
-                    message: format!("Invalid JSON request: {}", e),
-                },
-            };
-            let _ = std::fs::write(
-                &output_path,
-                serde_json::to_string(&resp).unwrap_or_default(),
-            );
-        }
+    if let (Some(hex), Some(output_path)) = (request_hex, response_file) {
+        let resp = match decode_hex(&hex).and_then(|bytes| {
+            serde_json::from_slice::<ElevatedRequest>(&bytes).map_err(|e| e.to_string())
+        }) {
+            Ok(req) => handle_request(req, expected_token.as_deref()),
+            Err(e) => ElevatedResponse {
+                success: false,
+                message: format!("Invalid request: {}", e),
+            },
+        };
+        let _ = std::fs::write(
+            &output_path,
+            serde_json::to_string(&resp).unwrap_or_default(),
+        );
         return;
     }
 

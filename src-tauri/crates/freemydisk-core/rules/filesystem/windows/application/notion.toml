@@ -8,6 +8,7 @@ verified_at = "2026-10-01"
 author = "FreeMyDisk Team"
 description = "Local media and document renderer cache from Notion desktop"
 platform = "windows"
+locking_processes = ["notion.exe"]
 
 [applicability]
 conditions = [

@@ -27,34 +27,9 @@ import { WinUIButton } from "@/components/winui/WinUIButton";
 import { LiveScanProgressWidget } from "@/components/shared/LiveScanProgressWidget";
 import { ProjectArtifactsView } from "@/components/cleanup/ProjectArtifactsView";
 import { AiAndToolchainsView } from "@/components/cleanup/AiAndToolchainsView";
-
-interface RuleScanCandidate {
-  path: string;
-  size_bytes: number;
-  is_dir: boolean;
-  rule_id: string;
-  rule_name: string;
-  category: string;
-  risk: string;
-  verified_rebuildable: boolean;
-  default_action: string;
-  protect_subpaths: string[];
-}
-
-interface RuleScanSummary {
-  rule_id: string;
-  rule_name: string;
-  category: string;
-  risk: string;
-  verified_rebuildable: boolean;
-  default_action: string;
-  default_selected: boolean;
-  total_bytes: number;
-  total_items: number;
-  candidates: RuleScanCandidate[];
-  is_locked_by_process?: boolean;
-  locking_process_name?: string;
-}
+import { useCleanupScanStore } from "@/stores/cleanup-scan-store";
+import type { RuleScanSummary } from "@/types/cleanup";
+import { describeDisposal } from "@/utils/disposal";
 
 interface DisposalItemResult {
   path: string;
@@ -70,6 +45,7 @@ interface DisposalSummary {
   successful_items: number;
   failed_items: number;
   total_freed_bytes: number;
+  recycled_bytes?: number;
   results: DisposalItemResult[];
   failed_trash_paths: string[];
 }
@@ -88,7 +64,11 @@ export const CleanupPage: React.FC = () => {
   const [showConfirmModal, setShowConfirmModal] = useState<boolean>(false);
 
   // Manual Follow-up Modal for failed trash
-  const [manualConflictPath, setManualConflictPath] = useState<string | null>(null);
+  // Items the Recycle Bin refused, handled one after another.
+  const [failedQueue, setFailedQueue] = useState<string[]>([]);
+  const [failedTotal, setFailedTotal] = useState(0);
+  const manualConflictPath = failedQueue[0] ?? null;
+  const resolveCurrentConflict = () => setFailedQueue((queue) => queue.slice(1));
   const [resolvingPath, setResolvingPath] = useState(false);
 
   const formatBytes = (bytes: number): string => {
@@ -99,19 +79,22 @@ export const CleanupPage: React.FC = () => {
     return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
   };
 
+  const applyScanResults = (results: RuleScanSummary[]) => {
+    setSummaries(results);
+    const autoSelected = new Set<string>();
+    results.forEach((r) => {
+      if (r.default_selected && (r.candidates.length > 0 || r.total_bytes > 0)) {
+        autoSelected.add(r.rule_id);
+      }
+    });
+    setSelectedRuleIds(autoSelected);
+  };
+
   const handleScan = async () => {
     setScanning(true);
     setLastDisposal(null);
     try {
-      const results = await invoke<RuleScanSummary[]>("scan_cleanup_rules");
-      setSummaries(results);
-      const autoSelected = new Set<string>();
-      results.forEach((r) => {
-        if (r.default_selected && (r.candidates.length > 0 || r.total_bytes > 0)) {
-          autoSelected.add(r.rule_id);
-        }
-      });
-      setSelectedRuleIds(autoSelected);
+      applyScanResults(await useCleanupScanStore.getState().scan());
     } catch (e) {
       console.error("Scan failed:", e);
       toast.error(t.common.error, String(e));
@@ -121,7 +104,13 @@ export const CleanupPage: React.FC = () => {
   };
 
   useEffect(() => {
-    handleScan();
+    // Reuse a recent scan (for example from the Dashboard) instead of scanning again.
+    const cached = useCleanupScanStore.getState().fresh();
+    if (cached) {
+      applyScanResults(cached);
+    } else {
+      handleScan();
+    }
   }, []);
 
   const toggleSelectRule = (ruleId: string) => {
@@ -209,11 +198,12 @@ export const CleanupPage: React.FC = () => {
           t.cleanup.trashFailedTitle,
           `${failedTrash.length} items require manual disposal decisions.`
         );
-        setManualConflictPath(failedTrash[0]);
+        setFailedQueue(failedTrash);
+        setFailedTotal(failedTrash.length);
       } else {
         toast.success(
           t.cleanup.cleanComplete,
-          `${formatBytes(result.total_freed_bytes)} ${t.dashboard.reclaimedNotice}`
+          describeDisposal(result, t, formatBytes)
         );
       }
     } catch (e) {
@@ -247,8 +237,12 @@ export const CleanupPage: React.FC = () => {
   const handleRetryTrash = async (path: string) => {
     setResolvingPath(true);
     try {
-      await invoke("retry_failed_trash", { path });
-      setManualConflictPath(null);
+      const outcome = await invoke<DisposalItemResult>("retry_failed_trash", { path });
+      if (outcome.success) {
+        resolveCurrentConflict();
+      } else {
+        toast.error(t.cleanup.trashFailedTitle, outcome.error ?? "");
+      }
     } catch (e) {
       toast.error("Retry Failed", String(e));
     } finally {
@@ -259,8 +253,12 @@ export const CleanupPage: React.FC = () => {
   const handleForceDelete = async (path: string) => {
     setResolvingPath(true);
     try {
-      await invoke("force_delete_permanently", { path });
-      setManualConflictPath(null);
+      const outcome = await invoke<DisposalItemResult>("force_delete_permanently", { path });
+      if (outcome.success) {
+        resolveCurrentConflict();
+      } else {
+        toast.error(t.cleanup.trashFailedTitle, outcome.error ?? "");
+      }
     } catch (e) {
       toast.error("Permanent Delete Failed", String(e));
     } finally {
@@ -393,7 +391,7 @@ export const CleanupPage: React.FC = () => {
           <div className="flex items-center gap-2.5 text-emerald-400">
             <CheckmarkCircle24Filled className="w-5 h-5 text-emerald-400 shrink-0" />
             <span>
-              <strong>{t.cleanup.cleanComplete}:</strong> {formatBytes(lastDisposal.total_freed_bytes)} {t.dashboard.reclaimedNotice} ({lastDisposal.successful_items} {t.common.files} processed).
+              <strong>{t.cleanup.cleanComplete}:</strong> {describeDisposal(lastDisposal, t, formatBytes)} ({lastDisposal.successful_items} {t.common.files}).
             </span>
           </div>
           <button
@@ -479,11 +477,17 @@ export const CleanupPage: React.FC = () => {
               Session: {lastDisposal.session_id.substring(0, 8)}...
             </div>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 font-ibm-mono">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 font-ibm-mono">
             <div className="p-2.5 bg-black/20 rounded-[4px] border border-[var(--border-subtle)]">
               <div className="text-[11px] text-[var(--text-muted)] font-sans">{t.cleanup.reclaimedSpace}</div>
               <div className="text-lg font-bold text-emerald-400 mt-0.5 tabular-nums">
                 {formatBytes(lastDisposal.total_freed_bytes)}
+              </div>
+            </div>
+            <div className="p-2.5 bg-black/20 rounded-[4px] border border-[var(--border-subtle)]">
+              <div className="text-[11px] text-[var(--text-muted)] font-sans">{t.cleanup.movedToRecycleBin}</div>
+              <div className="text-lg font-bold text-[var(--text-primary)] mt-0.5 tabular-nums">
+                {formatBytes(lastDisposal.recycled_bytes ?? 0)}
               </div>
             </div>
             <div className="p-2.5 bg-black/20 rounded-[4px] border border-[var(--border-subtle)]">
@@ -798,7 +802,14 @@ export const CleanupPage: React.FC = () => {
                 <Warning20Filled className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="font-semibold text-[var(--text-primary)] text-sm">{t.cleanup.trashFailedTitle}</h3>
+                <h3 className="font-semibold text-[var(--text-primary)] text-sm">
+                  {t.cleanup.trashFailedTitle}
+                  {failedTotal > 1 && (
+                    <span className="ml-2 font-ibm-mono text-xs text-[var(--text-muted)]">
+                      {failedTotal - failedQueue.length + 1} / {failedTotal}
+                    </span>
+                  )}
+                </h3>
                 <p className="text-xs text-[var(--text-secondary)]">{t.cleanup.trashFailedDesc}</p>
               </div>
             </div>
@@ -814,7 +825,7 @@ export const CleanupPage: React.FC = () => {
             <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--border-divider)]">
               <WinUIButton
                 variant="standard"
-                onClick={() => setManualConflictPath(null)}
+                onClick={resolveCurrentConflict}
                 disabled={resolvingPath}
               >
                 {t.cleanup.keepFileAction}

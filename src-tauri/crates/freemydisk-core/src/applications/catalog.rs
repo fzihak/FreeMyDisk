@@ -1,6 +1,5 @@
 use super::InstalledAppInfo;
 use freemydisk_platform::{get_platform, PlatformApplications};
-use std::collections::HashSet;
 use std::path::Path;
 use walkdir::WalkDir;
 
@@ -13,16 +12,18 @@ impl ApplicationCatalog {
         let raw_apps = platform.list_installed_apps().map_err(|e| e.to_string())?;
 
         let procs = platform.list_running_processes().unwrap_or_default();
-        let running_names: HashSet<String> =
-            procs.into_iter().map(|p| p.name.to_lowercase()).collect();
 
         let apps: Vec<InstalledAppInfo> = raw_apps
             .into_iter()
             .map(|raw| {
-                let lower_name = raw.name.to_lowercase();
-                let is_running = running_names.iter().any(|p| {
-                    p.contains(&lower_name) || lower_name.contains(p.trim_end_matches(".exe"))
-                });
+                let dirs = super::process_control::app_folders(
+                    raw.install_location.as_deref(),
+                    raw.display_icon.as_deref(),
+                );
+                let is_running = !dirs.is_empty()
+                    && procs
+                        .iter()
+                        .any(|p| super::process_control::runs_from(p, &dirs));
 
                 // If estimated size is missing in registry, attempt to resolve from install_location
                 let estimated_size_bytes = match raw.estimated_size_bytes {

@@ -25,7 +25,15 @@ pub struct DisposalSummary {
     pub total_requested_items: usize,
     pub successful_items: usize,
     pub failed_items: usize,
+    /// Items that no longer existed when their turn came.
+    #[serde(default)]
+    pub skipped_items: usize,
+    /// Bytes actually removed from disk. Items moved to the Recycle Bin still
+    /// occupy the same volume, so they are counted in `recycled_bytes` instead.
     pub total_freed_bytes: u64,
+    /// Bytes moved to the Recycle Bin.
+    #[serde(default)]
+    pub recycled_bytes: u64,
     pub results: Vec<DisposalItemResult>,
     pub failed_trash_paths: Vec<PathBuf>,
 }
@@ -88,8 +96,10 @@ impl DisposalEngine {
         let mut results = Vec::new();
         let mut failed_trash = Vec::new();
         let mut total_freed_bytes = 0u64;
+        let mut recycled_bytes = 0u64;
         let mut successful_items = 0usize;
         let mut failed_items = 0usize;
+        let mut skipped_items = 0usize;
 
         for (idx, item) in plan_items.iter().enumerate() {
             if cancel.is_cancelled() {
@@ -97,158 +107,157 @@ impl DisposalEngine {
             }
 
             let path = &item.original_path;
+            'item: {
+                if !path.exists() {
+                    skipped_items += 1;
+                    results.push(DisposalItemResult {
+                        path: path.clone(),
+                        success: true,
+                        bytes_freed: 0,
+                        route_used: "missing".to_string(),
+                        error: None,
+                    });
+                    break 'item;
+                }
 
-            // Step 1: Re-validate path and hard-filter protected subpaths
-            if !path.exists() {
-                continue;
-            }
+                if let Err(e) = ProtectedPathRegistry::assert_safe_for_disposal(path) {
+                    log::error!("Safety violation refused for {}: {}", path.display(), e);
+                    results.push(DisposalItemResult {
+                        path: path.clone(),
+                        success: false,
+                        bytes_freed: 0,
+                        route_used: "rejected".to_string(),
+                        error: Some(e.to_string()),
+                    });
+                    failed_items += 1;
+                    break 'item;
+                }
 
-            if let Err(e) = ProtectedPathRegistry::assert_safe_for_disposal(path) {
-                log::error!("Safety violation refused for {}: {}", path.display(), e);
-                results.push(DisposalItemResult {
-                    path: path.clone(),
-                    success: false,
-                    bytes_freed: 0,
-                    route_used: "rejected".to_string(),
-                    error: Some(e.to_string()),
-                });
-                failed_items += 1;
-                continue;
-            }
+                let route_is_permanent = !always_trash_override
+                    && item.verified_rebuildable
+                    && item.default_action == "permanent"
+                    && (item.risk == "safe" || item.risk == "recoverable");
+                let planned_action = if route_is_permanent {
+                    "permanent"
+                } else {
+                    "trash"
+                };
 
-            // Step 2: Classify disposal route
-            let route_is_permanent = !always_trash_override
-                && item.verified_rebuildable
-                && item.default_action == "permanent"
-                && (item.risk == "safe" || item.risk == "recoverable");
+                // Write intent to the crash recovery journal before touching the disk.
+                let staging_path = route_is_permanent.then(|| generate_staging_path(path));
+                let journal_id = match journal.write_intent(
+                    &session_id,
+                    path,
+                    staging_path.as_deref(),
+                    planned_action,
+                ) {
+                    Ok(id) => id,
+                    Err(e) => {
+                        log::error!(
+                            "Failed to pre-log journal intent for {}: {}",
+                            path.display(),
+                            e
+                        );
+                        results.push(DisposalItemResult {
+                            path: path.clone(),
+                            success: false,
+                            bytes_freed: 0,
+                            route_used: planned_action.to_string(),
+                            error: Some(format!("journal_error: {}", e)),
+                        });
+                        failed_items += 1;
+                        break 'item;
+                    }
+                };
 
-            let planned_action = if route_is_permanent {
-                "permanent"
-            } else {
-                "trash"
-            };
-
-            // Step 3: Write intent to WAL crash recovery journal
-            let staging_path = if route_is_permanent {
-                Some(generate_staging_path(path))
-            } else {
-                None
-            };
-
-            let journal_id = match journal.write_intent(
-                &session_id,
-                path,
-                staging_path.as_deref(),
-                planned_action,
-            ) {
-                Ok(id) => id,
-                Err(e) => {
+                // Re-validate right before acting (TOCTOU).
+                if let Err(e) = ProtectedPathRegistry::assert_safe_for_disposal(path) {
                     log::error!(
-                        "Failed to pre-log journal intent for {}: {}",
+                        "TOCTOU safety violation refused for {}: {}",
                         path.display(),
                         e
                     );
+                    let _ = journal.mark_failed(journal_id, &e.to_string());
                     results.push(DisposalItemResult {
                         path: path.clone(),
                         success: false,
                         bytes_freed: 0,
                         route_used: planned_action.to_string(),
-                        error: Some(format!("journal_error: {}", e)),
+                        error: Some(e.to_string()),
                     });
                     failed_items += 1;
-                    continue;
+                    break 'item;
                 }
-            };
 
-            // Step 4: Execute disposal (with TOCTOU race re-validation)
-            if let Err(e) = ProtectedPathRegistry::assert_safe_for_disposal(path) {
-                log::error!(
-                    "TOCTOU safety violation refused for {}: {}",
-                    path.display(),
-                    e
-                );
-                let _ = journal.mark_failed(journal_id, &e.to_string());
-                results.push(DisposalItemResult {
-                    path: path.clone(),
-                    success: false,
-                    bytes_freed: 0,
-                    route_used: planned_action.to_string(),
-                    error: Some(e.to_string()),
-                });
-                failed_items += 1;
-                continue;
-            }
-
-            if route_is_permanent {
-                let (freed, err) = delete_through_staging(
-                    path,
-                    staging_path.as_deref(),
-                    journal,
-                    journal_id,
-                    cancel,
-                );
-                if freed > 0 || err.is_none() {
-                    let actual_freed = if freed > 0 { freed } else { item.size_bytes };
-                    let _ = journal.mark_completed(journal_id);
-                    results.push(DisposalItemResult {
-                        path: path.clone(),
-                        success: true,
-                        bytes_freed: actual_freed,
-                        route_used: "permanent".to_string(),
-                        error: None,
-                    });
-                    total_freed_bytes += actual_freed;
-                    successful_items += 1;
-                } else {
-                    let err_msg = err.unwrap_or_else(|| "Failed to delete item".to_string());
-                    let _ = journal.mark_failed(journal_id, &err_msg);
-                    results.push(DisposalItemResult {
-                        path: path.clone(),
-                        success: false,
-                        bytes_freed: 0,
-                        route_used: "permanent".to_string(),
-                        error: Some(err_msg),
-                    });
-                    failed_items += 1;
-                }
-            } else {
-                // TRASH ROUTE (Default)
-                match platform.trash_path(path) {
-                    Ok(()) => {
-                        let _ = journal.mark_completed(journal_id);
-                        results.push(DisposalItemResult {
-                            path: path.clone(),
-                            success: true,
-                            bytes_freed: item.size_bytes,
-                            route_used: "trash".to_string(),
-                            error: None,
-                        });
-                        total_freed_bytes += item.size_bytes;
+                if route_is_permanent {
+                    let (freed, err) = delete_through_staging(
+                        path,
+                        staging_path.as_deref(),
+                        journal,
+                        journal_id,
+                        cancel,
+                    );
+                    // Only measured bytes count, also when deletion was partial.
+                    total_freed_bytes += freed;
+                    let _ = match err {
+                        None => journal.mark_completed(journal_id),
+                        Some(ref msg) => journal.mark_failed(journal_id, msg),
+                    };
+                    if err.is_none() {
                         successful_items += 1;
-                    }
-                    Err(e) => {
-                        // Never fall back to permanent deletion: the item is reported so the
-                        // user can decide explicitly (retry trash or force delete).
-                        log::warn!(
-                            "Trash failed for '{}'. Refusing automatic permanent deletion. Error: {}",
-                            path.display(),
-                            e
-                        );
-                        let _ = journal.mark_failed(journal_id, "trash_unavailable");
-                        results.push(DisposalItemResult {
-                            path: path.clone(),
-                            success: false,
-                            bytes_freed: 0,
-                            route_used: "trash".to_string(),
-                            error: Some("trash_unavailable".to_string()),
-                        });
-                        failed_trash.push(path.clone());
+                    } else {
                         failed_items += 1;
                     }
+                    results.push(DisposalItemResult {
+                        path: path.clone(),
+                        success: err.is_none(),
+                        bytes_freed: freed,
+                        route_used: "permanent".to_string(),
+                        error: err,
+                    });
+                } else {
+                    match platform.trash_path(path) {
+                        Ok(()) => {
+                            let _ = journal.mark_completed(journal_id);
+                            results.push(DisposalItemResult {
+                                path: path.clone(),
+                                success: true,
+                                bytes_freed: item.size_bytes,
+                                route_used: "trash".to_string(),
+                                error: None,
+                            });
+                            recycled_bytes += item.size_bytes;
+                            successful_items += 1;
+                        }
+                        Err(e) => {
+                            // Never fall back to permanent deletion: the item is reported so the
+                            // user can decide explicitly (retry trash or force delete).
+                            log::warn!(
+                                "Trash failed for '{}'. Refusing automatic permanent deletion. Error: {}",
+                                path.display(),
+                                e
+                            );
+                            let _ = journal.mark_failed(journal_id, "trash_unavailable");
+                            results.push(DisposalItemResult {
+                                path: path.clone(),
+                                success: false,
+                                bytes_freed: 0,
+                                route_used: "trash".to_string(),
+                                error: Some("trash_unavailable".to_string()),
+                            });
+                            failed_trash.push(path.clone());
+                            failed_items += 1;
+                        }
+                    }
                 }
             }
 
-            on_progress(idx + 1, plan_items.len(), path, total_freed_bytes);
+            on_progress(
+                idx + 1,
+                plan_items.len(),
+                path,
+                total_freed_bytes + recycled_bytes,
+            );
         }
 
         Ok(DisposalSummary {
@@ -256,7 +265,9 @@ impl DisposalEngine {
             total_requested_items: plan_items.len(),
             successful_items,
             failed_items,
+            skipped_items,
             total_freed_bytes,
+            recycled_bytes,
             results,
             failed_trash_paths: failed_trash,
         })
@@ -286,18 +297,6 @@ impl DisposalEngine {
                 CoreError::LockBusy
             })?;
 
-        let size = if path.is_dir() {
-            walkdir::WalkDir::new(path)
-                .min_depth(1)
-                .into_iter()
-                .filter_map(|e| e.ok())
-                .filter(|e| e.file_type().is_file())
-                .filter_map(|e| e.metadata().ok().map(|m| m.len()))
-                .sum()
-        } else {
-            path.metadata().map(|m| m.len()).unwrap_or(0)
-        };
-
         let session_id = format!("manual-{}", Uuid::new_v4());
         let staging_path = generate_staging_path(path);
 
@@ -307,27 +306,17 @@ impl DisposalEngine {
         let cancel = CancellationToken::new();
         let (freed, err) =
             delete_through_staging(path, Some(&staging_path), journal, journal_id, &cancel);
-        if freed > 0 || err.is_none() {
-            let actual_freed = if freed > 0 { freed } else { size };
-            let _ = journal.mark_completed(journal_id);
-            Ok(DisposalItemResult {
-                path: path.to_path_buf(),
-                success: true,
-                bytes_freed: actual_freed,
-                route_used: "permanent".to_string(),
-                error: None,
-            })
-        } else {
-            let err_msg = err.unwrap_or_else(|| "Failed to delete item".to_string());
-            let _ = journal.mark_failed(journal_id, &err_msg);
-            Ok(DisposalItemResult {
-                path: path.to_path_buf(),
-                success: false,
-                bytes_freed: 0,
-                route_used: "permanent".to_string(),
-                error: Some(err_msg),
-            })
-        }
+        let _ = match err {
+            None => journal.mark_completed(journal_id),
+            Some(ref msg) => journal.mark_failed(journal_id, msg),
+        };
+        Ok(DisposalItemResult {
+            path: path.to_path_buf(),
+            success: err.is_none(),
+            bytes_freed: freed,
+            route_used: "permanent".to_string(),
+            error: err,
+        })
     }
 }
 

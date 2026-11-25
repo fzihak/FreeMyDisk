@@ -697,10 +697,14 @@ fn handle_clean(
     print_disposal_summary(&summary, format);
 }
 
+/// Journal and lock folder shared with the desktop app, so the two never dispose of
+/// files at the same time and CLI runs appear in the app's history.
 fn get_cli_recovery_context() -> (CrashRecoveryJournal, PathBuf) {
-    let temp_dir = std::env::temp_dir().join("freemydisk_cli");
-    let _ = std::fs::create_dir_all(&temp_dir);
-    let journal_path = temp_dir.join("recovery_journal.db");
+    let data_dir = freemydisk_core::shared::paths::app_data_dir()
+        .unwrap_or_else(|| std::env::temp_dir().join("freemydisk_cli"));
+    let lock_dir = data_dir.join("locks");
+    let _ = std::fs::create_dir_all(&lock_dir);
+    let journal_path = data_dir.join("journal.db");
     let journal = match CrashRecoveryJournal::open(&journal_path) {
         Ok(j) => j,
         Err(e) => {
@@ -712,7 +716,7 @@ fn get_cli_recovery_context() -> (CrashRecoveryJournal, PathBuf) {
             std::process::exit(1);
         }
     };
-    (journal, temp_dir)
+    (journal, lock_dir)
 }
 
 fn print_disposal_summary(summary: &DisposalSummary, format: OutputFormat) {

@@ -7,12 +7,11 @@ authors.workspace = true
 license.workspace = true
 
 [dependencies]
-blake3 = { version = "1.5", features = ["rayon", "mmap"] }
+blake3 = { version = "1.5", features = ["rayon"] }
 crossbeam = "0.8"
 dunce = "1.0"
 freemydisk-platform = { path = "../freemydisk-platform" }
 log = "0.4"
-memmap2 = "0.9"
 parking_lot = "0.12"
 rayon = "1.10"
 rusqlite = { version = "0.32", features = ["bundled"] }

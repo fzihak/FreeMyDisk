@@ -8,6 +8,7 @@ verified_at = "2026-08-15"
 author = "FreeMyDisk Team"
 description = "Cached web images, scripts, and compiled code cache from Google Chrome"
 platform = "windows"
+locking_processes = ["chrome.exe"]
 
 [applicability]
 conditions = [

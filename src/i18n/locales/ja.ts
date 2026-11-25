@@ -120,6 +120,7 @@ export const ja: TranslationSchema = {
     "installedAppsCategory": "インストール済みアプリと機能",
     "systemReservedCategory": "システムおよび予約領域",
     "tempFilesCategory": "一時ファイルとキャッシュ",
+    "usedSpaceCategory": "使用中",
     "freeSpaceCategory": "空き容量"
   },
   "cleanup": {
@@ -150,6 +151,7 @@ export const ja: TranslationSchema = {
     "cleaningProgress": "クリーンアップ処理中...",
     "cleanComplete": "クリーンアップ完了",
     "reclaimedSpace": "回収された空き容量",
+    "movedToRecycleBin": "ごみ箱へ移動",
     "filesCleaned": "クリーンアップされたファイル数",
     "failedTrash": "ごみ箱への移動に失敗した項目",
     "allCleanTitle": "すべて正常にクリーンアップされました",
