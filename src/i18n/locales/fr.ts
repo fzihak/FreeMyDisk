@@ -247,6 +247,7 @@ export const fr: TranslationSchema = {
     "autoSelectRules": "Règles de sélection auto :",
     "selectAllDuplicates": "Sélectionner tous les doublons",
     "keepNewest": "Garder le plus récent (sélectionner les anciens)",
+    "keepOneCopy": "Conservez au moins une copie de chaque fichier.",
     "keepOldest": "Garder le plus ancien (sélectionner les récents)",
     "keepShortestPath": "Garder le chemin le plus court",
     "trashSelected": "Mettre les doublons à la corbeille",

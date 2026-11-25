@@ -1665,90 +1665,19 @@ async fn clean_project_artifacts(
 }
 
 #[tauri::command]
-#[allow(non_snake_case)]
 async fn trash_duplicate_files(
     app: AppHandle,
-    paths: Option<Vec<String>>,
-    file_paths: Option<Vec<String>>,
-    filePaths: Option<Vec<String>>,
-    groups: Option<Vec<DuplicateGroup>>,
+    groups: Vec<DuplicateGroup>,
 ) -> Result<DisposalSummary, String> {
     let operation = begin_operation(&app, "disposal");
     let cancel = operation.token();
     let journal = get_journal(&app)?;
     let failed_trash = app.state::<FailedTrashRegistry>().inner().clone();
-    let effective_paths = paths.or(file_paths).or(filePaths);
     let lock_dir = get_lock_dir(&app)?;
     let res = tauri::async_runtime::spawn_blocking(move || {
         let platform = get_platform();
-
-        if let Some(p_list) = effective_paths {
-            let items: Vec<freemydisk_core::cleanup::plan::CleanupPlanItem> = p_list
-                .into_iter()
-                .map(|p| {
-                    let pb = PathBuf::from(&p);
-                    let size = pb.metadata().map(|m| m.len()).unwrap_or(0);
-                    let canon = dunce::canonicalize(&pb)
-                        .unwrap_or_else(|_| dunce::simplified(&pb).to_path_buf());
-                    freemydisk_core::cleanup::plan::CleanupPlanItem {
-                        original_path: pb,
-                        canonical_path: canon,
-                        size_bytes: size,
-                        is_dir: false,
-                        matched_rules: vec!["duplicate_finder".to_string()],
-                        default_action: "trash".to_string(),
-                        verified_rebuildable: false,
-                        protect_subpaths: Vec::new(),
-                        risk: "safe".to_string(),
-                    }
-                })
-                .collect();
-
-            let app_clone = app.clone();
-            DisposalEngine::execute_plan_with_progress(
-                &items,
-                &platform,
-                &journal,
-                &lock_dir,
-                true,
-                &cancel,
-                move |idx, total, path, freed| {
-                    let pct = if total > 0 {
-                        ((idx as f32 / total as f32) * 100.0) as u8
-                    } else {
-                        100
-                    };
-                    let _ = app_clone.emit(
-                        "scan-progress",
-                        AppScanProgress {
-                            scan_type: "disposal".to_string(),
-                            stage: format!("Recycling duplicate files ({}/{})", idx, total),
-                            percent: pct.min(100),
-                            items_scanned: idx as u64,
-                            current_path: path.to_string_lossy().to_string(),
-                            bytes_found: freed,
-                            is_complete: idx >= total,
-                        },
-                    );
-                },
-            )
+        DuplicateDetector::batch_trash_duplicates(&groups, &platform, &journal, &lock_dir, &cancel)
             .map_err(|e| e.to_string())
-        } else if let Some(g_list) = groups {
-            DuplicateDetector::batch_trash_duplicates(
-                &g_list, &platform, &journal, &lock_dir, &cancel,
-            )
-            .map_err(|e| e.to_string())
-        } else {
-            Ok(DisposalSummary {
-                session_id: uuid::Uuid::new_v4().to_string(),
-                total_requested_items: 0,
-                successful_items: 0,
-                failed_items: 0,
-                total_freed_bytes: 0,
-                results: Vec::new(),
-                failed_trash_paths: Vec::new(),
-            })
-        }
     })
     .await
     .map_err(|e| e.to_string())?;

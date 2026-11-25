@@ -247,6 +247,7 @@ export const zhCN: TranslationSchema = {
     "autoSelectRules": "智能勾选策略:",
     "selectAllDuplicates": "全选所有重复副本",
     "keepNewest": "保留最新文件 (勾选旧文件)",
+    "keepOneCopy": "每个文件至少保留一个副本。",
     "keepOldest": "保留最旧文件 (勾选新文件)",
     "keepShortestPath": "保留最短路径文件",
     "trashSelected": "清理选中的重复副本",

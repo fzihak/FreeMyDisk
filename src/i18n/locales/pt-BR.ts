@@ -247,6 +247,7 @@ export const ptBR: TranslationSchema = {
     "autoSelectRules": "Regras de Seleção Automática:",
     "selectAllDuplicates": "Selecionar Todos os Duplicados",
     "keepNewest": "Manter Mais Recente (Selecionar Antigos)",
+    "keepOneCopy": "Mantenha pelo menos uma cópia de cada arquivo.",
     "keepOldest": "Manter Mais Antigo (Selecionar Recentes)",
     "keepShortestPath": "Manter Caminho Mais Curto",
     "trashSelected": "Mover Duplicados para a Lixeira",
