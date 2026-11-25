@@ -1,15 +1,13 @@
 pub mod applications;
-pub mod io_priority;
 pub mod maintenance;
-pub mod memory;
 pub mod optimization;
-pub mod power;
 pub mod privacy;
 pub mod restart_manager;
 pub mod startup;
-pub mod storage_optim;
 pub mod usn_scan;
 pub mod win32_fast_scan;
+
+pub use crate::{io_priority, memory, power, storage_optim};
 
 use crate::traits::{
     EmergencyRescueSummary, ExplorerSettings, FileIdentity, HibernationInfo, MaintenanceTaskKind,

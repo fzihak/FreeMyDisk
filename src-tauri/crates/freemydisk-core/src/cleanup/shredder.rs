@@ -106,8 +106,8 @@ fn is_ssd_media(path: &Path) -> bool {
     #[cfg(target_os = "windows")]
     {
         let drive_char = path.to_string_lossy().chars().next().unwrap_or('C');
-        let media = freemydisk_platform::windows::storage_optim::detect_drive_media(drive_char);
-        media == freemydisk_platform::windows::storage_optim::DriveMedia::Ssd
+        let media = freemydisk_platform::storage_optim::detect_drive_media(drive_char);
+        media == freemydisk_platform::storage_optim::DriveMedia::Ssd
     }
     #[cfg(not(target_os = "windows"))]
     {

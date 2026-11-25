@@ -343,8 +343,7 @@ fn handle_request(req: ElevatedRequest, expected_token: Option<&str>) -> Elevate
                         }
                     } else {
                         use freemydisk_platform::traits::PlatformStartup;
-                        let handler =
-                            freemydisk_platform::windows::startup::WindowsStartupHandler::new();
+                        let handler = freemydisk_platform::get_platform();
                         match handler.set_startup_entry_state(&p.entry_id, p.enable) {
                             Ok(()) => ElevatedResponse {
                                 success: true,
@@ -385,8 +384,7 @@ fn handle_request(req: ElevatedRequest, expected_token: Option<&str>) -> Elevate
                         }
                     } else {
                         use freemydisk_platform::traits::PlatformStartup;
-                        let handler =
-                            freemydisk_platform::windows::startup::WindowsStartupHandler::new();
+                        let handler = freemydisk_platform::get_platform();
                         match handler.delete_startup_entry(&p.entry_id) {
                             Ok(()) => ElevatedResponse {
                                 success: true,

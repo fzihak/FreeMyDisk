@@ -108,8 +108,8 @@ fn trim_process_memory() {
 }
 
 #[tauri::command]
-fn get_power_state() -> freemydisk_platform::windows::power::PowerState {
-    freemydisk_platform::windows::power::get_system_power_state()
+fn get_power_state() -> freemydisk_platform::power::PowerState {
+    freemydisk_platform::power::get_system_power_state()
 }
 
 #[tauri::command]
@@ -128,8 +128,7 @@ async fn compact_wsl_distribution(
         return Err("WSL distribution name cannot be empty".to_string());
     }
     tauri::async_runtime::spawn_blocking(move || {
-        let _bg_guard =
-            freemydisk_platform::windows::io_priority::BackgroundExecutionGuard::enter();
+        let _bg_guard = freemydisk_platform::io_priority::BackgroundExecutionGuard::enter();
         freemydisk_core::virtualization::WslManager::compact_distribution(name.trim())
             .map_err(|e| e.to_string())
     })
@@ -140,8 +139,7 @@ async fn compact_wsl_distribution(
 #[tauri::command]
 async fn docker_prune(prune_type: String) -> Result<u64, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        let _bg_guard =
-            freemydisk_platform::windows::io_priority::BackgroundExecutionGuard::enter();
+        let _bg_guard = freemydisk_platform::io_priority::BackgroundExecutionGuard::enter();
         freemydisk_core::virtualization::DockerManager::prune(&prune_type)
             .map_err(|e| e.to_string())
     })
@@ -573,8 +571,7 @@ async fn scan_cleanup_rules(app: AppHandle) -> Result<Vec<RuleScanSummary>, Stri
     let app_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
     let app_emitter = app.clone();
     tauri::async_runtime::spawn_blocking(move || {
-        let _bg_guard =
-            freemydisk_platform::windows::io_priority::BackgroundExecutionGuard::enter();
+        let _bg_guard = freemydisk_platform::io_priority::BackgroundExecutionGuard::enter();
         let mut engine = RuleEngine::new();
         let custom_rules_dir = app_dir.join("custom_rules");
         let _ = engine.load_custom_rules_from_dir(&custom_rules_dir);
@@ -727,8 +724,7 @@ async fn execute_cleanup_plan(
     let app_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
     let lock_dir = get_lock_dir(&app)?;
     tauri::async_runtime::spawn_blocking(move || {
-        let _bg_guard =
-            freemydisk_platform::windows::io_priority::BackgroundExecutionGuard::enter();
+        let _bg_guard = freemydisk_platform::io_priority::BackgroundExecutionGuard::enter();
         let journal_path = app_dir.join("journal.db");
         let journal = CrashRecoveryJournal::open(&journal_path).map_err(|e| e.to_string())?;
         let platform = get_platform();
@@ -746,7 +742,7 @@ async fn execute_cleanup_plan(
 
         if let Ok(ref s) = res {
             if s.total_freed_bytes >= 5 * 1024 * 1024 * 1024 {
-                freemydisk_platform::windows::storage_optim::trigger_background_trim_if_ssd('C');
+                freemydisk_platform::storage_optim::trigger_background_trim_if_ssd('C');
             }
             let _ = platform.refresh_shell();
         }
@@ -815,8 +811,7 @@ async fn execute_cleanup_rules(
     let app_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
     let lock_dir = get_lock_dir(&app)?;
     tauri::async_runtime::spawn_blocking(move || {
-        let _bg_guard =
-            freemydisk_platform::windows::io_priority::BackgroundExecutionGuard::enter();
+        let _bg_guard = freemydisk_platform::io_priority::BackgroundExecutionGuard::enter();
         let journal_path = app_dir.join("journal.db");
         let journal = CrashRecoveryJournal::open(&journal_path).map_err(|e| e.to_string())?;
         let platform = get_platform();
@@ -981,7 +976,7 @@ async fn execute_cleanup_rules(
         }
 
         if summary.total_freed_bytes >= 5 * 1024 * 1024 * 1024 {
-            freemydisk_platform::windows::storage_optim::trigger_background_trim_if_ssd('C');
+            freemydisk_platform::storage_optim::trigger_background_trim_if_ssd('C');
         }
         let _ = platform.refresh_shell();
 
@@ -1818,8 +1813,7 @@ async fn uninstall_uwp_application(
 async fn scan_deep_leftovers() -> Result<Vec<freemydisk_core::applications::LeftoverGroup>, String>
 {
     let res = tauri::async_runtime::spawn_blocking(|| {
-        let _bg_guard =
-            freemydisk_platform::windows::io_priority::BackgroundExecutionGuard::enter();
+        let _bg_guard = freemydisk_platform::io_priority::BackgroundExecutionGuard::enter();
         ApplicationService::new().scan_deep_leftovers()
     })
     .await
@@ -1837,8 +1831,7 @@ async fn clean_leftovers_safe(
 ) -> Result<u64, String> {
     let incl_reg = include_registry.or(includeRegistry).unwrap_or(true);
     let res = tauri::async_runtime::spawn_blocking(move || {
-        let _bg_guard =
-            freemydisk_platform::windows::io_priority::BackgroundExecutionGuard::enter();
+        let _bg_guard = freemydisk_platform::io_priority::BackgroundExecutionGuard::enter();
         freemydisk_core::applications::LeftoverScanner::clean_items(&paths, incl_reg)
     })
     .await
