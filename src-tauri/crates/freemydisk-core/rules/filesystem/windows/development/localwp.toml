@@ -1,0 +1,28 @@
+[rule]
+id = "windows_dev_localwp"
+name = "LocalWP MySQL Sockets & Runtime Logs"
+category = "development"
+risk = "low"
+verified_rebuildable = true
+verified_at = "2026-09-09"
+author = "FreeMyDisk Team"
+description = "Abandoned MySQL run sockets, server pids, and transient logs from LocalWP (often 20GB-30GB)"
+platform = "windows"
+
+[applicability]
+conditions = [
+    { type = "path_exists", path = "${app_data}/Local/run" }
+]
+
+[targets]
+paths = [
+    { path = "${app_data}/Local/run/*", matcher = "glob" },
+    { path = "${local_app_data}/Local/run/*", matcher = "glob" },
+    { path = "${app_data}/Local/logs/*", matcher = "glob" },
+    { path = "${local_app_data}/Local/logs/*", matcher = "glob" },
+    { path = "${local_app_data}/Local/run/mysql/data/*.log", matcher = "glob" }
+]
+
+[disposal]
+default_action = "trash"
+protect_subpaths = []

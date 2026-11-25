@@ -1,0 +1,25 @@
+[rule]
+id = "windows_dev_build_accelerator_cache"
+name = "Turborepo & Nx Build Caches"
+category = "development"
+risk = "safe"
+verified_rebuildable = true
+verified_at = "2026-10-06"
+author = "FreeMyDisk Team"
+description = "Monorepo computation caches and task artifact archives from Turborepo and Nx"
+platform = "windows"
+
+[applicability]
+conditions = [
+    { type = "path_exists", path = "${local_app_data}/turborepo" }
+]
+
+[targets]
+paths = [
+    { path = "${local_app_data}/turborepo/cache/*", matcher = "glob" },
+    { path = "${user_profile}/.nx/cache/*", matcher = "glob" }
+]
+
+[disposal]
+default_action = "permanent"
+protect_subpaths = []

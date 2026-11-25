@@ -1,0 +1,24 @@
+[rule]
+id = "windows_dev_cargo_cache"
+name = "Rust Cargo Registry Cache"
+category = "development"
+risk = "safe"
+verified_rebuildable = true
+verified_at = "2026-08-15"
+author = "FreeMyDisk Team"
+description = "Downloaded crates.io crate archives (.crate) in the Cargo registry"
+platform = "windows"
+
+[applicability]
+conditions = [
+    { type = "path_exists", path = "${home}/.cargo/registry/cache" }
+]
+
+[targets]
+paths = [
+    { path = "${home}/.cargo/registry/cache/*/*.crate", matcher = "glob" }
+]
+
+[disposal]
+default_action = "permanent"
+protect_subpaths = []

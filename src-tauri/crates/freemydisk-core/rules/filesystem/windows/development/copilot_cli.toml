@@ -1,0 +1,24 @@
+[rule]
+id = "windows_dev_copilot_cli_cache"
+name = "GitHub Copilot CLI Session Logs"
+category = "development"
+risk = "safe"
+verified_rebuildable = true
+verified_at = "2026-10-06"
+author = "FreeMyDisk Team"
+description = "Temporary session logs and telemetry cached by GitHub Copilot CLI"
+platform = "windows"
+
+[applicability]
+conditions = [
+    { type = "path_exists", path = "${user_profile}/.copilot" }
+]
+
+[targets]
+paths = [
+    { path = "${user_profile}/.copilot/cache/*", matcher = "glob" }
+]
+
+[disposal]
+default_action = "permanent"
+protect_subpaths = ["*/config.json"]

@@ -1,0 +1,25 @@
+[rule]
+id = "windows_dev_rustup_tmp"
+name = "Rustup Temporary Downloads"
+category = "development"
+risk = "safe"
+verified_rebuildable = true
+verified_at = "2026-10-06"
+author = "FreeMyDisk Team"
+description = "Incomplete toolchain downloads and temporary staging archives in rustup"
+platform = "windows"
+
+[applicability]
+conditions = [
+    { type = "path_exists", path = "${user_profile}/.rustup" }
+]
+
+[targets]
+paths = [
+    { path = "${user_profile}/.rustup/tmp/*", matcher = "glob" },
+    { path = "${user_profile}/.rustup/downloads/*", matcher = "glob" }
+]
+
+[disposal]
+default_action = "permanent"
+protect_subpaths = ["*/settings.toml"]

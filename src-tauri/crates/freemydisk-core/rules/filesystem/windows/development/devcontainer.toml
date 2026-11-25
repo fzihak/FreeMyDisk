@@ -1,0 +1,24 @@
+[rule]
+id = "windows_dev_devcontainer_features_cache"
+name = "Dev Container Features Cache"
+category = "development"
+risk = "safe"
+verified_rebuildable = true
+verified_at = "2026-10-06"
+author = "FreeMyDisk Team"
+description = "Downloaded feature layers and templates cached by VS Code Dev Containers"
+platform = "windows"
+
+[applicability]
+conditions = [
+    { type = "path_exists", path = "${local_app_data}/devcontainers" }
+]
+
+[targets]
+paths = [
+    { path = "${local_app_data}/devcontainers/features/cache/*", matcher = "glob" }
+]
+
+[disposal]
+default_action = "permanent"
+protect_subpaths = []
