@@ -30,7 +30,7 @@ use tauri::{AppHandle, Emitter, Manager, State};
 mod services;
 mod state;
 use services::application_icon::{ApplicationIcon, ApplicationIconService};
-use state::{JournalState, PANIC_JOURNAL};
+use state::{JournalState, OperationGuard, OperationRegistry, PANIC_JOURNAL};
 
 /// Trims the physical memory working set for both FreeMyDisk and any child processes
 /// (such as WebView2 renderer/GPU processes), purging inactive pages back to Windows.
@@ -150,9 +150,6 @@ async fn docker_prune(prune_type: String) -> Result<u64, String> {
     .map_err(|e| e.to_string())?
 }
 
-#[derive(Default, Clone)]
-pub struct ScanCancellationState(pub Arc<Mutex<Option<CancellationToken>>>);
-
 /// Leftover paths and registry keys returned by leftover scans in this session.
 /// Cleanup only accepts these, so the webview cannot ask for arbitrary deletions.
 #[derive(Default, Clone)]
@@ -234,6 +231,10 @@ pub struct RecoveryStatus {
 
 fn get_journal(app: &AppHandle) -> Result<CrashRecoveryJournal, String> {
     app.state::<JournalState>().0.clone()
+}
+
+fn begin_operation(app: &AppHandle, kind: &str) -> OperationGuard {
+    app.state::<OperationRegistry>().begin(kind)
 }
 
 fn get_lock_dir(app: &AppHandle) -> Result<PathBuf, String> {
@@ -634,6 +635,8 @@ fn detect_locking_process(
 
 #[tauri::command]
 async fn scan_cleanup_rules(app: AppHandle) -> Result<Vec<RuleScanSummary>, String> {
+    let operation = begin_operation(&app, "cleanup");
+    let cancel = operation.token();
     let app_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
     let app_emitter = app.clone();
     tauri::async_runtime::spawn_blocking(move || {
@@ -641,7 +644,6 @@ async fn scan_cleanup_rules(app: AppHandle) -> Result<Vec<RuleScanSummary>, Stri
         let mut engine = RuleEngine::new();
         let custom_rules_dir = app_dir.join("custom_rules");
         let _ = engine.load_custom_rules_from_dir(&custom_rules_dir);
-        let cancel = CancellationToken::new();
 
         let app_emit_cb = app_emitter.clone();
         let mut summaries = engine
@@ -848,6 +850,8 @@ async fn execute_cleanup_rules(
     alwaysTrash: Option<bool>,
     plan: Option<CleanupPlanInput>,
 ) -> Result<DisposalSummary, String> {
+    let operation = begin_operation(&app, "disposal");
+    let cancel = operation.token();
     let journal = get_journal(&app)?;
     let failed_trash = app.state::<FailedTrashRegistry>().inner().clone();
     let effective_rule_ids = if let Some(ids) = rule_ids.or(ruleIds) {
@@ -884,7 +888,6 @@ async fn execute_cleanup_rules(
     let res = tauri::async_runtime::spawn_blocking(move || {
         let _bg_guard = freemydisk_platform::io_priority::BackgroundExecutionGuard::enter();
         let platform = get_platform();
-        let cancel = CancellationToken::new();
 
         // If dry_run simulation, do not modify files, do not close apps, do not empty recycle bin
         if is_dry_run {
@@ -1075,12 +1078,13 @@ async fn execute_cleanup_rules(
 
 #[tauri::command]
 async fn retry_failed_trash(app: AppHandle, path: String) -> Result<DisposalItemResult, String> {
+    let operation = begin_operation(&app, "disposal");
+    let cancel = operation.token();
     let journal = get_journal(&app)?;
     let failed_trash = app.state::<FailedTrashRegistry>().inner().clone();
     let lock_dir = get_lock_dir(&app)?;
     let res = tauri::async_runtime::spawn_blocking(move || {
         let platform = get_platform();
-        let cancel = CancellationToken::new();
 
         let pb = PathBuf::from(&path);
         let size = pb.metadata().map(|m| m.len()).unwrap_or(0);
@@ -1121,6 +1125,7 @@ async fn force_delete_permanently(
     app: AppHandle,
     path: String,
 ) -> Result<DisposalItemResult, String> {
+    let _operation = begin_operation(&app, "disposal");
     let journal = get_journal(&app)?;
     let failed_trash = app.state::<FailedTrashRegistry>().inner().clone();
     let pb = PathBuf::from(path);
@@ -1153,14 +1158,8 @@ fn get_storage_volumes() -> Result<Vec<StorageVolumeInfo>, String> {
 }
 
 #[tauri::command]
-fn cancel_active_scan(cancel_state: State<'_, ScanCancellationState>) -> bool {
-    let mut guard = cancel_state.0.lock().unwrap();
-    if let Some(token) = guard.take() {
-        token.cancel();
-        true
-    } else {
-        false
-    }
+fn cancel_active_scan(ops: State<'_, OperationRegistry>, kind: Option<String>) -> bool {
+    ops.cancel(kind.as_deref()) > 0
 }
 
 #[tauri::command]
@@ -1174,17 +1173,14 @@ async fn get_application_icons(paths: Vec<String>) -> Result<Vec<ApplicationIcon
 #[allow(non_snake_case)]
 async fn scan_storage_tree(
     app: AppHandle,
-    cancel_state: State<'_, ScanCancellationState>,
+    ops: State<'_, OperationRegistry>,
     path: String,
     max_depth: Option<usize>,
     maxDepth: Option<usize>,
 ) -> Result<StorageTreeNode, String> {
     let effective_depth = max_depth.or(maxDepth).unwrap_or(3);
-    let cancel = CancellationToken::new();
-    {
-        let mut guard = cancel_state.0.lock().unwrap();
-        *guard = Some(cancel.clone());
-    }
+    let operation = ops.begin("storage");
+    let cancel = operation.token();
     let cancel_for_task = cancel.clone();
 
     let _ = app.emit(
@@ -1210,11 +1206,6 @@ async fn scan_storage_tree(
     .await
     .map_err(|e| e.to_string())?;
 
-    {
-        let mut guard = cancel_state.0.lock().unwrap();
-        *guard = None;
-    }
-
     if let Ok(ref tree) = res {
         let _ = app.emit(
             "scan-progress",
@@ -1238,12 +1229,12 @@ async fn scan_storage_tree(
 #[allow(non_snake_case)]
 async fn scan_directory_storage(
     app: AppHandle,
-    cancel_state: State<'_, ScanCancellationState>,
+    ops: State<'_, OperationRegistry>,
     path: String,
     max_depth: Option<usize>,
     maxDepth: Option<usize>,
 ) -> Result<StorageTreeNode, String> {
-    scan_storage_tree(app, cancel_state, path, max_depth, maxDepth).await
+    scan_storage_tree(app, ops, path, max_depth, maxDepth).await
 }
 
 #[tauri::command]
@@ -1259,7 +1250,7 @@ fn export_storage_scan(tree: StorageTreeNode, format: String) -> Result<String, 
 #[allow(non_snake_case)]
 async fn scan_heavy_folders(
     app: AppHandle,
-    cancel_state: State<'_, ScanCancellationState>,
+    ops: State<'_, OperationRegistry>,
     root: String,
     min_size_bytes: Option<u64>,
     minSizeBytes: Option<u64>,
@@ -1267,11 +1258,8 @@ async fn scan_heavy_folders(
     let effective_min = min_size_bytes
         .or(minSizeBytes)
         .unwrap_or(1024 * 1024 * 1024);
-    let cancel = CancellationToken::new();
-    {
-        let mut guard = cancel_state.0.lock().unwrap();
-        *guard = Some(cancel.clone());
-    }
+    let operation = ops.begin("heavy_folders");
+    let cancel = operation.token();
     let cancel_for_task = cancel.clone();
     let app_emitter = app.clone();
     let res = tauri::async_runtime::spawn_blocking(move || {
@@ -1303,11 +1291,6 @@ async fn scan_heavy_folders(
     .await
     .map_err(|e| e.to_string())?;
 
-    {
-        let mut guard = cancel_state.0.lock().unwrap();
-        *guard = None;
-    }
-
     if let Ok(ref result) = res {
         let _ = app.emit(
             "scan-progress",
@@ -1331,7 +1314,7 @@ async fn scan_heavy_folders(
 #[allow(non_snake_case, clippy::too_many_arguments)]
 async fn scan_large_files(
     app: AppHandle,
-    cancel_state: State<'_, ScanCancellationState>,
+    ops: State<'_, OperationRegistry>,
     roots: Option<Vec<String>>,
     root: Option<String>,
     root_path: Option<String>,
@@ -1350,11 +1333,8 @@ async fn scan_large_files(
     }
 
     let effective_min = min_size_bytes.or(minSizeBytes).unwrap_or(100 * 1024 * 1024);
-    let cancel = CancellationToken::new();
-    {
-        let mut guard = cancel_state.0.lock().unwrap();
-        *guard = Some(cancel.clone());
-    }
+    let operation = ops.begin("large_files");
+    let cancel = operation.token();
     let cancel_for_task = cancel.clone();
     let app_emitter = app.clone();
     let res = tauri::async_runtime::spawn_blocking(move || {
@@ -1385,11 +1365,6 @@ async fn scan_large_files(
     .await
     .map_err(|e| e.to_string())?;
 
-    {
-        let mut guard = cancel_state.0.lock().unwrap();
-        *guard = None;
-    }
-
     if let Ok(ref result) = res {
         let _ = app.emit(
             "scan-progress",
@@ -1411,6 +1386,7 @@ async fn scan_large_files(
 
 #[tauri::command]
 async fn trash_large_file(app: AppHandle, path: String) -> Result<DisposalItemResult, String> {
+    let _operation = begin_operation(&app, "disposal");
     let journal = get_journal(&app)?;
     let failed_trash = app.state::<FailedTrashRegistry>().inner().clone();
     let lock_dir = get_lock_dir(&app)?;
@@ -1436,6 +1412,7 @@ async fn trash_large_files(
     file_paths: Option<Vec<String>>,
     filePaths: Option<Vec<String>>,
 ) -> Result<DisposalSummary, String> {
+    let _operation = begin_operation(&app, "disposal");
     let journal = get_journal(&app)?;
     let failed_trash = app.state::<FailedTrashRegistry>().inner().clone();
     let effective_paths = paths.or(file_paths).or(filePaths).unwrap_or_default();
@@ -1483,7 +1460,7 @@ async fn trash_large_files(
 #[allow(non_snake_case, clippy::too_many_arguments)]
 async fn scan_duplicate_files(
     app: AppHandle,
-    cancel_state: State<'_, ScanCancellationState>,
+    ops: State<'_, OperationRegistry>,
     roots: Option<Vec<String>>,
     root: Option<String>,
     root_path: Option<String>,
@@ -1503,11 +1480,8 @@ async fn scan_duplicate_files(
 
     let app_data = app.path().app_data_dir().ok();
     let effective_min = min_size_bytes.or(minSizeBytes).unwrap_or(1024 * 1024);
-    let cancel = CancellationToken::new();
-    {
-        let mut guard = cancel_state.0.lock().unwrap();
-        *guard = Some(cancel.clone());
-    }
+    let operation = ops.begin("duplicates");
+    let cancel = operation.token();
     let cancel_for_task = cancel.clone();
     let app_emitter = app.clone();
     let res = tauri::async_runtime::spawn_blocking(move || {
@@ -1544,11 +1518,6 @@ async fn scan_duplicate_files(
     .await
     .map_err(|e| e.to_string())?;
 
-    {
-        let mut guard = cancel_state.0.lock().unwrap();
-        *guard = None;
-    }
-
     if let Ok(ref result) = res {
         let _ = app.emit(
             "scan-progress",
@@ -1576,13 +1545,14 @@ async fn trash_duplicate_folders(
     folder_paths: Option<Vec<String>>,
     folderPaths: Option<Vec<String>>,
 ) -> Result<DisposalSummary, String> {
+    let operation = begin_operation(&app, "disposal");
+    let cancel = operation.token();
     let journal = get_journal(&app)?;
     let failed_trash = app.state::<FailedTrashRegistry>().inner().clone();
     let effective_paths = paths.or(folder_paths).or(folderPaths).unwrap_or_default();
     let lock_dir = get_lock_dir(&app)?;
     let res = tauri::async_runtime::spawn_blocking(move || {
         let platform = get_platform();
-        let cancel = CancellationToken::new();
 
         let pbs: Vec<PathBuf> = effective_paths.into_iter().map(PathBuf::from).collect();
         DuplicateDetector::batch_trash_duplicate_folders(
@@ -1602,7 +1572,7 @@ async fn trash_duplicate_folders(
 #[allow(non_snake_case)]
 async fn scan_project_artifacts(
     app: AppHandle,
-    cancel_state: State<'_, ScanCancellationState>,
+    ops: State<'_, OperationRegistry>,
     roots: Option<Vec<String>>,
     min_size_bytes: Option<u64>,
     minSizeBytes: Option<u64>,
@@ -1614,11 +1584,8 @@ async fn scan_project_artifacts(
         .map(PathBuf::from)
         .collect();
 
-    let cancel = CancellationToken::new();
-    {
-        let mut guard = cancel_state.0.lock().unwrap();
-        *guard = Some(cancel.clone());
-    }
+    let operation = ops.begin("projects");
+    let cancel = operation.token();
     let cancel_for_task = cancel.clone();
 
     let _ = app.emit(
@@ -1644,11 +1611,6 @@ async fn scan_project_artifacts(
     })
     .await
     .map_err(|e| e.to_string())?;
-
-    {
-        let mut guard = cancel_state.0.lock().unwrap();
-        *guard = None;
-    }
 
     if let Ok(ref result) = res {
         let _ = app.emit(
@@ -1676,6 +1638,8 @@ async fn clean_project_artifacts(
     artifact_paths: Option<Vec<String>>,
     artifactPaths: Option<Vec<String>>,
 ) -> Result<DisposalSummary, String> {
+    let operation = begin_operation(&app, "disposal");
+    let cancel = operation.token();
     let journal = get_journal(&app)?;
     let failed_trash = app.state::<FailedTrashRegistry>().inner().clone();
     let paths = artifact_paths.or(artifactPaths).unwrap_or_default();
@@ -1683,7 +1647,6 @@ async fn clean_project_artifacts(
 
     let res = tauri::async_runtime::spawn_blocking(move || {
         let platform = get_platform();
-        let cancel = CancellationToken::new();
 
         let path_bufs: Vec<PathBuf> = paths.into_iter().map(PathBuf::from).collect();
         freemydisk_core::cleanup::project_artifacts::ProjectArtifactScanner::clean_artifacts(
@@ -1708,13 +1671,14 @@ async fn trash_duplicate_files(
     filePaths: Option<Vec<String>>,
     groups: Option<Vec<DuplicateGroup>>,
 ) -> Result<DisposalSummary, String> {
+    let operation = begin_operation(&app, "disposal");
+    let cancel = operation.token();
     let journal = get_journal(&app)?;
     let failed_trash = app.state::<FailedTrashRegistry>().inner().clone();
     let effective_paths = paths.or(file_paths).or(filePaths);
     let lock_dir = get_lock_dir(&app)?;
     let res = tauri::async_runtime::spawn_blocking(move || {
         let platform = get_platform();
-        let cancel = CancellationToken::new();
 
         if let Some(p_list) = effective_paths {
             let items: Vec<freemydisk_core::cleanup::plan::CleanupPlanItem> = p_list
@@ -1928,6 +1892,7 @@ async fn clean_leftovers_safe(
     include_registry: Option<bool>,
     includeRegistry: Option<bool>,
 ) -> Result<freemydisk_core::applications::LeftoverCleanSummary, String> {
+    let _operation = begin_operation(&app, "disposal");
     let journal = get_journal(&app)?;
     let incl_reg = include_registry.or(includeRegistry).unwrap_or(true);
     let scanned = app.state::<LeftoverScanRegistry>().inner().clone();
@@ -2507,7 +2472,7 @@ pub fn run() {
             }
             Ok(())
         })
-        .manage(ScanCancellationState::default())
+        .manage(OperationRegistry::default())
         .manage(FailedTrashRegistry::default())
         .manage(LeftoverScanRegistry::default())
         .invoke_handler(tauri::generate_handler![

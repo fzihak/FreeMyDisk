@@ -125,7 +125,7 @@ export const LargeFilesPage: React.FC = () => {
 
   const handleCancelScan = async () => {
     try {
-      await invoke("cancel_active_scan");
+      await invoke("cancel_active_scan", { kind: "large_files" });
       setScanning(false);
       setNotification("Scan cancelled.");
       setTimeout(() => setNotification(null), 4000);

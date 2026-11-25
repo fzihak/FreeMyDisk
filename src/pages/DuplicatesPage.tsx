@@ -143,7 +143,7 @@ export const DuplicatesPage: React.FC = () => {
 
   const handleCancelScan = async () => {
     try {
-      await invoke("cancel_active_scan");
+      await invoke("cancel_active_scan", { kind: "duplicates" });
       setScanning(false);
     } catch (e) {
       console.error("Failed to cancel scan:", e);
