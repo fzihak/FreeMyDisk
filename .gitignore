@@ -27,3 +27,20 @@ w-soft/
 
 # Local machine-specific toolchain configuration
 .cargo/config.toml
+
+# Local developer launchers (machine-specific paths)
+/Launch-FreeMyDisk.bat
+/run-dev.ps1
+/run-debug.ps1
+/start-app.ps1
+/check-window.ps1
+/build-scripts/process-icons.ps1
+
+# Scratch build assets and ad-hoc dev checks
+/build-scripts/extracted_*.png
+/build-scripts/icon_ico_preview.png
+/build-scripts/check_*.py
+/rules/
+
+# Local AI assistant notes
+CLAUDE.md
