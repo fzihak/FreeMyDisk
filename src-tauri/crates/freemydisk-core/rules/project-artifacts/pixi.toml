@@ -1,0 +1,15 @@
+[project]
+id = "project_pixi"
+name = "Pixi Environment Projects"
+description = "Pixi conda-based package environment and lock cache"
+icon = "pixi"
+
+[[detection]]
+marker_file = "pixi.toml"
+
+[[artifacts]]
+relative_path = ".pixi"
+category = "dependencies"
+risk = "safe"
+verified_rebuildable = true
+rebuild_command = "pixi install"

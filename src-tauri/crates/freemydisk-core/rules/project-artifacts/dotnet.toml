@@ -1,0 +1,41 @@
+[project]
+id = "project_dotnet"
+name = ".NET / C# Projects"
+description = ".NET compilation bin and obj intermediate folders and NuGet package directories"
+icon = "dotnet"
+
+[[detection]]
+marker_extension = "csproj"
+
+[[detection]]
+marker_extension = "sln"
+
+[[detection]]
+marker_file = "Directory.Build.props"
+
+[[artifacts]]
+relative_path = "bin"
+category = "build_output"
+risk = "safe"
+verified_rebuildable = true
+rebuild_command = "dotnet build"
+
+[[artifacts]]
+relative_path = "obj"
+category = "build_output"
+risk = "safe"
+verified_rebuildable = true
+rebuild_command = "dotnet build"
+
+[[artifacts]]
+relative_path = "packages"
+category = "dependencies"
+risk = "safe"
+verified_rebuildable = true
+rebuild_command = "dotnet restore"
+
+[[artifacts]]
+relative_path = ".vs"
+category = "cache"
+risk = "safe"
+verified_rebuildable = true

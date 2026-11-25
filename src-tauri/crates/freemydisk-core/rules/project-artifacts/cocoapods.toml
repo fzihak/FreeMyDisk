@@ -1,0 +1,15 @@
+[project]
+id = "project_cocoapods"
+name = "CocoaPods iOS Projects"
+description = "CocoaPods Pods dependency directory"
+icon = "cocoapods"
+
+[[detection]]
+marker_file = "Podfile"
+
+[[artifacts]]
+relative_path = "Pods"
+category = "dependencies"
+risk = "safe"
+verified_rebuildable = true
+rebuild_command = "pod install"
