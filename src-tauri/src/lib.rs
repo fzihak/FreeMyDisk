@@ -1,6 +1,4 @@
-use freemydisk_core::applications::{
-    ApplicationLeftover, ApplicationService, InstalledAppInfo, ProcessController,
-};
+use freemydisk_core::applications::{ApplicationService, InstalledAppInfo, ProcessController};
 use freemydisk_core::cleanup::cleaners::{
     AiModelAnalyzer, AiModelInfo, CondaCacheInfo, CondaCleaner, RustToolchainCleaner,
     RustToolchainScanResult,
@@ -110,11 +108,6 @@ pub fn trim_process_working_set() {}
 #[tauri::command]
 fn trim_process_memory() {
     trim_process_working_set();
-}
-
-#[tauri::command]
-fn get_power_state() -> freemydisk_platform::power::PowerState {
-    freemydisk_platform::power::get_system_power_state()
 }
 
 #[tauri::command]
@@ -313,12 +306,6 @@ fn log_frontend_exception(error: String, stack: Option<String>) -> Result<(), St
 }
 
 #[tauri::command]
-fn check_disk_space_guard(target_path: String, required_bytes: u64) -> Result<(), String> {
-    CrashRecoveryJournal::check_disk_space_guard(std::path::Path::new(&target_path), required_bytes)
-        .map_err(|e| e.to_string())
-}
-
-#[tauri::command]
 async fn remediate_interrupted_session(
     app: AppHandle,
 ) -> Result<Vec<freemydisk_core::filesystem::journal::RemediationResult>, String> {
@@ -332,158 +319,12 @@ async fn remediate_interrupted_session(
     .map_err(|e| e.to_string())?
 }
 
-#[tauri::command]
-async fn force_terminate_uninstaller(pid: u32) -> Result<bool, String> {
-    tauri::async_runtime::spawn_blocking(move || {
-        freemydisk_core::applications::process_control::ProcessController::terminate_by_pid(pid)
-    })
-    .await
-    .map_err(|e| e.to_string())?
-}
-
-#[tauri::command]
-fn track_uninstaller_watchdog(app: AppHandle, pid: u32, app_name: String) {
-    std::thread::spawn(move || {
-        let start = std::time::Instant::now();
-        loop {
-            std::thread::sleep(std::time::Duration::from_secs(1));
-            if !freemydisk_core::applications::process_control::ProcessController::is_process_alive(
-                pid,
-            ) {
-                break;
-            }
-            if start.elapsed().as_secs() >= 45 {
-                log::warn!(
-                    "Watchdog: Uninstaller for '{}' (PID {}) unresponsive for >45s",
-                    app_name,
-                    pid
-                );
-                use tauri::Emitter;
-                let _ = app.emit(
-                    "uninstaller-hung",
-                    serde_json::json!({
-                        "pid": pid,
-                        "app_name": app_name,
-                        "elapsed_seconds": start.elapsed().as_secs(),
-                    }),
-                );
-                break;
-            }
-        }
-    });
-}
-
-#[tauri::command]
-async fn generate_diagnostic_bundle(app: AppHandle) -> Result<String, String> {
-    let app_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
-    tauri::async_runtime::spawn_blocking(move || {
-        let os_info = std::env::consts::OS;
-        let arch_info = std::env::consts::ARCH;
-        let journal_path = app_dir.join("journal.db");
-        let journal_exists = journal_path.exists();
-
-        let journal_integrity = if journal_exists {
-            if let Ok(journal) = CrashRecoveryJournal::open(&journal_path) {
-                journal
-                    .check_integrity()
-                    .unwrap_or_else(|e| format!("Error checking integrity: {}", e))
-            } else {
-                "Failed to open journal".to_string()
-            }
-        } else {
-            "Not created yet".to_string()
-        };
-
-        let vitals_str = if let Ok(vitals) = get_platform().get_system_vitals() {
-            format!(
-                "RAM: {:.1} GB / {:.1} GB ({}%), Cores: {}, OS: {}",
-                vitals.used_ram_bytes as f64 / 1_073_741_824.0,
-                vitals.total_ram_bytes as f64 / 1_073_741_824.0,
-                vitals.memory_load_percent,
-                vitals.cpu_cores,
-                vitals.os_name,
-            )
-        } else {
-            "N/A".to_string()
-        };
-
-        // Recent frontend error log entries
-        let mut recent_logs = String::new();
-        if let Ok(local_app) = std::env::var("LOCALAPPDATA") {
-            let log_file = std::path::PathBuf::from(local_app)
-                .join("FreeMyDisk")
-                .join("logs")
-                .join("frontend_errors.log");
-            if log_file.exists() {
-                if let Ok(content) = std::fs::read_to_string(&log_file) {
-                    let lines: Vec<&str> = content.lines().rev().take(20).collect();
-                    recent_logs = lines.into_iter().rev().collect::<Vec<&str>>().join("\n");
-                }
-            }
-        }
-
-        // Recent crash dumps count
-        let crash_count =
-            freemydisk_core::filesystem::crash_report::CrashDumpReport::list_reports()
-                .map(|l| l.len())
-                .unwrap_or(0);
-
-        let report = format!(
-            "=== FreeMyDisk Privacy-Sanitized Diagnostic Bundle ===\n\
-             Version: {}\n\
-             Platform: {} ({})\n\
-             System Vitals: {}\n\
-             Journal Status: Present ({}) | Integrity Check: {}\n\
-             Crash Dumps on Disk: {}\n\
-             Generated: {:?}\n\n\
-             --- Recent Frontend Log Snippet ---\n\
-             {}\n\
-             =======================================================",
-            env!("CARGO_PKG_VERSION"),
-            os_info,
-            arch_info,
-            vitals_str,
-            journal_exists,
-            journal_integrity,
-            crash_count,
-            std::time::SystemTime::now(),
-            if recent_logs.is_empty() {
-                "No frontend errors recorded"
-            } else {
-                &recent_logs
-            }
-        );
-
-        let sanitized =
-            freemydisk_core::filesystem::crash_report::sanitize_diagnostic_text(&report);
-
-        // Also write diagnostic text report to user desktop or app data for 1-click sharing
-        if let Ok(profile) = std::env::var("USERPROFILE") {
-            let desktop = std::path::PathBuf::from(profile).join("Desktop");
-            if desktop.exists() {
-                let now_ts = std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .map(|d| d.as_secs())
-                    .unwrap_or(0);
-                let bundle_file = desktop.join(format!("FreeMyDisk_Diagnostic_{}.txt", now_ts));
-                let _ = std::fs::write(bundle_file, &sanitized);
-            }
-        }
-
-        Ok(sanitized)
-    })
-    .await
-    .map_err(|e| e.to_string())?
-}
-
-#[tauri::command]
 fn list_pending_reboot_deletions(
 ) -> Result<Vec<freemydisk_platform::traits::PendingRebootDeletion>, String> {
     let platform = get_platform();
     platform.list_pending_deletions().map_err(|e| e.to_string())
 }
 
-#[tauri::command]
 fn cancel_pending_reboot_deletion(path: String) -> Result<(), String> {
     let platform = get_platform();
     platform
@@ -1041,7 +882,6 @@ async fn get_application_icons(paths: Vec<String>) -> Result<Vec<ApplicationIcon
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
 #[allow(non_snake_case)]
 async fn scan_storage_tree(
     app: AppHandle,
@@ -1107,15 +947,6 @@ async fn scan_directory_storage(
     maxDepth: Option<usize>,
 ) -> Result<StorageTreeNode, String> {
     scan_storage_tree(app, ops, path, max_depth, maxDepth).await
-}
-
-#[tauri::command]
-fn export_storage_scan(tree: StorageTreeNode, format: String) -> Result<String, String> {
-    if format.eq_ignore_ascii_case("csv") {
-        StorageAnalyzer::export_to_csv(&tree).map_err(|e| e.to_string())
-    } else {
-        StorageAnalyzer::export_to_json(&tree).map_err(|e| e.to_string())
-    }
 }
 
 #[tauri::command]
@@ -1611,19 +1442,6 @@ async fn get_installed_applications() -> Result<Vec<InstalledAppInfo>, String> {
 }
 
 #[tauri::command]
-async fn scan_application_leftovers(app: AppHandle) -> Result<Vec<ApplicationLeftover>, String> {
-    let scanned = app.state::<LeftoverScanRegistry>().inner().clone();
-    let res = tauri::async_runtime::spawn_blocking(|| ApplicationService::new().scan_leftovers())
-        .await
-        .map_err(|e| e.to_string())?;
-    if let Ok(ref items) = res {
-        scanned.record(items.iter().map(|i| i.path.as_str()));
-    }
-    trim_process_working_set();
-    res
-}
-
-#[tauri::command]
 #[allow(non_snake_case)]
 async fn launch_uninstaller(app_id: Option<String>, appId: Option<String>) -> Result<(), String> {
     let id = app_id
@@ -1632,15 +1450,6 @@ async fn launch_uninstaller(app_id: Option<String>, appId: Option<String>) -> Re
     tauri::async_runtime::spawn_blocking(move || ApplicationService::new().launch_uninstaller(&id))
         .await
         .map_err(|e| e.to_string())?
-}
-
-#[tauri::command]
-#[allow(non_snake_case)]
-async fn launch_app_uninstaller(
-    app_id: Option<String>,
-    appId: Option<String>,
-) -> Result<(), String> {
-    launch_uninstaller(app_id, appId).await
 }
 
 #[tauri::command]
@@ -1767,74 +1576,10 @@ async fn uninstall_and_scan(
 }
 
 #[tauri::command]
-#[allow(non_snake_case)]
-async fn launch_silent_uninstaller(
-    app_id: Option<String>,
-    appId: Option<String>,
-) -> Result<(), String> {
-    let id = app_id
-        .or(appId)
-        .ok_or_else(|| "Missing application id".to_string())?;
-    tauri::async_runtime::spawn_blocking(move || {
-        ApplicationService::new().launch_silent_uninstaller(&id)
-    })
-    .await
-    .map_err(|e| e.to_string())?
-}
-
-#[tauri::command]
-#[allow(non_snake_case)]
-async fn uninstall_and_scan_silent(
-    app: AppHandle,
-    app_id: Option<String>,
-    appId: Option<String>,
-) -> Result<freemydisk_core::applications::UninstallResult, String> {
-    let target = app_id
-        .or(appId)
-        .ok_or_else(|| "Missing app id".to_string())?;
-    let scanned = app.state::<LeftoverScanRegistry>().inner().clone();
-    let res = tauri::async_runtime::spawn_blocking(move || {
-        ApplicationService::new().uninstall_and_scan_silent(&target)
-    })
-    .await
-    .map_err(|e| e.to_string())?;
-    if let Ok(freemydisk_core::applications::UninstallResult {
-        leftovers: Some(ref group),
-        ..
-    }) = res
-    {
-        scanned.record_groups(std::slice::from_ref(group));
-    }
-    res
-}
-
-#[tauri::command]
-async fn get_file_locking_processes(
-    path: String,
-) -> Result<Vec<freemydisk_platform::RawRunningProcess>, String> {
-    tauri::async_runtime::spawn_blocking(move || {
-        ApplicationService::new().get_locking_processes(std::path::Path::new(&path))
-    })
-    .await
-    .map_err(|e| e.to_string())?
-}
-
-#[tauri::command]
-async fn refresh_desktop_shell() -> Result<(), String> {
-    tauri::async_runtime::spawn_blocking(|| {
-        let platform = get_platform();
-        platform.refresh_shell().map_err(|e| e.to_string())
-    })
-    .await
-    .map_err(|e| e.to_string())?
-}
-
-#[tauri::command]
 fn get_maintenance_tasks() -> Vec<MaintenanceTask> {
     MaintenanceService::new().list_tasks()
 }
 
-#[tauri::command]
 async fn execute_maintenance_task(task_id: String) -> MaintenanceResult {
     let tid = task_id.clone();
     tauri::async_runtime::spawn_blocking(move || MaintenanceService::new().execute_task(&tid))
@@ -1866,31 +1611,6 @@ fn get_pending_reboot_deletions(
 #[tauri::command]
 fn cancel_reboot_deletion(path: String) -> Result<(), String> {
     cancel_pending_reboot_deletion(path)
-}
-
-#[tauri::command]
-fn is_elevated_process() -> bool {
-    freemydisk_platform::traits::PlatformElevation::is_elevated(&get_platform())
-}
-
-#[tauri::command]
-async fn execute_elevated_action(
-    operation: String,
-    payload: String,
-) -> Result<freemydisk_core::system_maintenance::ElevatedResponse, String> {
-    tauri::async_runtime::spawn_blocking(move || {
-        freemydisk_core::system_maintenance::ElevatedClient::execute_action(&operation, &payload)
-            .map_err(|e| e.to_string())
-    })
-    .await
-    .map_err(|e| e.to_string())?
-}
-
-#[tauri::command]
-async fn execute_all_recommended_maintenance() -> Vec<MaintenanceResult> {
-    tauri::async_runtime::spawn_blocking(|| MaintenanceService::new().execute_all_recommended())
-        .await
-        .unwrap_or_default()
 }
 
 #[tauri::command]
@@ -2306,24 +2026,19 @@ pub fn run() {
         .manage(LeftoverScanRegistry::default())
         .invoke_handler(tauri::generate_handler![
             trim_process_memory,
-            get_power_state,
             get_virtualization_overview,
             compact_wsl_distribution,
             docker_prune,
             get_recovery_status,
             acknowledge_recovery_banner,
-            list_pending_reboot_deletions,
-            cancel_pending_reboot_deletion,
             scan_cleanup_rules,
             execute_cleanup_rules,
             retry_failed_trash,
             force_delete_permanently,
             get_storage_volumes,
-            scan_storage_tree,
             scan_heavy_folders,
             cancel_active_scan,
             get_application_icons,
-            export_storage_scan,
             scan_large_files,
             trash_large_file,
             trash_large_files,
@@ -2338,20 +2053,12 @@ pub fn run() {
             get_installed_applications,
             get_uwp_applications,
             uninstall_uwp_application,
-            scan_application_leftovers,
             scan_deep_leftovers,
             clean_leftovers_safe,
             terminate_app_processes,
             uninstall_and_scan,
-            launch_app_uninstaller,
             launch_uninstaller,
-            launch_silent_uninstaller,
-            uninstall_and_scan_silent,
-            get_file_locking_processes,
-            refresh_desktop_shell,
             get_maintenance_tasks,
-            execute_maintenance_task,
-            execute_all_recommended_maintenance,
             execute_emergency_rescue,
             scan_privacy_data,
             clean_privacy_data,
@@ -2373,19 +2080,13 @@ pub fn run() {
             get_recycle_bin_status,
             empty_recycle_bin,
             log_frontend_exception,
-            check_disk_space_guard,
-            generate_diagnostic_bundle,
             scan_ai_models,
             clean_ai_model,
             scan_rust_toolchains,
             clean_rust_toolchain,
             scan_conda_cache,
             clean_conda_cache,
-            is_elevated_process,
-            execute_elevated_action,
             remediate_interrupted_session,
-            force_terminate_uninstaller,
-            track_uninstaller_watchdog,
         ])
         .run(tauri::generate_context!())
         .expect("error while running FreeMyDisk application");
