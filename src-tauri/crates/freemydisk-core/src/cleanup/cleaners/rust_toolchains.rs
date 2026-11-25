@@ -110,18 +110,36 @@ impl RustToolchainCleaner {
         let rustup_home = Self::get_rustup_home();
         let toolchains_dir = rustup_home.join("toolchains");
 
-        // Determine toolchain name and full directory path
-        let (toolchain_name, dir_path) = if Path::new(name_or_path).is_absolute() {
-            let pb = PathBuf::from(name_or_path);
-            let name = pb
-                .file_name()
-                .and_then(|n| n.to_str())
-                .unwrap_or(name_or_path)
-                .to_string();
-            (name, pb)
-        } else {
-            (name_or_path.to_string(), toolchains_dir.join(name_or_path))
-        };
+        // The toolchain is always resolved inside RUSTUP_HOME/toolchains; a full
+        // path is accepted only when it points at that same folder.
+        let toolchain_name = Path::new(name_or_path)
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or_default()
+            .to_string();
+        let valid_name = !toolchain_name.is_empty()
+            && toolchain_name != "."
+            && toolchain_name != ".."
+            && !toolchain_name.contains(['/', '\\', ':']);
+        if !valid_name {
+            return Err(CoreError::Validation(format!(
+                "Invalid toolchain name: {}",
+                name_or_path
+            )));
+        }
+        let dir_path = toolchains_dir.join(&toolchain_name);
+        if Path::new(name_or_path).is_absolute() {
+            let same = matches!(
+                (dunce::canonicalize(name_or_path), dunce::canonicalize(&dir_path)),
+                (Ok(a), Ok(b)) if a == b
+            );
+            if !same {
+                return Err(CoreError::Validation(format!(
+                    "Path is not an installed Rust toolchain: {}",
+                    name_or_path
+                )));
+            }
+        }
 
         if !dir_path.exists() {
             return Ok(0);
