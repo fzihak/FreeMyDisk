@@ -1,0 +1,24 @@
+[rule]
+id = "windows_browser_tor_cache"
+name = "Tor Browser Temporary Cache"
+category = "browser"
+risk = "safe"
+verified_rebuildable = true
+verified_at = "2026-10-06"
+author = "FreeMyDisk Team"
+description = "Residual temporary web cache from Tor Browser"
+platform = "windows"
+
+[applicability]
+conditions = [
+    { type = "path_exists", path = "${local_app_data}/Tor Browser" }
+]
+
+[targets]
+paths = [
+    { path = "${local_app_data}/Tor Browser/Browser/TorBrowser/Data/Browser/profile.default/cache2/*", matcher = "glob" }
+]
+
+[disposal]
+default_action = "permanent"
+protect_subpaths = []
