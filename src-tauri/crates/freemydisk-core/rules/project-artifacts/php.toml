@@ -1,0 +1,21 @@
+[project]
+id = "project_php"
+name = "PHP / Composer / Laravel Projects"
+description = "Composer vendor directory and framework cache"
+icon = "php"
+
+[[detection]]
+marker_file = "composer.json"
+
+[[artifacts]]
+relative_path = "vendor"
+category = "dependencies"
+risk = "safe"
+verified_rebuildable = true
+rebuild_command = "composer install"
+
+[[artifacts]]
+relative_path = "storage/framework/cache"
+category = "cache"
+risk = "safe"
+verified_rebuildable = true

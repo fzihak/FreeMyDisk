@@ -1,0 +1,76 @@
+[project]
+id = "project_node"
+name = "Node.js / Web Projects"
+description = "Rebuildable node_modules, .next, .nuxt, dist, and bundler caches"
+icon = "nodejs"
+
+[[detection]]
+marker_file = "package.json"
+
+[[detection]]
+marker_dir = "node_modules"
+
+[[artifacts]]
+relative_path = "node_modules"
+category = "dependencies"
+risk = "safe"
+verified_rebuildable = true
+rebuild_command = "npm install"
+
+[[artifacts]]
+relative_path = ".next"
+category = "build_output"
+risk = "safe"
+verified_rebuildable = true
+rebuild_command = "npm run build"
+
+[[artifacts]]
+relative_path = ".nuxt"
+category = "build_output"
+risk = "safe"
+verified_rebuildable = true
+rebuild_command = "npm run build"
+
+[[artifacts]]
+relative_path = ".turbo"
+category = "cache"
+risk = "safe"
+verified_rebuildable = true
+
+[[artifacts]]
+relative_path = ".cache"
+category = "cache"
+risk = "safe"
+verified_rebuildable = true
+
+[[artifacts]]
+relative_path = ".svelte-kit"
+category = "build_output"
+risk = "safe"
+verified_rebuildable = true
+
+[[artifacts]]
+relative_path = ".astro"
+category = "build_output"
+risk = "safe"
+verified_rebuildable = true
+
+[[artifacts]]
+relative_path = "dist"
+category = "build_output"
+risk = "moderate"
+verified_rebuildable = true
+rebuild_command = "npm run build"
+
+[[artifacts]]
+relative_path = "build"
+category = "build_output"
+risk = "moderate"
+verified_rebuildable = true
+rebuild_command = "npm run build"
+
+[[artifacts]]
+relative_path = ".parcel-cache"
+category = "cache"
+risk = "safe"
+verified_rebuildable = true

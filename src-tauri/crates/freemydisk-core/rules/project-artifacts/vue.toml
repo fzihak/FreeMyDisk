@@ -1,0 +1,24 @@
+[project]
+id = "project_vue"
+name = "Vue / Vite Projects"
+description = "Vite dev server cache and dist bundle"
+icon = "vue"
+
+[[detection]]
+marker_file = "vite.config.ts"
+
+[[detection]]
+marker_file = "vite.config.js"
+
+[[artifacts]]
+relative_path = "node_modules/.vite"
+category = "cache"
+risk = "safe"
+verified_rebuildable = true
+
+[[artifacts]]
+relative_path = "dist"
+category = "build_output"
+risk = "moderate"
+verified_rebuildable = true
+rebuild_command = "npm run build"

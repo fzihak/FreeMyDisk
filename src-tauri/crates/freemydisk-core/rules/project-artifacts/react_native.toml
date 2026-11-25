@@ -1,0 +1,32 @@
+[project]
+id = "project_react_native"
+name = "React Native Mobile Projects"
+description = "React Native Metro bundler caches and native mobile build folders"
+icon = "react"
+
+[[detection]]
+marker_file = "metro.config.js"
+
+[[artifacts]]
+relative_path = "android/build"
+category = "build_output"
+risk = "safe"
+verified_rebuildable = true
+
+[[artifacts]]
+relative_path = "android/app/build"
+category = "build_output"
+risk = "safe"
+verified_rebuildable = true
+
+[[artifacts]]
+relative_path = "ios/build"
+category = "build_output"
+risk = "safe"
+verified_rebuildable = true
+
+[[artifacts]]
+relative_path = ".metro"
+category = "cache"
+risk = "safe"
+verified_rebuildable = true
