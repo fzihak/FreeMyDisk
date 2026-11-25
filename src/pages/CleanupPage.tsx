@@ -27,35 +27,9 @@ import { WinUIButton } from "@/components/winui/WinUIButton";
 import { LiveScanProgressWidget } from "@/components/shared/LiveScanProgressWidget";
 import { ProjectArtifactsView } from "@/components/cleanup/ProjectArtifactsView";
 import { AiAndToolchainsView } from "@/components/cleanup/AiAndToolchainsView";
+import { useCleanupScanStore } from "@/stores/cleanup-scan-store";
+import type { RuleScanSummary } from "@/types/cleanup";
 import { describeDisposal } from "@/utils/disposal";
-
-interface RuleScanCandidate {
-  path: string;
-  size_bytes: number;
-  is_dir: boolean;
-  rule_id: string;
-  rule_name: string;
-  category: string;
-  risk: string;
-  verified_rebuildable: boolean;
-  default_action: string;
-  protect_subpaths: string[];
-}
-
-interface RuleScanSummary {
-  rule_id: string;
-  rule_name: string;
-  category: string;
-  risk: string;
-  verified_rebuildable: boolean;
-  default_action: string;
-  default_selected: boolean;
-  total_bytes: number;
-  total_items: number;
-  candidates: RuleScanCandidate[];
-  is_locked_by_process?: boolean;
-  locking_process_name?: string;
-}
 
 interface DisposalItemResult {
   path: string;
@@ -95,7 +69,6 @@ export const CleanupPage: React.FC = () => {
   const [failedTotal, setFailedTotal] = useState(0);
   const manualConflictPath = failedQueue[0] ?? null;
   const resolveCurrentConflict = () => setFailedQueue((queue) => queue.slice(1));
-
   const [resolvingPath, setResolvingPath] = useState(false);
 
   const formatBytes = (bytes: number): string => {
@@ -106,19 +79,22 @@ export const CleanupPage: React.FC = () => {
     return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
   };
 
+  const applyScanResults = (results: RuleScanSummary[]) => {
+    setSummaries(results);
+    const autoSelected = new Set<string>();
+    results.forEach((r) => {
+      if (r.default_selected && (r.candidates.length > 0 || r.total_bytes > 0)) {
+        autoSelected.add(r.rule_id);
+      }
+    });
+    setSelectedRuleIds(autoSelected);
+  };
+
   const handleScan = async () => {
     setScanning(true);
     setLastDisposal(null);
     try {
-      const results = await invoke<RuleScanSummary[]>("scan_cleanup_rules");
-      setSummaries(results);
-      const autoSelected = new Set<string>();
-      results.forEach((r) => {
-        if (r.default_selected && (r.candidates.length > 0 || r.total_bytes > 0)) {
-          autoSelected.add(r.rule_id);
-        }
-      });
-      setSelectedRuleIds(autoSelected);
+      applyScanResults(await useCleanupScanStore.getState().scan());
     } catch (e) {
       console.error("Scan failed:", e);
       toast.error(t.common.error, String(e));
@@ -128,7 +104,13 @@ export const CleanupPage: React.FC = () => {
   };
 
   useEffect(() => {
-    handleScan();
+    // Reuse a recent scan (for example from the Dashboard) instead of scanning again.
+    const cached = useCleanupScanStore.getState().fresh();
+    if (cached) {
+      applyScanResults(cached);
+    } else {
+      handleScan();
+    }
   }, []);
 
   const toggleSelectRule = (ruleId: string) => {
@@ -828,7 +810,6 @@ export const CleanupPage: React.FC = () => {
                     </span>
                   )}
                 </h3>
-
                 <p className="text-xs text-[var(--text-secondary)]">{t.cleanup.trashFailedDesc}</p>
               </div>
             </div>

@@ -5,6 +5,8 @@ import { useSettingsStore } from "@/stores/settings-store";
 import { useI18nStore } from "@/i18n";
 import { toast } from "@/stores/toast-store";
 import { useScanProgress, useScanProgressStore } from "@/stores/scan-progress-store";
+import { useCleanupScanStore } from "@/stores/cleanup-scan-store";
+import type { RuleScanSummary } from "@/types/cleanup";
 import { describeDisposal } from "@/utils/disposal";
 import {
   Storage24Filled,
@@ -31,13 +33,6 @@ interface StorageVolumeInfo {
   available_bytes: number;
   file_system: string;
   is_removable: boolean;
-}
-
-interface RuleScanSummary {
-  rule_id: string;
-  category: string;
-  total_bytes: number;
-  total_items: number;
 }
 
 interface StartupItem {
@@ -151,7 +146,13 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
 
   useEffect(() => {
     loadInitialData();
-    handleStartScan();
+    const cached = useCleanupScanStore.getState().fresh();
+    if (cached) {
+      setRuleSummaries(cached);
+      setScanCompleted(true);
+    } else {
+      handleStartScan();
+    }
   }, []);
 
   // Undefined until the drive list has loaded; nothing is shown in its place.
@@ -200,7 +201,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
     setScanStage(t.dashboard.scanningCaches);
 
     try {
-      const summaries = await invoke<RuleScanSummary[]>("scan_cleanup_rules");
+      const summaries = await useCleanupScanStore.getState().scan();
       setRuleSummaries(summaries);
       setScanProgress(100);
       setScanStage(t.dashboard.scanCompletedStage);
