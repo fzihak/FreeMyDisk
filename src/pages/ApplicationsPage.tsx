@@ -214,9 +214,13 @@ export const ApplicationsPage: React.FC = () => {
     try {
       const res = await invoke<LeftoverGroup[]>("scan_deep_leftovers");
       setDeepGroups(res);
-      const allPaths = new Set<string>();
-      res.forEach((g) => g.items.forEach((i) => allPaths.add(i.path_or_key)));
-      setSelectedLeftoverPaths(allPaths);
+      const confident = new Set<string>();
+      res.forEach((g) =>
+        g.items.forEach((i) => {
+          if (i.confidence.toLowerCase() === "high") confident.add(i.path_or_key);
+        })
+      );
+      setSelectedLeftoverPaths(confident);
     } catch (e) {
       console.error("Failed to scan application leftovers:", e);
       toast.error(t.common.error, String(e));

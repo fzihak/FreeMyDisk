@@ -1,4 +1,3 @@
-use super::confidence::ConfidenceScorer;
 use super::models::{LeftoverCandidate, LeftoverConfidence, LeftoverKind};
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
@@ -44,6 +43,17 @@ impl FilesystemLeftoverScanner {
             "comms",
             "assembly",
             "windowsapps",
+            "d3dscache",
+            "ms-playwright",
+            "pip",
+            "npm-cache",
+            "node-gyp",
+            "docker",
+            "jetbrains",
+            "mozilla",
+            "steam",
+            "unity",
+            "unreal engine",
         ]
         .into_iter()
         .collect()
@@ -89,7 +99,12 @@ impl FilesystemLeftoverScanner {
     /// Scans standard directories for orphaned application data not matching any active installed app
     pub fn scan_all(installed_names: &HashSet<String>) -> Vec<LeftoverCandidate> {
         let whitelist = Self::get_system_whitelist();
-        let roots = Self::get_search_roots();
+        // ProgramData holds shared machine state (package caches, SSH host keys, MSI
+        // sources) that cannot be tied to an app by folder name, so it is skipped here.
+        let roots: Vec<(PathBuf, &'static str)> = Self::get_search_roots()
+            .into_iter()
+            .filter(|(_, desc)| *desc != "ProgramData")
+            .collect();
         let mut results = Vec::new();
 
         for (root, category_desc) in roots {
@@ -138,16 +153,15 @@ impl FilesystemLeftoverScanner {
                     let (size_bytes, item_count) = Self::calculate_dir_metrics(&path);
                     // Filter out trivial 0-byte directories; keep directories >= 512 KB
                     if size_bytes >= 512 * 1024 {
-                        let confidence =
-                            ConfidenceScorer::score_filesystem(&folder_name, None, None, &path);
-
                         results.push(LeftoverCandidate {
                             id: format!("fs:{}", path.to_string_lossy()),
                             path_or_key: path.to_string_lossy().to_string(),
                             kind: LeftoverKind::Filesystem,
                             size_bytes,
                             item_count,
-                            confidence,
+                            // No installed app matched this folder; it may still belong to a
+                            // portable app, a game or a tool that never registered itself.
+                            confidence: LeftoverConfidence::Low,
                             description: format!("{} Remnant ({})", category_desc, folder_name),
                         });
                     }
