@@ -1,0 +1,25 @@
+[rule]
+id = "windows_app_zoom_cache"
+name = "Zoom Diagnostic & Temp Cache"
+category = "application"
+risk = "safe"
+verified_rebuildable = true
+verified_at = "2026-10-06"
+author = "FreeMyDisk Team"
+description = "Meeting logs, diagnostic dump files, and cached avatar media from Zoom"
+platform = "windows"
+
+[applicability]
+conditions = [
+    { type = "path_exists", path = "${app_data}/Zoom" }
+]
+
+[targets]
+paths = [
+    { path = "${app_data}/Zoom/data/*", matcher = "glob" },
+    { path = "${app_data}/Zoom/logs/*", matcher = "glob" }
+]
+
+[disposal]
+default_action = "trash"
+protect_subpaths = ["*/Zoom.ini"]

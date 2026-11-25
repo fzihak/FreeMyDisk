@@ -1,0 +1,26 @@
+[rule]
+id = "windows_app_whatsapp_cache"
+name = "WhatsApp Desktop Cache"
+category = "application"
+risk = "safe"
+verified_rebuildable = true
+verified_at = "2026-10-01"
+author = "FreeMyDisk Team"
+description = "Temporary cached media and code caches from WhatsApp Desktop"
+platform = "windows"
+
+[applicability]
+conditions = [
+    { type = "path_exists", path = "${local_app_data}/Packages/5319275A.WhatsAppDesktop_cv1g1gvanyjgm/LocalCache/Roaming/WhatsApp/Cache" }
+]
+
+[targets]
+paths = [
+    { path = "${local_app_data}/Packages/5319275A.WhatsAppDesktop_cv1g1gvanyjgm/LocalCache/Roaming/WhatsApp/Cache/*", matcher = "glob" },
+    { path = "${local_app_data}/Packages/5319275A.WhatsAppDesktop_cv1g1gvanyjgm/LocalCache/Roaming/WhatsApp/Code Cache/*", matcher = "glob" },
+    { path = "${local_app_data}/Packages/5319275A.WhatsAppDesktop_cv1g1gvanyjgm/LocalCache/Roaming/WhatsApp/GPUCache/*", matcher = "glob" }
+]
+
+[disposal]
+default_action = "permanent"
+protect_subpaths = []

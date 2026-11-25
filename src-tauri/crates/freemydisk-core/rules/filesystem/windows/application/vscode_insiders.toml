@@ -1,0 +1,25 @@
+[rule]
+id = "windows_app_vscode_insiders_cache"
+name = "Visual Studio Code - Insiders Cache"
+category = "application"
+risk = "safe"
+verified_rebuildable = true
+verified_at = "2026-10-06"
+author = "FreeMyDisk Team"
+description = "V8 compiled code cache, workspace storage, and logs from VS Code Insiders"
+platform = "windows"
+
+[applicability]
+conditions = [
+    { type = "path_exists", path = "${app_data}/Code - Insiders" }
+]
+
+[targets]
+paths = [
+    { path = "${app_data}/Code - Insiders/CachedData/*", matcher = "glob" },
+    { path = "${app_data}/Code - Insiders/logs/*", matcher = "glob" }
+]
+
+[disposal]
+default_action = "trash"
+protect_subpaths = ["*/User/settings.json", "*/User/keybindings.json"]

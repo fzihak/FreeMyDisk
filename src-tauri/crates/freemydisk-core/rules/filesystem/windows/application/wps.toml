@@ -1,0 +1,25 @@
+[rule]
+id = "windows_app_wps_cache"
+name = "WPS Office Cache & Temp Files"
+category = "application"
+risk = "safe"
+verified_rebuildable = true
+verified_at = "2026-10-06"
+author = "FreeMyDisk Team"
+description = "Rendering cache, auto-update logs, and temporary document files from WPS Office"
+platform = "windows"
+
+[applicability]
+conditions = [
+    { type = "path_exists", path = "${app_data}/Kingsoft" }
+]
+
+[targets]
+paths = [
+    { path = "${app_data}/Kingsoft/office6/temp/*", matcher = "glob" },
+    { path = "${local_app_data}/Kingsoft/WPS Office/*/cache/*", matcher = "glob" }
+]
+
+[disposal]
+default_action = "trash"
+protect_subpaths = []
