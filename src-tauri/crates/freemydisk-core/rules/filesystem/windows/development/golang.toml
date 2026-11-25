@@ -1,0 +1,25 @@
+[rule]
+id = "windows_dev_golang"
+name = "Go Build & Module Cache"
+category = "development"
+risk = "low"
+verified_rebuildable = true
+verified_at = "2026-09-09"
+author = "FreeMyDisk Team"
+description = "Compiled Go build artifacts and temporary compilation caches (2GB-6GB)"
+platform = "windows"
+
+[applicability]
+conditions = [
+    { type = "path_exists", path = "${local_app_data}/go-build" }
+]
+
+[targets]
+paths = [
+    { path = "${local_app_data}/go-build/*", matcher = "glob" },
+    { path = "${home}/go/pkg/mod/cache/*", matcher = "glob" }
+]
+
+[disposal]
+default_action = "trash"
+protect_subpaths = []

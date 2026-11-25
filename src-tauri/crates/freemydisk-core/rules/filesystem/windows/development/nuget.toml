@@ -1,0 +1,24 @@
+[rule]
+id = "windows_dev_nuget_cache"
+name = "NuGet Package Manager Cache"
+category = "development"
+risk = "safe"
+verified_rebuildable = true
+verified_at = "2026-10-01"
+author = "FreeMyDisk Team"
+description = "Cached .NET packages downloaded during Visual Studio and dotnet CLI builds"
+platform = "windows"
+
+[applicability]
+conditions = [
+    { type = "path_exists", path = "${user_profile}/.nuget/packages" }
+]
+
+[targets]
+paths = [
+    { path = "${user_profile}/.nuget/packages/*", matcher = "glob" }
+]
+
+[disposal]
+default_action = "permanent"
+protect_subpaths = []
