@@ -90,7 +90,12 @@ export const CleanupPage: React.FC = () => {
   const [showConfirmModal, setShowConfirmModal] = useState<boolean>(false);
 
   // Manual Follow-up Modal for failed trash
-  const [manualConflictPath, setManualConflictPath] = useState<string | null>(null);
+  // Items the Recycle Bin refused, handled one after another.
+  const [failedQueue, setFailedQueue] = useState<string[]>([]);
+  const [failedTotal, setFailedTotal] = useState(0);
+  const manualConflictPath = failedQueue[0] ?? null;
+  const resolveCurrentConflict = () => setFailedQueue((queue) => queue.slice(1));
+
   const [resolvingPath, setResolvingPath] = useState(false);
 
   const formatBytes = (bytes: number): string => {
@@ -211,7 +216,8 @@ export const CleanupPage: React.FC = () => {
           t.cleanup.trashFailedTitle,
           `${failedTrash.length} items require manual disposal decisions.`
         );
-        setManualConflictPath(failedTrash[0]);
+        setFailedQueue(failedTrash);
+        setFailedTotal(failedTrash.length);
       } else {
         toast.success(
           t.cleanup.cleanComplete,
@@ -249,8 +255,12 @@ export const CleanupPage: React.FC = () => {
   const handleRetryTrash = async (path: string) => {
     setResolvingPath(true);
     try {
-      await invoke("retry_failed_trash", { path });
-      setManualConflictPath(null);
+      const outcome = await invoke<DisposalItemResult>("retry_failed_trash", { path });
+      if (outcome.success) {
+        resolveCurrentConflict();
+      } else {
+        toast.error(t.cleanup.trashFailedTitle, outcome.error ?? "");
+      }
     } catch (e) {
       toast.error("Retry Failed", String(e));
     } finally {
@@ -261,8 +271,12 @@ export const CleanupPage: React.FC = () => {
   const handleForceDelete = async (path: string) => {
     setResolvingPath(true);
     try {
-      await invoke("force_delete_permanently", { path });
-      setManualConflictPath(null);
+      const outcome = await invoke<DisposalItemResult>("force_delete_permanently", { path });
+      if (outcome.success) {
+        resolveCurrentConflict();
+      } else {
+        toast.error(t.cleanup.trashFailedTitle, outcome.error ?? "");
+      }
     } catch (e) {
       toast.error("Permanent Delete Failed", String(e));
     } finally {
@@ -806,7 +820,15 @@ export const CleanupPage: React.FC = () => {
                 <Warning20Filled className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="font-semibold text-[var(--text-primary)] text-sm">{t.cleanup.trashFailedTitle}</h3>
+                <h3 className="font-semibold text-[var(--text-primary)] text-sm">
+                  {t.cleanup.trashFailedTitle}
+                  {failedTotal > 1 && (
+                    <span className="ml-2 font-ibm-mono text-xs text-[var(--text-muted)]">
+                      {failedTotal - failedQueue.length + 1} / {failedTotal}
+                    </span>
+                  )}
+                </h3>
+
                 <p className="text-xs text-[var(--text-secondary)]">{t.cleanup.trashFailedDesc}</p>
               </div>
             </div>
@@ -822,7 +844,7 @@ export const CleanupPage: React.FC = () => {
             <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--border-divider)]">
               <WinUIButton
                 variant="standard"
-                onClick={() => setManualConflictPath(null)}
+                onClick={resolveCurrentConflict}
                 disabled={resolvingPath}
               >
                 {t.cleanup.keepFileAction}
