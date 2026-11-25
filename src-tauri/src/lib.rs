@@ -1939,11 +1939,7 @@ pub fn run() {
     // 1. Cap worker threads (1..=4) to prevent CPU starvation and thread stack bloat on low-spec/4GB machines
     freemydisk_core::init_performance_profile();
 
-    // 2. Instruct mimalloc to release freed memory pages immediately back to the OS
-    std::env::set_var("MIMALLOC_PURGE_DELAY", "0");
-    std::env::set_var("MIMALLOC_ARENA_EAGER_COMMIT", "0");
-
-    // 3. Configure WebView2 (Chromium engine) for minimal RAM footprint
+    // 2. Configure WebView2 (Chromium engine) for minimal RAM footprint
     if std::env::var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS").is_err() {
         std::env::set_var(
             "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS",
