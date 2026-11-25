@@ -128,3 +128,31 @@ fn test_rule_approved_system_caches_are_disposable_but_their_folders_are_not() {
         &download.join(r"..\..\System32")
     ));
 }
+
+#[cfg(unix)]
+#[test]
+fn test_unix_system_and_home_folders_are_protected() {
+    use std::path::PathBuf;
+
+    for p in [
+        "/",
+        "/usr",
+        "/usr/bin/ls",
+        "/System/Library",
+        "/etc/hosts",
+        "/Applications",
+    ] {
+        assert!(
+            ProtectedPathRegistry::is_protected(Path::new(p)),
+            "{} must be protected",
+            p
+        );
+    }
+
+    let home = PathBuf::from(std::env::var("HOME").expect("HOME"));
+    assert!(ProtectedPathRegistry::is_protected(&home));
+    assert!(ProtectedPathRegistry::is_protected(&home.join("Documents")));
+    assert!(!ProtectedPathRegistry::is_protected(
+        &home.join("Documents").join("old-report.pdf")
+    ));
+}

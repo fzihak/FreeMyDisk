@@ -82,6 +82,31 @@ static DYNAMIC_SYSTEM_CRITICAL_PATHS: LazyLock<Vec<PathBuf>> = LazyLock::new(|| 
         paths.push(PathBuf::from(&pfw64));
     }
 
+    // macOS and Linux system folders.
+    #[cfg(not(target_os = "windows"))]
+    for p in [
+        "/System",
+        "/Library",
+        "/Applications",
+        "/bin",
+        "/sbin",
+        "/usr",
+        "/etc",
+        "/private",
+        "/var",
+        "/opt",
+        "/cores",
+        "/dev",
+        "/boot",
+        "/lib",
+        "/lib64",
+        "/proc",
+        "/sys",
+        "/snap",
+    ] {
+        paths.push(PathBuf::from(p));
+    }
+
     paths
 });
 
@@ -126,6 +151,29 @@ fn is_system_cleanable(norm: &str) -> bool {
         .any(|pattern| crate::cleanup::matchers::glob_match(pattern, norm))
 }
 
+/// Folders that directly hold user profiles; each child is a profile root.
+static USERS_ROOTS: LazyLock<Vec<String>> = LazyLock::new(|| {
+    let sys_drive = std::env::var("SystemDrive").unwrap_or_else(|_| "C:".to_string());
+    let mut roots = vec![
+        format!(r"{}\Users", sys_drive.trim_end_matches('\\')),
+        "/Users".to_string(),
+        "/home".to_string(),
+    ];
+    for var in ["USERPROFILE", "HOME"] {
+        if let Some(parent) = std::env::var(var)
+            .ok()
+            .and_then(|v| PathBuf::from(v).parent().map(Path::to_path_buf))
+        {
+            roots.push(parent.to_string_lossy().to_string());
+        }
+    }
+    roots
+        .iter()
+        .map(|r| normalize_upper(r))
+        .filter(|r| !r.is_empty())
+        .collect()
+});
+
 /// Folders that must never be deleted themselves, although files inside them may be.
 /// Covers the users root, each profile root and the standard profile folders.
 static CONTAINER_PATHS: LazyLock<Vec<String>> = LazyLock::new(|| {
@@ -167,11 +215,35 @@ static CONTAINER_PATHS: LazyLock<Vec<String>> = LazyLock::new(|| {
         }
     }
 
-    for var in ["APPDATA", "LOCALAPPDATA", "HOME"] {
+    for var in ["APPDATA", "LOCALAPPDATA"] {
         if let Ok(v) = std::env::var(var) {
             paths.push(PathBuf::from(v));
         }
     }
+
+    // macOS and Linux home folders.
+    if let Ok(home) = std::env::var("HOME") {
+        let home = PathBuf::from(home);
+        paths.push(home.clone());
+        for sub in [
+            "Desktop",
+            "Documents",
+            "Downloads",
+            "Pictures",
+            "Music",
+            "Movies",
+            "Videos",
+            "Library",
+            ".config",
+            ".local",
+            ".local/share",
+        ] {
+            paths.push(home.join(sub));
+        }
+    }
+    paths.push(PathBuf::from("/Volumes"));
+    paths.push(PathBuf::from("/media"));
+    paths.push(PathBuf::from("/mnt"));
 
     paths
         .iter()
@@ -211,8 +283,10 @@ fn is_container_or_ancestor(norm: &str) -> bool {
     if is_volume_root(norm) {
         return true;
     }
-    let users_root = CONTAINER_PATHS.first().map(String::as_str).unwrap_or("");
-    if !users_root.is_empty() {
+    for users_root in USERS_ROOTS.iter() {
+        if norm == users_root {
+            return true;
+        }
         if let Some(rest) = norm.strip_prefix(&format!(r"{}\", users_root)) {
             if !rest.is_empty() && !rest.contains('\\') {
                 return true;
