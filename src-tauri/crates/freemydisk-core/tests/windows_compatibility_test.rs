@@ -1,3 +1,5 @@
+#![cfg(target_os = "windows")]
+
 use freemydisk_core::cleanup::disposal::execute_tolerant_permanent_delete;
 use freemydisk_core::shared::paths::to_extended_path;
 use freemydisk_core::shared::progress::CancellationToken;

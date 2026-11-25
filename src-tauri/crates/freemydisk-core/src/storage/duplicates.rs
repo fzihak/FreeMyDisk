@@ -113,8 +113,7 @@ impl DuplicateDetector {
     where
         F: FnMut(&str, u8, u64, &Path, u64),
     {
-        let _bg_guard =
-            freemydisk_platform::windows::io_priority::BackgroundExecutionGuard::enter();
+        let _bg_guard = freemydisk_platform::io_priority::BackgroundExecutionGuard::enter();
         let start_time = Instant::now();
         let mut cache_hits = 0usize;
         let mut items_scanned = 0u64;
@@ -331,7 +330,8 @@ impl DuplicateDetector {
             for cand in candidates {
                 processed_partial += 1;
                 if last_emit.elapsed().as_millis() >= 33 {
-                    let pct = 60 + ((processed_partial * 30) / total_partial_cands.max(1)).min(30) as u8;
+                    let pct =
+                        60 + ((processed_partial * 30) / total_partial_cands.max(1)).min(30) as u8;
                     on_progress(
                         "Phase 3/4: Computing streaming BLAKE3 hashes...",
                         pct,
@@ -460,7 +460,7 @@ impl DuplicateDetector {
         );
 
         #[cfg(target_os = "windows")]
-        freemydisk_platform::windows::memory::trim_working_set();
+        freemydisk_platform::memory::trim_working_set();
 
         Ok(DuplicateScanResult {
             total_groups,

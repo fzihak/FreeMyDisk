@@ -19,7 +19,7 @@
     "build": "tsc && vite build",
     "build:helpers": "cargo build --release -p freemydisk-elevated -p freemydisk-cli && node build-scripts/sync-helpers.cjs",
     "build:bundle-prep": "pnpm build && pnpm build:helpers",
-    "build:bundle": "pnpm build:bundle-prep && pnpm tauri build",
+    "build:bundle": "pnpm tauri build --config src-tauri/tauri.bundle.conf.json",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",

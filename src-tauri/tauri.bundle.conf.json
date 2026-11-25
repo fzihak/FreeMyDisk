@@ -1,0 +1,9 @@
+{
+  "$schema": "https://raw.githubusercontent.com/tauri-apps/tauri/dev/crates/tauri-cli/schema.json",
+  "bundle": {
+    "resources": [
+      "resources/freemydisk-elevated.exe",
+      "resources/freemydisk-cli.exe"
+    ]
+  }
+}

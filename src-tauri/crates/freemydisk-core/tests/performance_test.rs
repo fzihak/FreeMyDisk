@@ -1,7 +1,8 @@
-use freemydisk_platform::windows::io_priority::BackgroundExecutionGuard;
-use freemydisk_platform::windows::memory::trim_working_set;
-use freemydisk_platform::windows::power::{get_adaptive_concurrency_limit, get_system_power_state};
-use freemydisk_platform::windows::storage_optim::{detect_drive_media, DriveMedia};
+use freemydisk_platform::io_priority::BackgroundExecutionGuard;
+use freemydisk_platform::memory::trim_working_set;
+use freemydisk_platform::power::{get_adaptive_concurrency_limit, get_system_power_state};
+use freemydisk_platform::storage_optim::{detect_drive_media, DriveMedia};
+#[cfg(target_os = "windows")]
 use freemydisk_platform::windows::usn_scan::UsnVolumeIndex;
 use std::fs::File;
 use std::io::Write;
@@ -42,6 +43,7 @@ fn test_drive_media_detection() {
     ));
 }
 
+#[cfg(target_os = "windows")]
 #[test]
 fn test_usn_volume_index_graceful_fallback() {
     // Probing a non-existent or invalid drive letter (e.g., 'Z') should gracefully return None

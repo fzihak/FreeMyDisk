@@ -41,7 +41,13 @@ impl HeavyFoldersScanner {
         max_depth: usize,
         cancel: &CancellationToken,
     ) -> Result<HeavyFoldersScanResult, CoreError> {
-        Self::scan_heavy_folders_with_progress(root, min_size_bytes, max_depth, cancel, |_, _, _| {})
+        Self::scan_heavy_folders_with_progress(
+            root,
+            min_size_bytes,
+            max_depth,
+            cancel,
+            |_, _, _| {},
+        )
     }
 
     pub fn scan_heavy_folders_with_progress<F>(

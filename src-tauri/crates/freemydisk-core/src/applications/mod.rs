@@ -10,7 +10,7 @@ pub use catalog::ApplicationCatalog;
 pub use leftovers::models::{
     ApplicationLeftover, LeftoverCandidate, LeftoverConfidence, LeftoverGroup, LeftoverKind,
 };
-pub use leftovers::scanner::LeftoverScanner;
+pub use leftovers::scanner::{LeftoverCleanSummary, LeftoverScanner};
 pub use process_control::ProcessController;
 pub use uninstall::{UninstallOrchestrator, UninstallResult};
 
@@ -33,24 +33,24 @@ pub struct InstalledAppInfo {
 
 pub struct ApplicationService {
     platform: Box<dyn PlatformApplications>,
-    _fs_platform: Box<dyn PlatformFilesystem>,
+    fs_platform: Box<dyn PlatformFilesystem>,
 }
 
 impl ApplicationService {
     pub fn new() -> Self {
         Self {
             platform: Box::new(get_platform()),
-            _fs_platform: Box::new(get_platform()),
+            fs_platform: Box::new(get_platform()),
         }
     }
 
     pub fn with_platform(
         platform: Box<dyn PlatformApplications>,
-        _fs_platform: Box<dyn PlatformFilesystem>,
+        fs_platform: Box<dyn PlatformFilesystem>,
     ) -> Self {
         Self {
             platform,
-            _fs_platform,
+            fs_platform,
         }
     }
 
@@ -89,8 +89,13 @@ impl ApplicationService {
     }
 
     /// Cleans leftover items across filesystem and registry
-    pub fn clean_leftovers(&self, paths: &[String]) -> Result<u64, String> {
-        LeftoverScanner::clean_items(paths, true)
+    pub fn clean_leftovers(
+        &self,
+        paths: &[String],
+        journal: &crate::filesystem::journal::CrashRecoveryJournal,
+        lock_dir: &std::path::Path,
+    ) -> Result<LeftoverCleanSummary, String> {
+        LeftoverScanner::clean_items(paths, true, self.fs_platform.as_ref(), journal, lock_dir)
     }
 
     /// Safely terminates running processes matching an app
@@ -120,19 +125,34 @@ impl ApplicationService {
         UninstallOrchestrator::uninstall_and_scan_silent(&target_app)
     }
 
-    pub fn launch_uninstaller(&self, uninstall_string: &str) -> Result<(), String> {
+    /// Resolves an installed application by id. The uninstall command is always taken
+    /// from the system's own registration, never from the caller.
+    fn find_application(&self, app_id: &str) -> Result<InstalledAppInfo, String> {
+        self.list_applications()?
+            .into_iter()
+            .find(|a| a.id == app_id)
+            .ok_or_else(|| "The selected application is no longer installed.".to_string())
+    }
+
+    pub fn launch_uninstaller(&self, app_id: &str) -> Result<(), String> {
+        let app = self.find_application(app_id)?;
+        let cmd = app
+            .uninstall_string
+            .as_deref()
+            .ok_or_else(|| format!("'{}' has no registered uninstaller.", app.name))?;
         self.platform
-            .launch_uninstaller(uninstall_string)
+            .launch_uninstaller(cmd)
             .map_err(|e| e.to_string())
     }
 
-    pub fn launch_silent_uninstaller(
-        &self,
-        uninstall_string: &str,
-        install_dir: Option<&str>,
-    ) -> Result<(), String> {
+    pub fn launch_silent_uninstaller(&self, app_id: &str) -> Result<(), String> {
+        let app = self.find_application(app_id)?;
+        let cmd = app
+            .uninstall_string
+            .as_deref()
+            .ok_or_else(|| format!("'{}' has no registered uninstaller.", app.name))?;
         self.platform
-            .launch_silent_uninstaller(uninstall_string, install_dir)
+            .launch_silent_uninstaller(cmd, app.install_location.as_deref())
             .map_err(|e| e.to_string())
     }
 

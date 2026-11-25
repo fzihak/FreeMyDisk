@@ -57,3 +57,44 @@ fn test_self_preservation_blocks_internal_assets() {
     assert!(ProtectedPathRegistry::is_self_asset(exe));
     assert!(ProtectedPathRegistry::assert_safe_for_disposal(exe).is_err());
 }
+
+#[cfg(target_os = "windows")]
+#[test]
+fn test_volume_roots_and_profile_folders_cannot_be_disposed() {
+    use std::path::PathBuf;
+
+    let profile = PathBuf::from(std::env::var("USERPROFILE").expect("USERPROFILE"));
+    let users_root = profile.parent().expect("profile parent").to_path_buf();
+
+    let blocked = [
+        PathBuf::from(r"D:\"),
+        PathBuf::from(r"Z:"),
+        PathBuf::from(r"\\server\share"),
+        users_root.clone(),
+        users_root.join("SomeOtherUser"),
+        profile.clone(),
+        profile.join("Desktop"),
+        profile.join("Documents"),
+        profile.join(r"AppData\Local"),
+    ];
+    for path in &blocked {
+        assert!(
+            ProtectedPathRegistry::assert_safe_for_disposal(path).is_err(),
+            "{} must be protected",
+            path.display()
+        );
+    }
+
+    let allowed = [
+        profile.join(r"Desktop\old-report.pdf"),
+        profile.join(r"Downloads\setup.exe"),
+        PathBuf::from(r"D:\Projects\app\node_modules"),
+    ];
+    for path in &allowed {
+        assert!(
+            ProtectedPathRegistry::assert_safe_for_disposal(path).is_ok(),
+            "{} must stay disposable",
+            path.display()
+        );
+    }
+}

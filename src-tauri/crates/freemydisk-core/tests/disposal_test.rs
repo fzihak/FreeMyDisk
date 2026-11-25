@@ -165,6 +165,41 @@ fn test_manual_permanent_delete_reuses_standard_staging_pipeline() {
 }
 
 #[test]
+fn test_rebuildable_item_is_kept_when_trash_fails_under_always_trash() {
+    let temp = tempdir().unwrap();
+    let target_file = temp.path().join("rebuildable_cache.bin");
+    fs::write(&target_file, b"cache").unwrap();
+
+    let journal = CrashRecoveryJournal::open(&temp.path().join("journal.db")).unwrap();
+    let lock_dir = temp.path().join("locks");
+    let platform = MockDisposalPlatform::new(true);
+    let cancel = CancellationToken::new();
+
+    let plan_item = CleanupPlanItem {
+        original_path: target_file.clone(),
+        canonical_path: target_file.clone(),
+        size_bytes: 5,
+        is_dir: false,
+        matched_rules: vec!["rebuildable_rule".to_string()],
+        default_action: "permanent".to_string(),
+        verified_rebuildable: true,
+        protect_subpaths: Vec::new(),
+        risk: "safe".to_string(),
+    };
+
+    let summary =
+        DisposalEngine::execute_plan(&[plan_item], &platform, &journal, &lock_dir, true, &cancel)
+            .unwrap();
+
+    assert_eq!(summary.successful_items, 0);
+    assert_eq!(summary.failed_trash_paths, vec![target_file.clone()]);
+    assert!(
+        target_file.exists(),
+        "File was deleted although trash failed"
+    );
+}
+
+#[test]
 fn test_extra_safe_override_forces_trash_route() {
     let temp = tempdir().unwrap();
     let target_file = temp.path().join("rebuildable_target.tmp");

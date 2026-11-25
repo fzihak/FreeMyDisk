@@ -1,7 +1,27 @@
 use crate::traits::{PlatformError, PlatformStartup, RawStartupEntry};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use winreg::enums::{HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE, KEY_READ, KEY_SET_VALUE};
 use winreg::RegKey;
+
+/// Resolves a startup-folder entry name to its shortcut path.
+/// Only plain `.lnk` / `.lnk.disabled` file names that exist directly in `dir` are accepted,
+/// so an entry id cannot point outside the Startup folder.
+fn resolve_startup_shortcut(dir: &Path, fname: &str) -> Result<PathBuf, PlatformError> {
+    let is_plain_name = Path::new(fname).file_name().and_then(|n| n.to_str()) == Some(fname);
+    let is_shortcut = fname.ends_with(".lnk") || fname.ends_with(".lnk.disabled");
+    if !is_plain_name || !is_shortcut || fname.contains(['/', '\\', ':']) {
+        return Err(PlatformError::OperationFailed(
+            "Invalid startup folder entry".to_string(),
+        ));
+    }
+    let path = dir.join(fname);
+    if !path.is_file() {
+        return Err(PlatformError::OperationFailed(
+            "Startup folder entry no longer exists".to_string(),
+        ));
+    }
+    Ok(path)
+}
 
 pub struct WindowsStartupHandler;
 
@@ -267,16 +287,19 @@ impl PlatformStartup for WindowsStartupHandler {
                 })?;
             }
         } else if let Some(fname) = entry_id.strip_prefix("folder:user:") {
-            if let Some(user_startup) = get_user_startup_dir() {
-                if enable && fname.ends_with(".lnk.disabled") {
-                    let old_path = user_startup.join(fname);
-                    let new_path = user_startup.join(fname.trim_end_matches(".disabled"));
-                    let _ = std::fs::rename(old_path, new_path);
-                } else if !enable && fname.ends_with(".lnk") {
-                    let old_path = user_startup.join(fname);
-                    let new_path = user_startup.join(format!("{}.disabled", fname));
-                    let _ = std::fs::rename(old_path, new_path);
-                }
+            let user_startup = get_user_startup_dir().ok_or_else(|| {
+                PlatformError::OperationFailed("Startup folder not found".to_string())
+            })?;
+            let old_path = resolve_startup_shortcut(&user_startup, fname)?;
+            let new_path = if enable && fname.ends_with(".lnk.disabled") {
+                Some(user_startup.join(fname.trim_end_matches(".disabled")))
+            } else if !enable && fname.ends_with(".lnk") {
+                Some(user_startup.join(format!("{}.disabled", fname)))
+            } else {
+                None
+            };
+            if let Some(new_path) = new_path {
+                std::fs::rename(old_path, new_path).map_err(PlatformError::Io)?;
             }
         }
 
@@ -320,10 +343,16 @@ impl PlatformStartup for WindowsStartupHandler {
                 let _ = disabled_key.delete_value(entry_id);
             }
         } else if let Some(fname) = entry_id.strip_prefix("folder:user:") {
-            if let Some(user_startup) = get_user_startup_dir() {
-                let path = user_startup.join(fname);
-                let _ = std::fs::remove_file(path);
-            }
+            let user_startup = get_user_startup_dir().ok_or_else(|| {
+                PlatformError::OperationFailed("Startup folder not found".to_string())
+            })?;
+            let path = resolve_startup_shortcut(&user_startup, fname)?;
+            trash::delete(&path).map_err(|e| {
+                PlatformError::OperationFailed(format!(
+                    "Could not move the startup shortcut to the Recycle Bin: {}",
+                    e
+                ))
+            })?;
         }
 
         Ok(())

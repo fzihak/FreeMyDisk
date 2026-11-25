@@ -85,6 +85,104 @@ static DYNAMIC_SYSTEM_CRITICAL_PATHS: LazyLock<Vec<PathBuf>> = LazyLock::new(|| 
     paths
 });
 
+/// Folders that must never be deleted themselves, although files inside them may be.
+/// Covers the users root, each profile root and the standard profile folders.
+static CONTAINER_PATHS: LazyLock<Vec<String>> = LazyLock::new(|| {
+    let mut paths: Vec<PathBuf> = Vec::new();
+
+    let sys_drive = std::env::var("SystemDrive").unwrap_or_else(|_| "C:".to_string());
+    let users_root = PathBuf::from(format!(r"{}\Users", sys_drive.trim_end_matches('\\')));
+    paths.push(users_root);
+
+    for var in ["USERPROFILE", "PUBLIC", "OneDrive", "TEMP", "TMP"] {
+        if let Ok(v) = std::env::var(var) {
+            paths.push(PathBuf::from(v));
+        }
+    }
+
+    if let Ok(profile) = std::env::var("USERPROFILE") {
+        let profile = PathBuf::from(profile);
+        if let Some(parent) = profile.parent() {
+            paths.push(parent.to_path_buf());
+        }
+        for sub in [
+            "Desktop",
+            "Documents",
+            "Downloads",
+            "Pictures",
+            "Music",
+            "Videos",
+            "Favorites",
+            "Contacts",
+            "Saved Games",
+            "OneDrive",
+            "AppData",
+            r"AppData\Local",
+            r"AppData\LocalLow",
+            r"AppData\Roaming",
+            r"AppData\Local\Temp",
+        ] {
+            paths.push(profile.join(sub));
+        }
+    }
+
+    for var in ["APPDATA", "LOCALAPPDATA", "HOME"] {
+        if let Ok(v) = std::env::var(var) {
+            paths.push(PathBuf::from(v));
+        }
+    }
+
+    paths
+        .iter()
+        .map(|p| normalize_upper(&p.to_string_lossy()))
+        .filter(|s| !s.is_empty())
+        .collect()
+});
+
+fn normalize_upper(s: &str) -> String {
+    let mut upper = s.replace('/', r"\").to_ascii_uppercase();
+    if let Some(stripped) = upper.strip_prefix(r"\\?\UNC\") {
+        upper = format!(r"\\{}", stripped);
+    } else if let Some(stripped) = upper.strip_prefix(r"\\?\") {
+        upper = stripped.to_string();
+    }
+    upper.trim_end_matches('\\').to_string()
+}
+
+/// True for a drive or share root such as `D:`, `D:\` or `\\server\share`.
+fn is_volume_root(norm: &str) -> bool {
+    if norm.is_empty() {
+        return true;
+    }
+    let bytes = norm.as_bytes();
+    if bytes.len() == 2 && bytes[1] == b':' && bytes[0].is_ascii_alphabetic() {
+        return true;
+    }
+    if let Some(rest) = norm.strip_prefix(r"\\") {
+        return rest.split('\\').filter(|s| !s.is_empty()).count() <= 2;
+    }
+    !norm.contains('\\') && norm.starts_with('/') && norm.trim_matches('/').is_empty()
+}
+
+/// True when `norm` is a container folder, an ancestor of one, or a profile root
+/// directly under the users folder.
+fn is_container_or_ancestor(norm: &str) -> bool {
+    if is_volume_root(norm) {
+        return true;
+    }
+    let users_root = CONTAINER_PATHS.first().map(String::as_str).unwrap_or("");
+    if !users_root.is_empty() {
+        if let Some(rest) = norm.strip_prefix(&format!(r"{}\", users_root)) {
+            if !rest.is_empty() && !rest.contains('\\') {
+                return true;
+            }
+        }
+    }
+    CONTAINER_PATHS
+        .iter()
+        .any(|c| c == norm || c.starts_with(&format!(r"{}\", norm)))
+}
+
 pub struct ProtectedPathRegistry;
 
 impl ProtectedPathRegistry {
@@ -322,6 +420,16 @@ impl ProtectedPathRegistry {
             Self::get_final_canonical_path(path).map(|p| normalize(&p.to_string_lossy()));
 
         let candidate_norms = [&path_norm, &canon_norm, &exp_norm, &lex_norm];
+
+        if candidate_norms
+            .iter()
+            .any(|c| is_container_or_ancestor(&normalize_upper(c)))
+            || final_norm
+                .as_deref()
+                .is_some_and(|f| is_container_or_ancestor(&normalize_upper(f)))
+        {
+            return true;
+        }
 
         let windir = std::env::var("SystemRoot")
             .or_else(|_| std::env::var("windir"))

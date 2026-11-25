@@ -72,6 +72,13 @@ export interface LeftoverGroup {
   overall_confidence: "high" | "medium" | "low" | string;
 }
 
+interface LeftoverCleanSummary {
+  freed_bytes: number;
+  removed_folders: number;
+  removed_registry_keys: number;
+  failed: string[];
+}
+
 export interface UninstallResult {
   app_id: string;
   app_name: string;
@@ -189,14 +196,31 @@ export const ApplicationsPage: React.FC = () => {
     }
   };
 
+  const reportLeftoverClean = (summary: LeftoverCleanSummary) => {
+    if (summary.failed.length > 0) {
+      const attempted =
+        summary.failed.length + summary.removed_folders + summary.removed_registry_keys;
+      toast.warning(t.cleanup.trashFailedTitle, `${summary.failed.length} / ${attempted}`);
+    } else {
+      toast.success(
+        t.applications.cleanLeftovers,
+        `${formatBytes(summary.freed_bytes)} ${t.cleanup.reclaimedSpace}`
+      );
+    }
+  };
+
   const handleScanLeftovers = async () => {
     setLeftoverLoading(true);
     try {
       const res = await invoke<LeftoverGroup[]>("scan_deep_leftovers");
       setDeepGroups(res);
-      const allPaths = new Set<string>();
-      res.forEach((g) => g.items.forEach((i) => allPaths.add(i.path_or_key)));
-      setSelectedLeftoverPaths(allPaths);
+      const confident = new Set<string>();
+      res.forEach((g) =>
+        g.items.forEach((i) => {
+          if (i.confidence.toLowerCase() === "high") confident.add(i.path_or_key);
+        })
+      );
+      setSelectedLeftoverPaths(confident);
     } catch (e) {
       console.error("Failed to scan application leftovers:", e);
       toast.error(t.common.error, String(e));
@@ -210,14 +234,11 @@ export const ApplicationsPage: React.FC = () => {
     setCleaning(true);
     try {
       const paths = Array.from(selectedLeftoverPaths);
-      const reclaimed = await invoke<number>("clean_leftovers_safe", {
+      const summary = await invoke<LeftoverCleanSummary>("clean_leftovers_safe", {
         paths,
         includeRegistry: true,
       });
-      toast.success(
-        t.applications.cleanLeftovers,
-        `${formatBytes(reclaimed)} ${t.cleanup.reclaimedSpace}`
-      );
+      reportLeftoverClean(summary);
       await handleScanLeftovers();
     } catch (e) {
       console.error("Failed to clean leftovers:", e);
@@ -271,14 +292,11 @@ export const ApplicationsPage: React.FC = () => {
     setCleaningModalLeftovers(true);
     try {
       const paths = group.items.map((i) => i.path_or_key);
-      const reclaimed = await invoke<number>("clean_leftovers_safe", {
+      const summary = await invoke<LeftoverCleanSummary>("clean_leftovers_safe", {
         paths,
         includeRegistry: true,
       });
-      toast.success(
-        t.applications.cleanLeftovers,
-        `${formatBytes(reclaimed)} ${t.cleanup.reclaimedSpace}`
-      );
+      reportLeftoverClean(summary);
       setLeftoverModalResult(null);
       handleScanLeftovers();
     } catch (e) {
@@ -295,11 +313,9 @@ export const ApplicationsPage: React.FC = () => {
   const handleUninstall = async (app: InstalledAppInfo) => {
     if (!app.uninstall_string) return;
     try {
-      await invoke("launch_uninstaller", {
-        uninstallString: app.uninstall_string,
-      });
+      await invoke("launch_uninstaller", { appId: app.id });
     } catch (e) {
-      console.error("Failed to launch uninstaller:", e);
+      toast.error(t.applications.uninstall, String(e));
     }
   };
 

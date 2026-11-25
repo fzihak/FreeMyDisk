@@ -134,6 +134,8 @@ impl RegistryLeftoverScanner {
 
     /// Safely deletes a leftover registry subkey tree
     pub fn clean_registry_key(key_path: &str) -> Result<(), String> {
+        freemydisk_platform::registry_policy::validate_leftover_key(key_path)?;
+
         #[cfg(target_os = "windows")]
         {
             match Self::clean_registry_key_windows(key_path) {

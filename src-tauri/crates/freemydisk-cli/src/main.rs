@@ -1766,6 +1766,26 @@ fn handle_apps(leftovers: bool, clean_leftovers: bool, yes: bool, format: Output
             return;
         }
 
+        // Folders that matched no installed app are reported but never cleaned
+        // automatically: they may belong to portable apps or games.
+        let skipped = items
+            .iter()
+            .filter(|l| l.confidence.eq_ignore_ascii_case("low"))
+            .count();
+        let items: Vec<_> = items
+            .into_iter()
+            .filter(|l| !l.confidence.eq_ignore_ascii_case("low"))
+            .collect();
+        if skipped > 0 && format == OutputFormat::Text {
+            println!(
+                "{} low-confidence item(s) skipped. Review them with `freemydisk apps --leftovers`.",
+                skipped.to_string().yellow()
+            );
+        }
+        if items.is_empty() {
+            return;
+        }
+
         let total_bytes: u64 = items.iter().map(|l| l.size_bytes).sum();
         let paths: Vec<String> = items.iter().map(|l| l.path.clone()).collect();
 
@@ -1784,7 +1804,11 @@ fn handle_apps(leftovers: bool, clean_leftovers: bool, yes: bool, format: Output
             }
         }
 
-        match service.clean_leftovers(&paths) {
+        let (journal, lock_dir) = get_cli_recovery_context();
+        match service
+            .clean_leftovers(&paths, &journal, &lock_dir)
+            .map(|summary| summary.freed_bytes)
+        {
             Ok(freed) => match format {
                 OutputFormat::Json => {
                     #[derive(Serialize)]

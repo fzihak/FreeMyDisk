@@ -343,8 +343,7 @@ fn handle_request(req: ElevatedRequest, expected_token: Option<&str>) -> Elevate
                         }
                     } else {
                         use freemydisk_platform::traits::PlatformStartup;
-                        let handler =
-                            freemydisk_platform::windows::startup::WindowsStartupHandler::new();
+                        let handler = freemydisk_platform::get_platform();
                         match handler.set_startup_entry_state(&p.entry_id, p.enable) {
                             Ok(()) => ElevatedResponse {
                                 success: true,
@@ -385,8 +384,7 @@ fn handle_request(req: ElevatedRequest, expected_token: Option<&str>) -> Elevate
                         }
                     } else {
                         use freemydisk_platform::traits::PlatformStartup;
-                        let handler =
-                            freemydisk_platform::windows::startup::WindowsStartupHandler::new();
+                        let handler = freemydisk_platform::get_platform();
                         match handler.delete_startup_entry(&p.entry_id) {
                             Ok(()) => ElevatedResponse {
                                 success: true,
@@ -419,11 +417,14 @@ fn handle_request(req: ElevatedRequest, expected_token: Option<&str>) -> Elevate
             match serde_json::from_str::<RegPayload>(&req.payload) {
                 Ok(p) => {
                     let trimmed = p.key_path.trim();
-                    if !trimmed.to_ascii_uppercase().starts_with(r"HKLM\SOFTWARE\") {
+                    let policy =
+                        freemydisk_platform::registry_policy::validate_leftover_key(trimmed);
+                    if !trimmed.to_ascii_uppercase().starts_with(r"HKLM\") || policy.is_err() {
                         ElevatedResponse {
                             success: false,
-                            message: "Invalid registry path: must start with HKLM\\SOFTWARE\\"
-                                .to_string(),
+                            message: policy.err().unwrap_or_else(|| {
+                                "Only HKLM leftover keys are handled here".to_string()
+                            }),
                         }
                     } else {
                         #[cfg(target_os = "windows")]

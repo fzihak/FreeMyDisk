@@ -270,7 +270,11 @@ impl LargeFilesScanner {
 
         let cancel = CancellationToken::new();
         DisposalEngine::execute_plan_with_progress(
-            &items, platform, journal, lock_dir, true, // Always Trash
+            &items,
+            platform,
+            journal,
+            lock_dir,
+            true, // Always Trash
             &cancel,
             on_progress,
         )
