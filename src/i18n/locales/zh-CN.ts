@@ -120,6 +120,7 @@ export const zhCN: TranslationSchema = {
     "installedAppsCategory": "已安装应用与组件",
     "systemReservedCategory": "系统与保留空间",
     "tempFilesCategory": "临时文件与缓存",
+    "usedSpaceCategory": "已使用",
     "freeSpaceCategory": "可用空间"
   },
   "cleanup": {

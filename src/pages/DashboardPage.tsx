@@ -154,18 +154,14 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
     handleStartScan();
   }, []);
 
-  const currentVolume = volumes[selectedVolumeIdx] || {
-    mount_point: "C:\\",
-    volume_name: "Local Disk",
-    total_bytes: 512 * 1024 * 1024 * 1024,
-    available_bytes: 128 * 1024 * 1024 * 1024,
-    file_system: "NTFS",
-    is_removable: false,
-  };
-
-  const volumeUsedBytes = Math.max(0, currentVolume.total_bytes - currentVolume.available_bytes);
-  const volumePercentUsed = currentVolume.total_bytes > 0
-    ? Math.round((volumeUsedBytes / currentVolume.total_bytes) * 100)
+  // Undefined until the drive list has loaded; nothing is shown in its place.
+  const currentVolume: StorageVolumeInfo | undefined = volumes[selectedVolumeIdx];
+  const volumeTotalBytes = currentVolume?.total_bytes ?? 0;
+  const volumeUsedBytes = currentVolume
+    ? Math.max(0, currentVolume.total_bytes - currentVolume.available_bytes)
+    : 0;
+  const volumePercentUsed = volumeTotalBytes > 0
+    ? Math.round((volumeUsedBytes / volumeTotalBytes) * 100)
     : 0;
 
   const totalCleanableBytes = useMemo(() => {
@@ -488,16 +484,27 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-sm font-semibold text-[var(--text-primary)]">
-                  {currentVolume.volume_name || "Local Disk"} ({currentVolume.mount_point})
+                  {currentVolume
+                    ? `${currentVolume.volume_name || currentVolume.mount_point} (${currentVolume.mount_point})`
+                    : t.dashboard.driveSpaceTitle}
                 </h2>
-                <span className="text-[10px] font-ibm-mono px-1.5 py-0.5 rounded-[4px] bg-white/[0.06] text-[var(--text-secondary)]">
-                  {currentVolume.file_system}
-                </span>
+                {currentVolume && (
+                  <span className="text-[10px] font-ibm-mono px-1.5 py-0.5 rounded-[4px] bg-white/[0.06] text-[var(--text-secondary)]">
+                    {currentVolume.file_system}
+                  </span>
+                )}
               </div>
               <p className="text-xs text-[var(--text-secondary)] font-ibm-mono mt-0.5">
-                <span>{formatBytes(volumeUsedBytes)}</span> used of{" "}
-                <span>{formatBytes(currentVolume.total_bytes)}</span> ({volumePercentUsed}%) ·{" "}
-                <strong className="text-emerald-400 font-semibold">{formatBytes(currentVolume.available_bytes)} free</strong>
+                {currentVolume ? (
+                  <>
+                    <span>{formatBytes(volumeUsedBytes)}</span> / <span>{formatBytes(volumeTotalBytes)}</span> ({volumePercentUsed}%) ·{" "}
+                    <strong className="text-emerald-400 font-semibold">
+                      {formatBytes(currentVolume.available_bytes)} {t.dashboard.freeSpaceCategory}
+                    </strong>
+                  </>
+                ) : (
+                  <span className="inline-block w-48 h-3 rounded bg-white/[0.06] animate-pulse" />
+                )}
               </p>
             </div>
           </div>
@@ -522,47 +529,37 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
           )}
         </div>
 
-        {/* Windows 11 Storage Sense Segmented Capacity Bar */}
+        {/* Capacity bar: real used space, the part a scan found cleanable, and free space */}
         <div className="w-full h-3 bg-black/20 rounded-[4px] overflow-hidden flex border border-[var(--border-subtle)]">
-          <div
-            style={{ width: `${Math.min(100, Math.max(5, volumePercentUsed * 0.65))}%` }}
-            title="Installed Apps & Features"
-            className="h-full bg-[#0078d4] transition-all duration-500"
-          />
-          <div
-            style={{ width: `${Math.min(100, Math.max(3, volumePercentUsed * 0.15))}%` }}
-            title="System & Reserved Files"
-            className="h-full bg-[#8764b8] transition-all duration-500"
-          />
-          <div
-            style={{ width: `${Math.min(100, Math.max(2, volumePercentUsed * 0.2))}%` }}
-            title="Temporary Files & Caches"
-            className="h-full bg-[#f7630c] transition-all duration-500"
-          />
-          <div
-            style={{ width: `${Math.max(0, 100 - volumePercentUsed)}%` }}
-            title="Free Space"
-            className="h-full bg-white/[0.06] transition-all duration-500"
-          />
+          {volumeTotalBytes > 0 && (
+            <>
+              <div
+                style={{ width: `${((volumeUsedBytes - Math.min(totalCleanableBytes, volumeUsedBytes)) / volumeTotalBytes) * 100}%` }}
+                title={t.dashboard.usedSpaceCategory}
+                className="h-full bg-[#0078d4] transition-all duration-500"
+              />
+              <div
+                style={{ width: `${(Math.min(totalCleanableBytes, volumeUsedBytes) / volumeTotalBytes) * 100}%` }}
+                title={t.dashboard.tempFilesCategory}
+                className="h-full bg-[#f7630c] transition-all duration-500"
+              />
+            </>
+          )}
         </div>
 
         {/* Legend Row */}
         <div className="flex flex-wrap items-center gap-5 text-[11px] text-[var(--text-secondary)] pt-1">
           <div className="flex items-center gap-1.5">
             <span className="w-2.5 h-2.5 rounded-[2px] bg-[#0078d4]" />
-            <span>Installed Apps</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-[2px] bg-[#8764b8]" />
-            <span>System & Reserved</span>
+            <span>{t.dashboard.usedSpaceCategory}</span>
           </div>
           <div className="flex items-center gap-1.5">
             <span className="w-2.5 h-2.5 rounded-[2px] bg-[#f7630c]" />
-            <span>Temporary Files</span>
+            <span>{t.dashboard.tempFilesCategory}</span>
           </div>
           <div className="flex items-center gap-1.5">
             <span className="w-2.5 h-2.5 rounded-[2px] bg-white/[0.15]" />
-            <span>Free Space</span>
+            <span>{t.dashboard.freeSpaceCategory}</span>
           </div>
         </div>
       </WinUICard>

@@ -120,6 +120,7 @@ export const bn: TranslationSchema = {
     "installedAppsCategory": "ইনস্টল করা অ্যাপ ও ফিচার",
     "systemReservedCategory": "সিস্টেম ও সংরক্ষিত স্পেস",
     "tempFilesCategory": "অস্থায়ী ফাইল ও ক্যাশ",
+    "usedSpaceCategory": "ব্যবহৃত",
     "freeSpaceCategory": "খালি জায়গা"
   },
   "cleanup": {

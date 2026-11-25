@@ -120,6 +120,7 @@ export const ja: TranslationSchema = {
     "installedAppsCategory": "インストール済みアプリと機能",
     "systemReservedCategory": "システムおよび予約領域",
     "tempFilesCategory": "一時ファイルとキャッシュ",
+    "usedSpaceCategory": "使用中",
     "freeSpaceCategory": "空き容量"
   },
   "cleanup": {

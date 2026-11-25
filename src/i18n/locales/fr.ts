@@ -120,6 +120,7 @@ export const fr: TranslationSchema = {
     "installedAppsCategory": "Applications et fonctionnalités",
     "systemReservedCategory": "Fichiers système et réservés",
     "tempFilesCategory": "Fichiers temporaires et caches",
+    "usedSpaceCategory": "Utilisé",
     "freeSpaceCategory": "Espace libre"
   },
   "cleanup": {

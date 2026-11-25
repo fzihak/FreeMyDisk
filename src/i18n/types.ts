@@ -147,6 +147,7 @@ export interface TranslationSchema {
     installedAppsCategory: string;
     systemReservedCategory: string;
     tempFilesCategory: string;
+    usedSpaceCategory: string;
     freeSpaceCategory: string;
   };
   cleanup: {

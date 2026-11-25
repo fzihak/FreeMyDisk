@@ -120,6 +120,7 @@ export const ko: TranslationSchema = {
     "installedAppsCategory": "설치된 앱 및 기능",
     "systemReservedCategory": "시스템 및 예약 파일",
     "tempFilesCategory": "임시 파일 및 캐시",
+    "usedSpaceCategory": "사용 중",
     "freeSpaceCategory": "사용 가능한 여유 공간"
   },
   "cleanup": {

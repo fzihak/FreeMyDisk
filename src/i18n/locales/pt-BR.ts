@@ -120,6 +120,7 @@ export const ptBR: TranslationSchema = {
     "installedAppsCategory": "Aplicativos e recursos instalados",
     "systemReservedCategory": "Arquivos do sistema e reservados",
     "tempFilesCategory": "Arquivos temporários e caches",
+    "usedSpaceCategory": "Em uso",
     "freeSpaceCategory": "Espaço livre"
   },
   "cleanup": {
