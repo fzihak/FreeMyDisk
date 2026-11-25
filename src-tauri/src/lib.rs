@@ -1939,12 +1939,14 @@ pub fn run() {
     // 1. Cap worker threads (1..=4) to prevent CPU starvation and thread stack bloat on low-spec/4GB machines
     freemydisk_core::init_performance_profile();
 
-    // 2. Configure WebView2 (Chromium engine) for minimal RAM footprint
+    // 2. Configure WebView2 for a small footprint. The JavaScript heap is left at
+    //    its default size: large scan results (duplicates, large files) need it, and
+    //    a fixed 128 MB cap crashed the UI to a blank window.
     if std::env::var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS").is_err() {
         std::env::set_var(
             "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS",
             "--renderer-process-limit=1 \
-             --js-flags=\"--max-old-space-size=128 --optimize-for-size\" \
+             --js-flags=\"--optimize-for-size\" \
              --disable-gpu-shader-disk-cache \
              --disable-features=Translate,OptimizationHints,MediaRouter,CalculateNativeWinOcclusion \
              --disable-background-networking \
