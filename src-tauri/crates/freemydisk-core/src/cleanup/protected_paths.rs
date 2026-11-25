@@ -85,6 +85,47 @@ static DYNAMIC_SYSTEM_CRITICAL_PATHS: LazyLock<Vec<PathBuf>> = LazyLock::new(|| 
     paths
 });
 
+/// Cache locations inside protected system folders that built-in rules are allowed
+/// to clean. Each entry is a glob relative to the Windows or ProgramData folder;
+/// the cache folders themselves stay protected, only their contents are released.
+static SYSTEM_CLEANABLE_PATTERNS: LazyLock<Vec<String>> = LazyLock::new(|| {
+    let win_dir = std::env::var("SystemRoot")
+        .or_else(|_| std::env::var("windir"))
+        .unwrap_or_else(|_| r"C:\Windows".to_string());
+    let program_data =
+        std::env::var("ProgramData").unwrap_or_else(|_| r"C:\ProgramData".to_string());
+
+    let windows = [
+        "SoftwareDistribution/Download/*/**",
+        "SoftwareDistribution/DeliveryOptimization/*/**",
+        "Minidump/*/**",
+        "Installer/$PatchCache$/*/**",
+        "System32/winevt/Logs/Archive-*.evtx",
+        "MEMORY.DMP",
+    ];
+    let program_data_entries = [
+        "Microsoft/Search/Data/Temp/*/**",
+        "Battle.net/Agent/data/cache/*/**",
+        "GOG.com/Galaxy/logs/*/**",
+    ];
+
+    windows
+        .iter()
+        .map(|p| format!("{}/{}", win_dir, p))
+        .chain(
+            program_data_entries
+                .iter()
+                .map(|p| format!("{}/{}", program_data, p)),
+        )
+        .collect()
+});
+
+fn is_system_cleanable(norm: &str) -> bool {
+    SYSTEM_CLEANABLE_PATTERNS
+        .iter()
+        .any(|pattern| crate::cleanup::matchers::glob_match(pattern, norm))
+}
+
 /// Folders that must never be deleted themselves, although files inside them may be.
 /// Covers the users root, each profile root and the standard profile folders.
 static CONTAINER_PATHS: LazyLock<Vec<String>> = LazyLock::new(|| {
@@ -436,7 +477,16 @@ impl ProtectedPathRegistry {
             .unwrap_or_else(|_| r"C:\Windows".to_string());
         let windir_norm = normalize(&windir);
 
+        // Rule-approved caches inside system folders skip the system-folder check only
+        // when every resolved form of the path (including the final target of any
+        // link) stays inside an approved location.
+        let system_cleanable = candidate_norms.iter().all(|c| is_system_cleanable(c))
+            && final_norm.as_deref().is_none_or(is_system_cleanable);
+
         for crit in DYNAMIC_SYSTEM_CRITICAL_PATHS.iter() {
+            if system_cleanable {
+                break;
+            }
             let crit_norm = normalize(&crit.to_string_lossy());
 
             for cand in candidate_norms {
