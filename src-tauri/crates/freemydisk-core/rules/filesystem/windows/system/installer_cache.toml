@@ -1,0 +1,24 @@
+[rule]
+id = "windows_system_installer_patch_cache"
+name = "Windows Installer Orphaned Patch Cache"
+category = "system"
+risk = "moderate"
+verified_rebuildable = false
+verified_at = "2026-10-06"
+author = "FreeMyDisk Team"
+description = "Orphaned installer baseline patches in Windows Installer cache ($PatchCache$)"
+platform = "windows"
+
+[applicability]
+conditions = [
+    { type = "path_exists", path = "${win_dir}/Installer" }
+]
+
+[targets]
+paths = [
+    { path = "${win_dir}/Installer/$PatchCache$/*", matcher = "glob" }
+]
+
+[disposal]
+default_action = "trash"
+protect_subpaths = ["*.msi", "*.msp"]

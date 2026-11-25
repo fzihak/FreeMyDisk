@@ -1,0 +1,26 @@
+[rule]
+id = "windows_system_app_updaters"
+name = "Application Auto-Updater Staging"
+category = "system"
+risk = "safe"
+verified_rebuildable = true
+verified_at = "2026-09-09"
+author = "FreeMyDisk Team"
+description = "Leftover installer downloads from Discord, Slack, Spotify, and Electron-based app auto-updaters (1GB-3GB)"
+platform = "windows"
+
+[applicability]
+conditions = [
+    { type = "path_exists", path = "${local_app_data}" }
+]
+
+[targets]
+paths = [
+    { path = "${local_app_data}/*-updater/pending/*", matcher = "glob" },
+    { path = "${local_app_data}/local-updater/*", matcher = "glob" },
+    { path = "${local_app_data}/sparkle-updater/*", matcher = "glob" }
+]
+
+[disposal]
+default_action = "trash"
+protect_subpaths = []

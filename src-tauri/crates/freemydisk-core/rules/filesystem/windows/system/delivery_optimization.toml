@@ -1,0 +1,24 @@
+[rule]
+id = "windows_system_delivery_optimization"
+name = "Windows Delivery Optimization Files"
+category = "system"
+risk = "safe"
+verified_rebuildable = true
+verified_at = "2026-09-09"
+author = "FreeMyDisk Team"
+description = "Peer-to-peer Windows update cache and partial update delivery chunks (2GB-6GB)"
+platform = "windows"
+
+[applicability]
+conditions = [
+    { type = "path_exists", path = "${win_dir}/SoftwareDistribution/DeliveryOptimization" }
+]
+
+[targets]
+paths = [
+    { path = "${win_dir}/SoftwareDistribution/DeliveryOptimization/*", matcher = "glob" }
+]
+
+[disposal]
+default_action = "trash"
+protect_subpaths = []
