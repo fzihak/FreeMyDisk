@@ -1,0 +1,28 @@
+[rule]
+id = "windows_dev_conda_cache"
+name = "Conda Package Cache"
+category = "development"
+risk = "moderate"
+verified_rebuildable = true
+verified_at = "2026-10-06"
+author = "FreeMyDisk Team"
+description = "Downloaded package tarballs (.conda, .tar.bz2) in Conda/Miniconda/Anaconda caches"
+platform = "windows"
+
+[applicability]
+conditions = [
+    { type = "path_exists", path = "${user_profile}" }
+]
+
+[targets]
+paths = [
+    { path = "${user_profile}/miniconda3/pkgs/*.conda", matcher = "glob" },
+    { path = "${user_profile}/miniconda3/pkgs/*.tar.bz2", matcher = "glob" },
+    { path = "${user_profile}/anaconda3/pkgs/*.conda", matcher = "glob" },
+    { path = "${user_profile}/anaconda3/pkgs/*.tar.bz2", matcher = "glob" },
+    { path = "${local_app_data}/conda/conda/pkgs/*.conda", matcher = "glob" }
+]
+
+[disposal]
+default_action = "permanent"
+protect_subpaths = ["*/urls.txt", "*/manifest*"]
