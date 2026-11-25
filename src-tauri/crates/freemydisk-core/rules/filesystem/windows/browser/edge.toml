@@ -1,0 +1,36 @@
+[rule]
+id = "windows_browser_edge_cache"
+name = "Microsoft Edge Cache"
+category = "browser"
+risk = "safe"
+verified_rebuildable = true
+verified_at = "2026-08-15"
+author = "FreeMyDisk Team"
+description = "Cached web data and compiled bytecode from Microsoft Edge"
+platform = "windows"
+
+[applicability]
+conditions = [
+    { type = "path_exists", path = "${local_app_data}/Microsoft/Edge/User Data" }
+]
+
+[targets]
+paths = [
+    { path = "${local_app_data}/Microsoft/Edge/User Data/*/Cache/*", matcher = "glob" },
+    { path = "${local_app_data}/Microsoft/Edge/User Data/*/Code Cache/*", matcher = "glob" },
+    { path = "${local_app_data}/Microsoft/Edge/User Data/*/GPUCache/*", matcher = "glob" },
+    { path = "${local_app_data}/Microsoft/Edge/User Data/*/DawnCache/*", matcher = "glob" },
+    { path = "${local_app_data}/Microsoft/Edge/User Data/*/ShaderCache/*", matcher = "glob" },
+    { path = "${local_app_data}/Microsoft/Edge/User Data/*/GrShaderCache/*", matcher = "glob" },
+    { path = "${local_app_data}/Microsoft/Edge/User Data/*/Media Cache/*", matcher = "glob" }
+]
+
+[disposal]
+default_action = "permanent"
+protect_subpaths = [
+    "*/cookies*",
+    "*/history*",
+    "*/Sessions/*",
+    "*/Login Data*",
+    "*/Web Data*"
+]
