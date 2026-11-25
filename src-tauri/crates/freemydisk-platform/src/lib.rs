@@ -1,6 +1,7 @@
 pub mod io_priority;
 pub mod memory;
 pub mod power;
+pub mod registry_policy;
 pub mod storage_optim;
 pub mod traits;
 

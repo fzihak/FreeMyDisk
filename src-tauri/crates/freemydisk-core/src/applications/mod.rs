@@ -10,7 +10,7 @@ pub use catalog::ApplicationCatalog;
 pub use leftovers::models::{
     ApplicationLeftover, LeftoverCandidate, LeftoverConfidence, LeftoverGroup, LeftoverKind,
 };
-pub use leftovers::scanner::LeftoverScanner;
+pub use leftovers::scanner::{LeftoverCleanSummary, LeftoverScanner};
 pub use process_control::ProcessController;
 pub use uninstall::{UninstallOrchestrator, UninstallResult};
 
@@ -33,24 +33,24 @@ pub struct InstalledAppInfo {
 
 pub struct ApplicationService {
     platform: Box<dyn PlatformApplications>,
-    _fs_platform: Box<dyn PlatformFilesystem>,
+    fs_platform: Box<dyn PlatformFilesystem>,
 }
 
 impl ApplicationService {
     pub fn new() -> Self {
         Self {
             platform: Box::new(get_platform()),
-            _fs_platform: Box::new(get_platform()),
+            fs_platform: Box::new(get_platform()),
         }
     }
 
     pub fn with_platform(
         platform: Box<dyn PlatformApplications>,
-        _fs_platform: Box<dyn PlatformFilesystem>,
+        fs_platform: Box<dyn PlatformFilesystem>,
     ) -> Self {
         Self {
             platform,
-            _fs_platform,
+            fs_platform,
         }
     }
 
@@ -89,8 +89,13 @@ impl ApplicationService {
     }
 
     /// Cleans leftover items across filesystem and registry
-    pub fn clean_leftovers(&self, paths: &[String]) -> Result<u64, String> {
-        LeftoverScanner::clean_items(paths, true)
+    pub fn clean_leftovers(
+        &self,
+        paths: &[String],
+        journal: &crate::filesystem::journal::CrashRecoveryJournal,
+        lock_dir: &std::path::Path,
+    ) -> Result<LeftoverCleanSummary, String> {
+        LeftoverScanner::clean_items(paths, true, self.fs_platform.as_ref(), journal, lock_dir)
     }
 
     /// Safely terminates running processes matching an app

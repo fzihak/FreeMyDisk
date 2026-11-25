@@ -151,6 +151,42 @@ async fn docker_prune(prune_type: String) -> Result<u64, String> {
 #[derive(Default, Clone)]
 pub struct ScanCancellationState(pub Arc<Mutex<Option<CancellationToken>>>);
 
+/// Leftover paths and registry keys returned by leftover scans in this session.
+/// Cleanup only accepts these, so the webview cannot ask for arbitrary deletions.
+#[derive(Default, Clone)]
+pub struct LeftoverScanRegistry(Arc<Mutex<HashSet<String>>>);
+
+impl LeftoverScanRegistry {
+    fn record<'a>(&self, items: impl Iterator<Item = &'a str>) {
+        let mut set = self.0.lock().unwrap_or_else(|e| e.into_inner());
+        set.extend(items.map(|i| i.trim().to_lowercase()));
+    }
+
+    fn record_groups(&self, groups: &[freemydisk_core::applications::LeftoverGroup]) {
+        self.record(
+            groups
+                .iter()
+                .flat_map(|g| g.items.iter().map(|i| i.path_or_key.as_str())),
+        );
+    }
+
+    /// Splits requested items into those produced by a scan and the rest.
+    fn partition(&self, requested: &[String]) -> (Vec<String>, Vec<String>) {
+        let set = self.0.lock().unwrap_or_else(|e| e.into_inner());
+        requested
+            .iter()
+            .cloned()
+            .partition(|r| set.contains(&r.trim().to_lowercase()))
+    }
+
+    fn forget<'a>(&self, items: impl Iterator<Item = &'a String>) {
+        let mut set = self.0.lock().unwrap_or_else(|e| e.into_inner());
+        for item in items {
+            set.remove(&item.trim().to_lowercase());
+        }
+    }
+}
+
 /// Paths whose move to the Recycle Bin failed during this session.
 /// Permanent deletion is only accepted for these paths, so the webview cannot
 /// request permanent deletion of an arbitrary location.
@@ -1835,21 +1871,14 @@ async fn get_installed_applications() -> Result<Vec<InstalledAppInfo>, String> {
 }
 
 #[tauri::command]
-async fn scan_application_leftovers() -> Result<Vec<ApplicationLeftover>, String> {
+async fn scan_application_leftovers(app: AppHandle) -> Result<Vec<ApplicationLeftover>, String> {
+    let scanned = app.state::<LeftoverScanRegistry>().inner().clone();
     let res = tauri::async_runtime::spawn_blocking(|| ApplicationService::new().scan_leftovers())
         .await
         .map_err(|e| e.to_string())?;
-    trim_process_working_set();
-    res
-}
-
-#[tauri::command]
-async fn clean_application_leftovers(paths: Vec<String>) -> Result<u64, String> {
-    let res = tauri::async_runtime::spawn_blocking(move || {
-        ApplicationService::new().clean_leftovers(&paths)
-    })
-    .await
-    .map_err(|e| e.to_string())?;
+    if let Ok(ref items) = res {
+        scanned.record(items.iter().map(|i| i.path.as_str()));
+    }
     trim_process_working_set();
     res
 }
@@ -1899,14 +1928,19 @@ async fn uninstall_uwp_application(
 }
 
 #[tauri::command]
-async fn scan_deep_leftovers() -> Result<Vec<freemydisk_core::applications::LeftoverGroup>, String>
-{
+async fn scan_deep_leftovers(
+    app: AppHandle,
+) -> Result<Vec<freemydisk_core::applications::LeftoverGroup>, String> {
+    let scanned = app.state::<LeftoverScanRegistry>().inner().clone();
     let res = tauri::async_runtime::spawn_blocking(|| {
         let _bg_guard = freemydisk_platform::io_priority::BackgroundExecutionGuard::enter();
         ApplicationService::new().scan_deep_leftovers()
     })
     .await
     .map_err(|e| e.to_string())?;
+    if let Ok(ref groups) = res {
+        scanned.record_groups(groups);
+    }
     trim_process_working_set();
     res
 }
@@ -1914,17 +1948,41 @@ async fn scan_deep_leftovers() -> Result<Vec<freemydisk_core::applications::Left
 #[tauri::command]
 #[allow(non_snake_case)]
 async fn clean_leftovers_safe(
+    app: AppHandle,
     paths: Vec<String>,
     include_registry: Option<bool>,
     includeRegistry: Option<bool>,
-) -> Result<u64, String> {
+) -> Result<freemydisk_core::applications::LeftoverCleanSummary, String> {
     let incl_reg = include_registry.or(includeRegistry).unwrap_or(true);
+    let scanned = app.state::<LeftoverScanRegistry>().inner().clone();
+    let (known, unknown) = scanned.partition(&paths);
+    if !unknown.is_empty() {
+        log::warn!(
+            "Rejected {} leftover item(s) that were not produced by a scan",
+            unknown.len()
+        );
+    }
+    if known.is_empty() {
+        return Err("Run a leftover scan before cleaning.".to_string());
+    }
+
+    let app_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let lock_dir = get_lock_dir(&app)?;
     let res = tauri::async_runtime::spawn_blocking(move || {
         let _bg_guard = freemydisk_platform::io_priority::BackgroundExecutionGuard::enter();
-        freemydisk_core::applications::LeftoverScanner::clean_items(&paths, incl_reg)
+        let journal =
+            CrashRecoveryJournal::open(&app_dir.join("journal.db")).map_err(|e| e.to_string())?;
+        let platform = get_platform();
+        freemydisk_core::applications::LeftoverScanner::clean_items(
+            &known, incl_reg, &platform, &journal, &lock_dir,
+        )
     })
     .await
     .map_err(|e| e.to_string())?;
+    if let Ok(ref summary) = res {
+        let failed: HashSet<String> = summary.failed.iter().map(|f| f.to_lowercase()).collect();
+        scanned.forget(paths.iter().filter(|p| !failed.contains(&p.to_lowercase())));
+    }
     trim_process_working_set();
     res
 }
@@ -1948,17 +2006,27 @@ async fn terminate_app_processes(
 #[tauri::command]
 #[allow(non_snake_case)]
 async fn uninstall_and_scan(
+    app: AppHandle,
     app_id: Option<String>,
     appId: Option<String>,
 ) -> Result<freemydisk_core::applications::UninstallResult, String> {
     let target = app_id
         .or(appId)
         .ok_or_else(|| "Missing app id".to_string())?;
-    tauri::async_runtime::spawn_blocking(move || {
+    let scanned = app.state::<LeftoverScanRegistry>().inner().clone();
+    let res = tauri::async_runtime::spawn_blocking(move || {
         ApplicationService::new().uninstall_and_scan(&target)
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(|e| e.to_string())?;
+    if let Ok(freemydisk_core::applications::UninstallResult {
+        leftovers: Some(ref group),
+        ..
+    }) = res
+    {
+        scanned.record_groups(std::slice::from_ref(group));
+    }
+    res
 }
 
 #[tauri::command]
@@ -1980,17 +2048,27 @@ async fn launch_silent_uninstaller(
 #[tauri::command]
 #[allow(non_snake_case)]
 async fn uninstall_and_scan_silent(
+    app: AppHandle,
     app_id: Option<String>,
     appId: Option<String>,
 ) -> Result<freemydisk_core::applications::UninstallResult, String> {
     let target = app_id
         .or(appId)
         .ok_or_else(|| "Missing app id".to_string())?;
-    tauri::async_runtime::spawn_blocking(move || {
+    let scanned = app.state::<LeftoverScanRegistry>().inner().clone();
+    let res = tauri::async_runtime::spawn_blocking(move || {
         ApplicationService::new().uninstall_and_scan_silent(&target)
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(|e| e.to_string())?;
+    if let Ok(freemydisk_core::applications::UninstallResult {
+        leftovers: Some(ref group),
+        ..
+    }) = res
+    {
+        scanned.record_groups(std::slice::from_ref(group));
+    }
+    res
 }
 
 #[tauri::command]
@@ -2450,6 +2528,7 @@ pub fn run() {
         })
         .manage(ScanCancellationState::default())
         .manage(FailedTrashRegistry::default())
+        .manage(LeftoverScanRegistry::default())
         .invoke_handler(tauri::generate_handler![
             trim_process_memory,
             get_power_state,
@@ -2487,7 +2566,6 @@ pub fn run() {
             uninstall_uwp_application,
             scan_application_leftovers,
             scan_deep_leftovers,
-            clean_application_leftovers,
             clean_leftovers_safe,
             terminate_app_processes,
             uninstall_and_scan,

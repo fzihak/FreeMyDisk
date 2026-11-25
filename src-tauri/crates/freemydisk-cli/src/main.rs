@@ -1784,7 +1784,11 @@ fn handle_apps(leftovers: bool, clean_leftovers: bool, yes: bool, format: Output
             }
         }
 
-        match service.clean_leftovers(&paths) {
+        let (journal, lock_dir) = get_cli_recovery_context();
+        match service
+            .clean_leftovers(&paths, &journal, &lock_dir)
+            .map(|summary| summary.freed_bytes)
+        {
             Ok(freed) => match format {
                 OutputFormat::Json => {
                     #[derive(Serialize)]
