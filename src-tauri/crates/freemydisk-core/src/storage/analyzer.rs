@@ -57,7 +57,7 @@ impl StorageAnalyzer {
             .map(|s| s.to_string_lossy().to_string())
             .unwrap_or_else(|| path.to_string_lossy().to_string());
 
-        let is_system_protected = ProtectedPathRegistry::is_protected(path);
+        let is_system_protected = ProtectedPathRegistry::is_protected_lexical(path);
 
         let meta = match std::fs::symlink_metadata(path) {
             Ok(m) => m,
@@ -124,7 +124,8 @@ impl StorageAnalyzer {
                         }
 
                         let child_path = entry.path();
-                        let is_child_protected = ProtectedPathRegistry::is_protected(&child_path);
+                        let is_child_protected =
+                            ProtectedPathRegistry::is_protected_lexical(&child_path);
 
                         let child_meta = match entry.metadata() {
                             Ok(m) => m,
@@ -197,7 +198,8 @@ impl StorageAnalyzer {
                     }
 
                     let child_path = entry.path();
-                    let is_child_protected = ProtectedPathRegistry::is_protected(&child_path);
+                    let is_child_protected =
+                        ProtectedPathRegistry::is_protected_lexical(&child_path);
 
                     let child_meta = match entry.metadata() {
                         Ok(m) => m,

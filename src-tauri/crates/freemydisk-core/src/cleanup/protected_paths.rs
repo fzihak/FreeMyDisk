@@ -435,39 +435,42 @@ impl ProtectedPathRegistry {
     /// Returns true if the path points to, or is an ancestor of, a protected system path,
     /// or if the path is identical to a critical protected path.
     pub fn is_protected(path: &Path) -> bool {
-        let path_str = path.to_string_lossy();
         let canonical = dunce::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
-        let canonical_str = canonical.to_string_lossy();
         let expanded = Self::expand_8_3_short_path(path);
-        let expanded_str = expanded.to_string_lossy();
         let lexical = Self::normalize_lexical(path);
-        let lexical_str = lexical.to_string_lossy();
 
-        let normalize = |s: &str| -> String {
-            let mut upper = s.to_ascii_uppercase();
-            if upper.starts_with(r"\\?\") {
-                upper = upper[4..].to_string();
-            }
-            upper.trim_end_matches('\\').to_string()
-        };
-
-        let path_norm = normalize(&path_str);
-        let canon_norm = normalize(&canonical_str);
-        let exp_norm = normalize(&expanded_str);
-        let lex_norm = normalize(&lexical_str);
-
+        let candidates = [
+            normalize_upper(&path.to_string_lossy()),
+            normalize_upper(&canonical.to_string_lossy()),
+            normalize_upper(&expanded.to_string_lossy()),
+            normalize_upper(&lexical.to_string_lossy()),
+        ];
         // Also check if final handle resolution reveals substitution
         let final_norm =
-            Self::get_final_canonical_path(path).map(|p| normalize(&p.to_string_lossy()));
+            Self::get_final_canonical_path(path).map(|p| normalize_upper(&p.to_string_lossy()));
 
-        let candidate_norms = [&path_norm, &canon_norm, &exp_norm, &lex_norm];
+        Self::is_protected_forms(&candidates, final_norm.as_deref())
+    }
 
-        if candidate_norms
+    /// Path-only variant of [`is_protected`](Self::is_protected) for read-only scans.
+    /// It makes no file-system calls, so it is cheap enough to run for every file a
+    /// scan visits. Disposal always re-checks with the full version, which also
+    /// resolves links, short names and the final path of an open handle.
+    pub fn is_protected_lexical(path: &Path) -> bool {
+        let lexical = Self::normalize_lexical(path);
+        let candidates = [
+            normalize_upper(&path.to_string_lossy()),
+            normalize_upper(&lexical.to_string_lossy()),
+        ];
+        Self::is_protected_forms(&candidates, None)
+    }
+
+    fn is_protected_forms(candidates: &[String], final_norm: Option<&str>) -> bool {
+        if candidates
             .iter()
-            .any(|c| is_container_or_ancestor(&normalize_upper(c)))
-            || final_norm
-                .as_deref()
-                .is_some_and(|f| is_container_or_ancestor(&normalize_upper(f)))
+            .map(String::as_str)
+            .chain(final_norm)
+            .any(is_container_or_ancestor)
         {
             return true;
         }
@@ -475,72 +478,47 @@ impl ProtectedPathRegistry {
         let windir = std::env::var("SystemRoot")
             .or_else(|_| std::env::var("windir"))
             .unwrap_or_else(|_| r"C:\Windows".to_string());
-        let windir_norm = normalize(&windir);
+        let windir_norm = normalize_upper(&windir);
+        let in_windows_temp = |p: &str| {
+            p.starts_with(&format!(r"{}\TEMP", windir_norm)) || p.starts_with(r"C:\WINDOWS\TEMP")
+        };
 
         // Rule-approved caches inside system folders skip the system-folder check only
         // when every resolved form of the path (including the final target of any
         // link) stays inside an approved location.
-        let system_cleanable = candidate_norms.iter().all(|c| is_system_cleanable(c))
-            && final_norm.as_deref().is_none_or(is_system_cleanable);
+        let system_cleanable = candidates.iter().all(|c| is_system_cleanable(c))
+            && final_norm.is_none_or(is_system_cleanable);
 
-        for crit in DYNAMIC_SYSTEM_CRITICAL_PATHS.iter() {
-            if system_cleanable {
-                break;
-            }
-            let crit_norm = normalize(&crit.to_string_lossy());
+        if !system_cleanable {
+            for crit in DYNAMIC_SYSTEM_CRITICAL_PATHS.iter() {
+                let crit_norm = normalize_upper(&crit.to_string_lossy());
+                let is_windows_dir = crit_norm == windir_norm || crit_norm == r"C:\WINDOWS";
 
-            for cand in candidate_norms {
-                // Exact match on critical path itself
-                if *cand == crit_norm {
-                    return true;
-                }
-
-                // Path is inside protected directory
-                if cand.starts_with(&format!(r"{}\", crit_norm)) {
-                    if crit_norm == windir_norm || crit_norm == r"C:\WINDOWS" {
-                        // Allow Windows Temp (handled by cleanup rules with safe guards)
-                        if !cand.starts_with(&format!(r"{}\TEMP", windir_norm))
-                            && !cand.starts_with(r"C:\WINDOWS\TEMP")
-                        {
-                            return true;
-                        }
-                    } else {
+                for cand in candidates.iter().map(String::as_str).chain(final_norm) {
+                    if cand == crit_norm {
                         return true;
                     }
-                }
-
-                // Protected path is inside target (e.g. attempting to delete drive root)
-                if crit_norm.starts_with(&format!(r"{}\", cand)) || crit_norm == *cand {
-                    return true;
-                }
-            }
-
-            if let Some(ref f_norm) = final_norm {
-                if *f_norm == crit_norm || f_norm.starts_with(&format!(r"{}\", crit_norm)) {
-                    if (crit_norm == windir_norm || crit_norm == r"C:\WINDOWS")
-                        && (f_norm.starts_with(&format!(r"{}\TEMP", windir_norm))
-                            || f_norm.starts_with(r"C:\WINDOWS\TEMP"))
+                    // Inside a protected folder (Windows Temp is cleaned by rules).
+                    if cand.starts_with(&format!(r"{}\", crit_norm))
+                        && !(is_windows_dir && in_windows_temp(cand))
                     {
-                        // Allow
-                    } else {
+                        return true;
+                    }
+                    // A protected folder inside the target, e.g. a drive root.
+                    if crit_norm.starts_with(&format!(r"{}\", cand)) {
                         return true;
                     }
                 }
             }
         }
 
-        // Dynamic protected paths check
         let dyn_set = DYNAMIC_PROTECTED_PATHS.read();
-        for dyn_path in dyn_set.iter() {
-            let dyn_norm = normalize(&dyn_path.to_string_lossy());
-            for cand in candidate_norms {
-                if *cand == dyn_norm || cand.starts_with(&format!(r"{}\", dyn_norm)) {
-                    return true;
-                }
-            }
-        }
-
-        false
+        dyn_set.iter().any(|dyn_path| {
+            let dyn_norm = normalize_upper(&dyn_path.to_string_lossy());
+            candidates
+                .iter()
+                .any(|c| *c == dyn_norm || c.starts_with(&format!(r"{}\", dyn_norm)))
+        })
     }
 
     /// Enforces that a path is safe for disposal. Returns Ok(()) if safe,

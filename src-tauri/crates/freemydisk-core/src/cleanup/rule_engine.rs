@@ -359,7 +359,7 @@ impl RuleEngine {
                                 continue;
                             }
 
-                            if ProtectedPathRegistry::is_protected(path) {
+                            if ProtectedPathRegistry::is_protected_lexical(path) {
                                 continue;
                             }
 
@@ -400,7 +400,7 @@ impl RuleEngine {
                 }
             } else if expanded.exists()
                 && !is_subpath_protected(&expanded, &rule.disposal.protect_subpaths)
-                && !ProtectedPathRegistry::is_protected(&expanded)
+                && !ProtectedPathRegistry::is_protected_lexical(&expanded)
             {
                 let is_dir = expanded.is_dir();
                 let (size, count) = if is_dir {
@@ -561,7 +561,7 @@ impl RuleEngine {
                                     continue;
                                 }
 
-                                if ProtectedPathRegistry::is_protected(path) {
+                                if ProtectedPathRegistry::is_protected_lexical(path) {
                                     continue;
                                 }
 
@@ -595,7 +595,7 @@ impl RuleEngine {
                     }
                 } else if expanded.exists()
                     && !is_subpath_protected(&expanded, &rule.disposal.protect_subpaths)
-                    && !ProtectedPathRegistry::is_protected(&expanded)
+                    && !ProtectedPathRegistry::is_protected_lexical(&expanded)
                 {
                     let is_dir = expanded.is_dir();
                     let (size, _) = if is_dir {
@@ -630,7 +630,7 @@ fn calculate_dir_size_with_filter(dir: &Path, protect_patterns: &[String]) -> (u
     let walk = walkdir::WalkDir::new(dir).min_depth(1).into_iter();
     for entry in walk.flatten() {
         let p = entry.path();
-        if is_subpath_protected(p, protect_patterns) || ProtectedPathRegistry::is_protected(p) {
+        if is_subpath_protected(p, protect_patterns) || ProtectedPathRegistry::is_protected_lexical(p) {
             continue;
         }
         if entry.file_type().is_file() {

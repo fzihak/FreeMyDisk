@@ -145,7 +145,7 @@ impl HeavyFoldersScanner {
 
             if meta.is_dir() {
                 folder_count += 1;
-                let is_protected = ProtectedPathRegistry::is_protected(&entry_path);
+                let is_protected = ProtectedPathRegistry::is_protected_lexical(&entry_path);
 
                 if current_depth < max_depth {
                     let child_stats = Self::scan_dir_internal(

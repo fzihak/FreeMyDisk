@@ -149,7 +149,7 @@ impl DuplicateDetector {
                             last_emit = Instant::now();
                         }
 
-                        if ProtectedPathRegistry::is_protected(entry_path) {
+                        if ProtectedPathRegistry::is_protected_lexical(entry_path) {
                             return false;
                         }
                         if !is_dir && size >= min_size && size > 0 {
@@ -204,14 +204,14 @@ impl DuplicateDetector {
                     }
 
                     if entry.file_type().is_dir() {
-                        if ProtectedPathRegistry::is_protected(path) {
+                        if ProtectedPathRegistry::is_protected_lexical(path) {
                             it.skip_current_dir();
                         }
                         continue;
                     }
 
                     if entry.file_type().is_file() {
-                        if ProtectedPathRegistry::is_protected(path) {
+                        if ProtectedPathRegistry::is_protected_lexical(path) {
                             continue;
                         }
 
