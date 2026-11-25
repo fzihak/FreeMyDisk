@@ -1,0 +1,14 @@
+[project]
+id = "project_pants"
+name = "Pants Build System"
+description = "Pants build system cache directory"
+icon = "pants"
+
+[[detection]]
+marker_file = "pants.toml"
+
+[[artifacts]]
+relative_path = ".pants.d"
+category = "cache"
+risk = "safe"
+verified_rebuildable = true

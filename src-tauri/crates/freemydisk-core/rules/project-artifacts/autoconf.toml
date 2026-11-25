@@ -1,0 +1,14 @@
+[project]
+id = "project_autoconf"
+name = "GNU Autoconf Projects"
+description = "Autom4te macro cache directories"
+icon = "gnu"
+
+[[detection]]
+marker_file = "configure.ac"
+
+[[artifacts]]
+relative_path = "autom4te.cache"
+category = "cache"
+risk = "safe"
+verified_rebuildable = true

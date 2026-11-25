@@ -1,0 +1,21 @@
+[project]
+id = "project_go"
+name = "Go Projects"
+description = "Go vendor directory when go.sum lock is present"
+icon = "go"
+
+[[detection]]
+marker_file = "go.mod"
+
+[[artifacts]]
+relative_path = "vendor"
+category = "dependencies"
+risk = "moderate"
+verified_rebuildable = true
+rebuild_command = "go mod vendor"
+
+[[artifacts]]
+relative_path = "bin"
+category = "build_output"
+risk = "moderate"
+verified_rebuildable = true

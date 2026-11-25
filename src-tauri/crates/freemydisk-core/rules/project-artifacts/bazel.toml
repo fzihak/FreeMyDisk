@@ -1,0 +1,30 @@
+[project]
+id = "project_bazel"
+name = "Bazel Monorepo Projects"
+description = "Bazel compilation outputs and test logs"
+icon = "bazel"
+
+[[detection]]
+marker_file = "WORKSPACE"
+
+[[detection]]
+marker_file = "BUILD.bazel"
+
+[[artifacts]]
+relative_path = "bazel-out"
+category = "build_output"
+risk = "safe"
+verified_rebuildable = true
+rebuild_command = "bazel build //..."
+
+[[artifacts]]
+relative_path = "bazel-bin"
+category = "build_output"
+risk = "safe"
+verified_rebuildable = true
+
+[[artifacts]]
+relative_path = "bazel-testlogs"
+category = "logs"
+risk = "safe"
+verified_rebuildable = true

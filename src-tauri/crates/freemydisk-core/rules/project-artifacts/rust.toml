@@ -1,0 +1,15 @@
+[project]
+id = "project_rust"
+name = "Rust Cargo Projects"
+description = "Cargo target compilation directory containing build artifacts and intermediate objects"
+icon = "rust"
+
+[[detection]]
+marker_file = "Cargo.toml"
+
+[[artifacts]]
+relative_path = "target"
+category = "build_output"
+risk = "safe"
+verified_rebuildable = true
+rebuild_command = "cargo build"
