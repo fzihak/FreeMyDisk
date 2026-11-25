@@ -1,0 +1,15 @@
+[project]
+id = "project_mill"
+name = "Mill Scala Build Tool"
+description = "Mill compilation output directories"
+icon = "scala"
+
+[[detection]]
+marker_file = "build.sc"
+
+[[artifacts]]
+relative_path = "out"
+category = "build_output"
+risk = "safe"
+verified_rebuildable = true
+rebuild_command = "mill __.compile"

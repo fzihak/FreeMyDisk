@@ -1,0 +1,15 @@
+[project]
+id = "project_rebar"
+name = "Erlang Rebar3 Projects"
+description = "Rebar3 build compilation and release folders"
+icon = "erlang"
+
+[[detection]]
+marker_file = "rebar.config"
+
+[[artifacts]]
+relative_path = "_build"
+category = "build_output"
+risk = "safe"
+verified_rebuildable = true
+rebuild_command = "rebar3 compile"

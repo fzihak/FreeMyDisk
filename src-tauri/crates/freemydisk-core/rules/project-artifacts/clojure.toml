@@ -1,0 +1,24 @@
+[project]
+id = "project_clojure"
+name = "Clojure Projects"
+description = "Leiningen and CLI target folders and classpath caches"
+icon = "clojure"
+
+[[detection]]
+marker_file = "project.clj"
+
+[[detection]]
+marker_file = "deps.edn"
+
+[[artifacts]]
+relative_path = "target"
+category = "build_output"
+risk = "safe"
+verified_rebuildable = true
+rebuild_command = "lein compile"
+
+[[artifacts]]
+relative_path = ".cpcache"
+category = "cache"
+risk = "safe"
+verified_rebuildable = true
