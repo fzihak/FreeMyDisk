@@ -34,6 +34,26 @@ pub fn expand_path_variables(template: &str) -> PathBuf {
     PathBuf::from(resolved)
 }
 
+/// Bundle identifier of the desktop app; its data folder is named after it.
+pub const APP_IDENTIFIER: &str = "app.freemydisk.desktop";
+
+/// Data folder shared by the desktop app and the CLI. Matches Tauri's
+/// `app_data_dir()` for [`APP_IDENTIFIER`], so both use the same journal and lock.
+pub fn app_data_dir() -> Option<PathBuf> {
+    #[cfg(target_os = "windows")]
+    let base = std::env::var_os("APPDATA").map(PathBuf::from);
+    #[cfg(target_os = "macos")]
+    let base = std::env::var_os("HOME")
+        .map(|h| PathBuf::from(h).join("Library").join("Application Support"));
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    let base = std::env::var_os("XDG_DATA_HOME")
+        .map(PathBuf::from)
+        .or_else(|| {
+            std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".local").join("share"))
+        });
+    base.map(|b| b.join(APP_IDENTIFIER))
+}
+
 pub fn normalize_path(path: &Path) -> PathBuf {
     dunce::canonicalize(path).unwrap_or_else(|_| dunce::simplified(path).to_path_buf())
 }
