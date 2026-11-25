@@ -116,6 +116,7 @@ impl DuplicateDetector {
         let _bg_guard = freemydisk_platform::io_priority::BackgroundExecutionGuard::enter();
         let start_time = Instant::now();
         let mut cache_hits = 0usize;
+        let mut unknown_identities = 0u64;
         let mut items_scanned = 0u64;
         let mut last_emit = Instant::now();
 
@@ -268,11 +269,16 @@ impl DuplicateDetector {
                     continue;
                 }
 
-                let identity = platform.get_file_identity(&path).unwrap_or(FileIdentity {
-                    device_id: 0,
-                    file_index: 0,
-                    link_count: 1,
-                    is_reparse_or_symlink: false,
+                // An unknown identity must never make two different files look like one
+                // physical file, so each gets a key no real file can share.
+                let identity = platform.get_file_identity(&path).unwrap_or_else(|_| {
+                    unknown_identities += 1;
+                    FileIdentity {
+                        device_id: u64::MAX,
+                        file_index: unknown_identities,
+                        link_count: 1,
+                        is_reparse_or_symlink: false,
+                    }
                 });
 
                 let modified_at = std::fs::metadata(&path)
