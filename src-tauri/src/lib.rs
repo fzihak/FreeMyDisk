@@ -1729,17 +1729,15 @@ async fn clean_leftovers_safe(
 #[tauri::command]
 #[allow(non_snake_case)]
 async fn terminate_app_processes(
-    app_name: Option<String>,
-    appName: Option<String>,
+    app_id: Option<String>,
+    appId: Option<String>,
 ) -> Result<usize, String> {
-    let name = app_name
-        .or(appName)
-        .ok_or_else(|| "Missing app name".to_string())?;
-    tauri::async_runtime::spawn_blocking(move || {
-        freemydisk_core::applications::ProcessController::terminate_app_processes(&name)
-    })
-    .await
-    .map_err(|e| e.to_string())?
+    let id = app_id
+        .or(appId)
+        .ok_or_else(|| "Missing application id".to_string())?;
+    tauri::async_runtime::spawn_blocking(move || ApplicationService::new().terminate_app(&id))
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]

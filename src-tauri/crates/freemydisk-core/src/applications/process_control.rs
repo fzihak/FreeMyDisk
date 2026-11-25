@@ -1,5 +1,6 @@
+use super::InstalledAppInfo;
 use freemydisk_platform::{get_platform, PlatformApplications, RawRunningProcess};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 pub struct ProcessController;
 
@@ -149,32 +150,101 @@ impl ProcessController {
         !Self::is_process_alive(pid)
     }
 
-    /// Identifies and terminates all running processes matching the application name
-    pub fn terminate_app_processes(app_name: &str) -> Result<usize, String> {
-        let platform = get_platform();
-        let procs = platform
+    /// Closes every running process whose executable lives in one of the app's
+    /// folders. Apps whose folder cannot be determined are refused rather than
+    /// guessed by name, which used to close unrelated processes.
+    pub fn terminate_app(app: &InstalledAppInfo) -> Result<usize, String> {
+        let dirs = app_folders(app.install_location.as_deref(), app.display_icon.as_deref());
+        if dirs.is_empty() {
+            return Err(format!(
+                "'{}' does not report its install folder, so its processes cannot be identified safely.",
+                app.name
+            ));
+        }
+
+        let procs = get_platform()
             .list_running_processes()
             .map_err(|e| e.to_string())?;
-
-        let app_lower = app_name.to_lowercase();
-        let app_clean = app_lower.replace(['-', '_', ' ', '.'], "");
         let mut count = 0;
-
-        for p in procs {
-            let proc_lower = p.name.to_lowercase();
-            let proc_clean = proc_lower
-                .trim_end_matches(".exe")
-                .replace(['-', '_', ' ', '.'], "");
-
-            let matches = proc_clean == app_clean
-                || (app_clean.len() >= 4 && proc_clean.contains(&app_clean))
-                || (proc_clean.len() >= 4 && app_clean.contains(&proc_clean));
-
-            if matches && Self::graceful_terminate(p.pid, &p.name)? {
+        for p in procs.iter().filter(|p| runs_from(p, &dirs)) {
+            if Self::graceful_terminate(p.pid, &p.name)? {
                 count += 1;
             }
         }
-
         Ok(count)
     }
+}
+
+/// Folders an installed app runs from: its install location and the folder of
+/// its display icon (usually the main executable). System and shared folders are
+/// excluded so they can never match unrelated processes.
+pub fn app_folders(install_location: Option<&str>, display_icon: Option<&str>) -> Vec<PathBuf> {
+    let icon_dir = display_icon.and_then(|icon| {
+        let exe = icon.trim().trim_matches('"');
+        let exe = exe
+            .split(',')
+            .next()
+            .unwrap_or(exe)
+            .trim()
+            .trim_matches('"');
+        Path::new(exe).parent().map(Path::to_path_buf)
+    });
+
+    let mut dirs: Vec<PathBuf> = install_location
+        .map(|l| PathBuf::from(l.trim().trim_matches('"')))
+        .into_iter()
+        .chain(icon_dir)
+        .filter(|d| d.is_absolute() && is_app_specific_folder(d))
+        .map(|d| dunce::canonicalize(&d).unwrap_or(d))
+        .collect();
+    dirs.dedup();
+    dirs
+}
+
+/// True when `dir` belongs to one app rather than to Windows or to many apps.
+fn is_app_specific_folder(dir: &Path) -> bool {
+    let norm = |p: &Path| {
+        p.to_string_lossy()
+            .trim_end_matches(['\\', '/'])
+            .to_ascii_lowercase()
+    };
+    let candidate = norm(dir);
+    if dir.components().count() < 3 {
+        return false;
+    }
+    let shared: Vec<String> = [
+        "ProgramFiles",
+        "ProgramFiles(x86)",
+        "ProgramW6432",
+        "ProgramData",
+        "LOCALAPPDATA",
+        "APPDATA",
+        "USERPROFILE",
+    ]
+    .iter()
+    .filter_map(|v| std::env::var(v).ok())
+    .map(|v| norm(Path::new(&v)))
+    .collect();
+    if shared.contains(&candidate) {
+        return false;
+    }
+    let windows = std::env::var("SystemRoot")
+        .map(|v| norm(Path::new(&v)))
+        .unwrap_or_else(|_| r"c:\windows".to_string());
+    candidate != windows && !candidate.starts_with(&format!("{}\\", windows))
+}
+
+/// True when the process executable lies inside one of `dirs`.
+pub fn runs_from(process: &RawRunningProcess, dirs: &[PathBuf]) -> bool {
+    // Windows paths are case-insensitive, so compare lowercased strings on a
+    // separator boundary.
+    process.exe_path.as_deref().is_some_and(|exe| {
+        let exe = exe.to_lowercase();
+        dirs.iter().any(|d| {
+            let dir = d.to_string_lossy().to_lowercase();
+            let dir = dir.trim_end_matches(['\\', '/']);
+            exe.strip_prefix(dir)
+                .is_some_and(|rest| rest.starts_with(['\\', '/']))
+        })
+    })
 }

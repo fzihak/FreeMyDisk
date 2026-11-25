@@ -25,7 +25,7 @@ impl UninstallOrchestrator {
     pub fn uninstall_and_scan(app: &InstalledAppInfo) -> Result<UninstallResult, String> {
         // 1. Terminate any active running processes
         if app.is_running {
-            let _ = ProcessController::terminate_app_processes(&app.name);
+            let _ = ProcessController::terminate_app(app);
         }
 
         // 2. Launch native uninstaller
@@ -63,7 +63,7 @@ impl UninstallOrchestrator {
     pub fn uninstall_and_scan_silent(app: &InstalledAppInfo) -> Result<UninstallResult, String> {
         // 1. Terminate any active running processes
         if app.is_running {
-            let _ = ProcessController::terminate_app_processes(&app.name);
+            let _ = ProcessController::terminate_app(app);
         }
 
         // 2. Launch silent uninstaller

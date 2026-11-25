@@ -99,8 +99,8 @@ impl ApplicationService {
     }
 
     /// Safely terminates running processes matching an app
-    pub fn terminate_app(&self, app_name: &str) -> Result<usize, String> {
-        ProcessController::terminate_app_processes(app_name)
+    pub fn terminate_app(&self, app_id: &str) -> Result<usize, String> {
+        ProcessController::terminate_app(&self.find_application(app_id)?)
     }
 
     /// Orchestrates uninstallation and scans for leftovers
