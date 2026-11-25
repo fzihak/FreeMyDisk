@@ -236,6 +236,7 @@ impl DuplicateDetector {
             path: PathBuf,
             size: u64,
             modified_at: u64,
+            cache_stamp: u64,
             identity: FileIdentity,
             sample_hash: String,
             cached_full_hash: Option<String>,
@@ -281,14 +282,15 @@ impl DuplicateDetector {
                     }
                 });
 
-                let modified_at = std::fs::metadata(&path)
+                let modified = std::fs::metadata(&path)
                     .and_then(|m| m.modified())
                     .ok()
                     .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-                    .map(|d| d.as_secs())
-                    .unwrap_or(0);
+                    .unwrap_or_default();
+                let modified_at = modified.as_secs();
+                let cache_stamp = u64::try_from(modified.as_nanos()).unwrap_or(u64::MAX);
 
-                let cached_entry = cache.and_then(|c| c.lookup(&path, size, modified_at));
+                let cached_entry = cache.and_then(|c| c.lookup(&path, size, cache_stamp));
                 let (partial_hash, cached_full_hash) = if let Some(cached) = cached_entry {
                     cache_hits += 1;
                     (cached.sample_hash, Some(cached.full_hash))
@@ -307,6 +309,7 @@ impl DuplicateDetector {
                         path,
                         size,
                         modified_at,
+                        cache_stamp,
                         identity,
                         sample_hash: partial_hash,
                         cached_full_hash,
@@ -357,7 +360,7 @@ impl DuplicateDetector {
                                 c.store(
                                     &cand.path,
                                     cand.size,
-                                    cand.modified_at,
+                                    cand.cache_stamp,
                                     &cand.sample_hash,
                                     &fh,
                                 );

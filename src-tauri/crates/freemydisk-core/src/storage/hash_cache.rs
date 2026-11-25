@@ -27,16 +27,16 @@ impl HashCache {
         conn.execute_batch(
             "PRAGMA journal_mode = WAL;
              PRAGMA synchronous = NORMAL;
-             CREATE TABLE IF NOT EXISTS hash_cache (
+             DROP TABLE IF EXISTS hash_cache;
+             CREATE TABLE IF NOT EXISTS hash_cache_v2 (
                  path TEXT NOT NULL,
                  size INTEGER NOT NULL,
-                 mtime_secs INTEGER NOT NULL,
+                 mtime_ns INTEGER NOT NULL,
                  sample_hash TEXT NOT NULL,
                  full_hash TEXT NOT NULL,
                  created_at INTEGER NOT NULL,
-                 PRIMARY KEY (path, size, mtime_secs)
-             );
-             CREATE INDEX IF NOT EXISTS idx_hash_lookup ON hash_cache(path, size, mtime_secs);",
+                 PRIMARY KEY (path, size, mtime_ns)
+             );",
         )?;
 
         Ok(Self {
@@ -49,14 +49,14 @@ impl HashCache {
         let conn = Connection::open_in_memory()?;
 
         conn.execute_batch(
-            "CREATE TABLE IF NOT EXISTS hash_cache (
+            "CREATE TABLE IF NOT EXISTS hash_cache_v2 (
                  path TEXT NOT NULL,
                  size INTEGER NOT NULL,
-                 mtime_secs INTEGER NOT NULL,
+                 mtime_ns INTEGER NOT NULL,
                  sample_hash TEXT NOT NULL,
                  full_hash TEXT NOT NULL,
                  created_at INTEGER NOT NULL,
-                 PRIMARY KEY (path, size, mtime_secs)
+                 PRIMARY KEY (path, size, mtime_ns)
              );",
         )?;
 
@@ -65,21 +65,23 @@ impl HashCache {
         })
     }
 
-    /// Looks up a cached hash for the given path, size, and modified timestamp.
-    /// If the file was touched (mtime changed) or resized, this immediately returns None.
-    pub fn lookup(&self, path: &Path, size: u64, mtime_secs: u64) -> Option<CachedHash> {
+    /// Looks up a cached hash for the given path, size and modification time in
+    /// nanoseconds. Any change to the file's size or timestamp misses the cache.
+    /// (The previous table keyed on whole seconds, so an edit within the same second
+    /// returned a stale hash; it is dropped on open.)
+    pub fn lookup(&self, path: &Path, size: u64, mtime_ns: u64) -> Option<CachedHash> {
         let path_str = path.to_string_lossy();
         let guard = self.conn.lock().ok()?;
 
         let mut stmt = guard
             .prepare_cached(
-                "SELECT sample_hash, full_hash FROM hash_cache WHERE path = ?1 AND size = ?2 AND mtime_secs = ?3 LIMIT 1",
+                "SELECT sample_hash, full_hash FROM hash_cache_v2 WHERE path = ?1 AND size = ?2 AND mtime_ns = ?3 LIMIT 1",
             )
             .ok()?;
 
         let res = stmt
             .query_row(
-                params![path_str.as_ref(), size as i64, mtime_secs as i64],
+                params![path_str.as_ref(), size as i64, mtime_ns as i64],
                 |row| {
                     Ok(CachedHash {
                         sample_hash: row.get(0)?,
@@ -93,14 +95,7 @@ impl HashCache {
     }
 
     /// Stores a computed partial and full hash in the persistent cache.
-    pub fn store(
-        &self,
-        path: &Path,
-        size: u64,
-        mtime_secs: u64,
-        sample_hash: &str,
-        full_hash: &str,
-    ) {
+    pub fn store(&self, path: &Path, size: u64, mtime_ns: u64, sample_hash: &str, full_hash: &str) {
         let path_str = path.to_string_lossy();
         let now_secs = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -109,12 +104,12 @@ impl HashCache {
 
         if let Ok(guard) = self.conn.lock() {
             let _ = guard.execute(
-                "INSERT OR REPLACE INTO hash_cache (path, size, mtime_secs, sample_hash, full_hash, created_at)
+                "INSERT OR REPLACE INTO hash_cache_v2 (path, size, mtime_ns, sample_hash, full_hash, created_at)
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
                 params![
                     path_str.as_ref(),
                     size as i64,
-                    mtime_secs as i64,
+                    mtime_ns as i64,
                     sample_hash,
                     full_hash,
                     now_secs as i64
@@ -134,7 +129,7 @@ impl HashCache {
         let guard = self.conn.lock().map_err(|_| CoreError::LockBusy)?;
 
         let deleted = guard.execute(
-            "DELETE FROM hash_cache WHERE created_at < ?1",
+            "DELETE FROM hash_cache_v2 WHERE created_at < ?1",
             params![cutoff_secs as i64],
         )?;
 
