@@ -8,6 +8,7 @@ verified_at = "2026-10-01"
 author = "FreeMyDisk Team"
 description = "Cached sessions, GPU shaders and temporary web data from ChatGPT"
 platform = "windows"
+locking_processes = ["chatgpt.exe"]
 
 [applicability]
 conditions = [

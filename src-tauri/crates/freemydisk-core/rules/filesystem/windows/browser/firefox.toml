@@ -8,6 +8,7 @@ verified_at = "2026-08-15"
 author = "FreeMyDisk Team"
 description = "Cached web pages, media, and script caches from Mozilla Firefox"
 platform = "windows"
+locking_processes = ["firefox.exe"]
 
 [applicability]
 conditions = [

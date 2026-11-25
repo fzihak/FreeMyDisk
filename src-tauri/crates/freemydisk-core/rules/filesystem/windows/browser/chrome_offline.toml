@@ -8,6 +8,7 @@ verified_at = "2026-10-06"
 author = "FreeMyDisk Team"
 description = "Offline service worker caches and stored web application state from Google Chrome"
 platform = "windows"
+locking_processes = ["chrome.exe"]
 
 [applicability]
 conditions = [

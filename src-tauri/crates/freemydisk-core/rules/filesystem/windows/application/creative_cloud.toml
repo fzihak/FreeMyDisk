@@ -8,6 +8,7 @@ verified_at = "2026-10-06"
 author = "FreeMyDisk Team"
 description = "Accumulated sync logs and updater crash dumps from Adobe Creative Cloud"
 platform = "windows"
+locking_processes = ["creative cloud.exe"]
 
 [applicability]
 conditions = [

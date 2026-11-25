@@ -8,6 +8,7 @@ verified_at = "2026-10-06"
 author = "FreeMyDisk Team"
 description = "Embedded web engine cache and log files from Epic Games Launcher"
 platform = "windows"
+locking_processes = ["epicgameslauncher.exe"]
 
 [applicability]
 conditions = [

@@ -13,6 +13,10 @@ pub struct RuleMetadata {
     pub platform: String,
     #[serde(default)]
     pub default_selected: bool,
+    /// Executables that hold this rule's files open (for example `chrome.exe`).
+    /// When one is running the scan reports the rule as locked.
+    #[serde(default)]
+    pub locking_processes: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

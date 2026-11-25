@@ -39,6 +39,9 @@ pub struct RuleScanSummary {
     pub is_locked_by_process: bool,
     #[serde(default)]
     pub locking_process_name: Option<String>,
+    /// Executables that hold this rule's files open.
+    #[serde(default)]
+    pub locking_processes: Vec<String>,
     /// Every matched item, not capped like `candidates`. Kept on the Rust side so a
     /// cleanup acts on exactly what was scanned; never sent to the webview.
     #[serde(skip)]
@@ -286,6 +289,7 @@ impl RuleEngine {
                 candidates: Vec::new(),
                 is_locked_by_process: false,
                 locking_process_name: None,
+                locking_processes: rule.rule.locking_processes.clone(),
                 all_candidates: Vec::new(),
             });
         }
@@ -349,6 +353,7 @@ impl RuleEngine {
             candidates,
             is_locked_by_process: false,
             locking_process_name: None,
+            locking_processes: rule.rule.locking_processes.clone(),
             all_candidates,
         })
     }

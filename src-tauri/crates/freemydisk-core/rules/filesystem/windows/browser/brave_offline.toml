@@ -8,6 +8,7 @@ verified_at = "2026-10-06"
 author = "FreeMyDisk Team"
 description = "Offline service worker caches and cached web storage from Brave Browser"
 platform = "windows"
+locking_processes = ["brave.exe"]
 
 [applicability]
 conditions = [

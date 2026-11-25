@@ -8,6 +8,7 @@ verified_at = "2026-10-06"
 author = "FreeMyDisk Team"
 description = "Electron GPU and Chromium web engine caches from OpenAI ChatGPT desktop app"
 platform = "windows"
+locking_processes = ["chatgpt.exe"]
 
 [applicability]
 conditions = [

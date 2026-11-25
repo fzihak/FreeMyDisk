@@ -491,150 +491,6 @@ fn cancel_pending_reboot_deletion(path: String) -> Result<(), String> {
         .map_err(|e| e.to_string())
 }
 
-fn detect_locking_process(
-    rule_id: &str,
-    running_procs: &std::collections::HashSet<String>,
-) -> Option<String> {
-    let check = |names: &[&str]| {
-        for &name in names {
-            if running_procs.contains(&name.to_lowercase()) {
-                return Some(name.to_string());
-            }
-        }
-        None
-    };
-
-    let rid = rule_id.to_lowercase();
-    if rid.contains("chrome") {
-        check(&["chrome.exe"])
-    } else if rid.contains("edge") {
-        check(&["msedge.exe"])
-    } else if rid.contains("firefox") {
-        check(&["firefox.exe"])
-    } else if rid.contains("brave") {
-        check(&["brave.exe"])
-    } else if rid.contains("opera") {
-        check(&["opera.exe"])
-    } else if rid.contains("spotify") {
-        check(&["spotify.exe"])
-    } else if rid.contains("discord") {
-        check(&["discord.exe"])
-    } else if rid.contains("slack") {
-        check(&["slack.exe"])
-    } else if rid.contains("vscode") {
-        check(&["code.exe"])
-    } else if rid.contains("cursor") {
-        check(&["cursor.exe"])
-    } else if rid.contains("postman") {
-        check(&["postman.exe"])
-    } else if rid.contains("telegram") {
-        check(&["telegram.exe"])
-    } else if rid.contains("whatsapp") {
-        check(&["whatsapp.exe"])
-    } else if rid.contains("notion") {
-        check(&["notion.exe"])
-    } else if rid.contains("docker") {
-        check(&["docker.exe", "docker desktop.exe"])
-    } else if rid.contains("jetbrains") {
-        check(&[
-            "idea64.exe",
-            "pycharm64.exe",
-            "webstorm64.exe",
-            "clion64.exe",
-            "rider64.exe",
-            "goland64.exe",
-            "rustrover64.exe",
-        ])
-    } else if rid.contains("visual_studio") {
-        check(&["devenv.exe"])
-    } else if rid.contains("steam") {
-        check(&["steam.exe"])
-    } else if rid.contains("adobe") {
-        check(&[
-            "photoshop.exe",
-            "illustrator.exe",
-            "premiere.exe",
-            "creative cloud.exe",
-        ])
-    } else if rid.contains("ollama") {
-        check(&["ollama.exe", "ollama_app.exe"])
-    } else if rid.contains("vivaldi") {
-        check(&["vivaldi.exe"])
-    } else if rid.contains("arc") {
-        check(&["arc.exe"])
-    } else if rid.contains("chromium") {
-        check(&["chromium.exe"])
-    } else if rid.contains("duckduckgo") {
-        check(&["duckduckgo.exe"])
-    } else if rid.contains("waterfox") {
-        check(&["waterfox.exe"])
-    } else if rid.contains("floorp") {
-        check(&["floorp.exe"])
-    } else if rid.contains("librewolf") {
-        check(&["librewolf.exe"])
-    } else if rid.contains("tor") {
-        check(&["tor.exe", "firefox.exe"])
-    } else if rid.contains("yandex") {
-        check(&["browser.exe", "yandex.exe"])
-    } else if rid.contains("samsung_internet") {
-        check(&["samsunginternet.exe"])
-    } else if rid.contains("teams") {
-        check(&["teams.exe", "ms-teams.exe"])
-    } else if rid.contains("zoom") {
-        check(&["zoom.exe"])
-    } else if rid.contains("obs") {
-        check(&["obs64.exe", "obs32.exe"])
-    } else if rid.contains("signal") {
-        check(&["signal.exe"])
-    } else if rid.contains("vlc") {
-        check(&["vlc.exe"])
-    } else if rid.contains("wps") {
-        check(&["wps.exe", "wpp.exe", "et.exe"])
-    } else if rid.contains("battle_net") {
-        check(&["battle.net.exe", "agent.exe"])
-    } else if rid.contains("ea_app") {
-        check(&["eadesktop.exe"])
-    } else if rid.contains("epic_games") {
-        check(&["epicgameslauncher.exe"])
-    } else if rid.contains("gog") {
-        check(&["galaxyclient.exe"])
-    } else if rid.contains("figma") {
-        check(&["figma.exe"])
-    } else if rid.contains("obsidian") {
-        check(&["obsidian.exe"])
-    } else if rid.contains("linear") {
-        check(&["linear.exe"])
-    } else if rid.contains("todoist") {
-        check(&["todoist.exe"])
-    } else if rid.contains("thunderbird") {
-        check(&["thunderbird.exe"])
-    } else if rid.contains("outlook") {
-        check(&["olk.exe", "outlook.exe"])
-    } else if rid.contains("dropbox") {
-        check(&["dropbox.exe"])
-    } else if rid.contains("onedrive") {
-        check(&["onedrive.exe"])
-    } else if rid.contains("google_drive") {
-        check(&["googledrivefs.exe"])
-    } else if rid.contains("twitch") {
-        check(&["twitch.exe"])
-    } else if rid.contains("skype") {
-        check(&["skype.exe"])
-    } else if rid.contains("wechat") {
-        check(&["wechat.exe"])
-    } else if rid.contains("sublime") {
-        check(&["sublime_text.exe"])
-    } else if rid.contains("lmstudio") {
-        check(&["lm studio.exe"])
-    } else if rid.contains("podman") {
-        check(&["podman-desktop.exe"])
-    } else if rid.contains("rancher") {
-        check(&["rancher desktop.exe"])
-    } else {
-        None
-    }
-}
-
 #[tauri::command]
 async fn scan_cleanup_rules(app: AppHandle) -> Result<Vec<RuleScanSummary>, String> {
     let operation = begin_operation(&app, "cleanup");
@@ -691,6 +547,7 @@ async fn scan_cleanup_rules(app: AppHandle) -> Result<Vec<RuleScanSummary>, Stri
                             candidates: Vec::new(),
                             is_locked_by_process: false,
                             locking_process_name: None,
+                            locking_processes: Vec::new(),
                             all_candidates: Vec::new(),
                         },
                     );
@@ -704,9 +561,13 @@ async fn scan_cleanup_rules(app: AppHandle) -> Result<Vec<RuleScanSummary>, Stri
             let proc_set: std::collections::HashSet<String> =
                 procs.into_iter().map(|p| p.name.to_lowercase()).collect();
             for s in &mut summaries {
-                if let Some(lock_name) = detect_locking_process(&s.rule_id, &proc_set) {
+                if let Some(lock_name) = s
+                    .locking_processes
+                    .iter()
+                    .find(|name| proc_set.contains(&name.to_lowercase()))
+                {
                     s.is_locked_by_process = true;
-                    s.locking_process_name = Some(lock_name);
+                    s.locking_process_name = Some(lock_name.clone());
                 }
             }
         }
@@ -877,6 +738,11 @@ async fn execute_cleanup_rules(
     let empty_recycle_bin = effective_rule_ids
         .iter()
         .any(|id| id == "windows_recycle_bin");
+    let custom_rules_dir = app
+        .path()
+        .app_data_dir()
+        .ok()
+        .map(|d| d.join("custom_rules"));
 
     let lock_dir = get_lock_dir(&app)?;
     let res = tauri::async_runtime::spawn_blocking(move || {
@@ -930,21 +796,23 @@ async fn execute_cleanup_rules(
 
         if should_close_apps {
             let mut closed_any = false;
+            let mut engine = RuleEngine::new();
+            if let Some(dir) = &custom_rules_dir {
+                let _ = engine.load_custom_rules_from_dir(dir);
+            }
+            let locking: std::collections::HashSet<String> = engine
+                .rules()
+                .iter()
+                .filter(|r| effective_rule_ids.contains(&r.rule.id))
+                .flat_map(|r| r.rule.locking_processes.iter().map(|n| n.to_lowercase()))
+                .collect();
             if let Ok(procs) = platform.list_running_processes() {
-                let proc_set: std::collections::HashSet<String> =
-                    procs.iter().map(|p| p.name.to_lowercase()).collect();
-                for r_id in &effective_rule_ids {
-                    if let Some(p_name) = detect_locking_process(r_id, &proc_set) {
-                        for p in procs
-                            .iter()
-                            .filter(|p| p.name.eq_ignore_ascii_case(&p_name))
-                        {
-                            if ProcessController::graceful_terminate(p.pid, &p.name)
-                                .unwrap_or(false)
-                            {
-                                closed_any = true;
-                            }
-                        }
+                for p in procs
+                    .iter()
+                    .filter(|p| locking.contains(&p.name.to_lowercase()))
+                {
+                    if ProcessController::graceful_terminate(p.pid, &p.name).unwrap_or(false) {
+                        closed_any = true;
                     }
                 }
             }

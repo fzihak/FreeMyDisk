@@ -8,6 +8,7 @@ verified_at = "2026-08-15"
 author = "FreeMyDisk Team"
 description = "Cached channel images, avatars, emojis, and code caches from Discord"
 platform = "windows"
+locking_processes = ["discord.exe"]
 
 [applicability]
 conditions = [

@@ -8,6 +8,7 @@ verified_at = "2026-10-06"
 author = "FreeMyDisk Team"
 description = "Web assets and GPU cache from Todoist Windows application"
 platform = "windows"
+locking_processes = ["todoist.exe"]
 
 [applicability]
 conditions = [

@@ -8,6 +8,7 @@ verified_at = "2026-10-01"
 author = "FreeMyDisk Team"
 description = "Temporary Electron caches and diagnostic logs from Docker Desktop"
 platform = "windows"
+locking_processes = ["docker desktop.exe", "com.docker.backend.exe"]
 
 [applicability]
 conditions = [

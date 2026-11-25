@@ -8,6 +8,7 @@ verified_at = "2026-10-06"
 author = "FreeMyDisk Team"
 description = "Cached web assets and code cache from standard Chromium builds"
 platform = "windows"
+locking_processes = ["chrome.exe"]
 
 [applicability]
 conditions = [

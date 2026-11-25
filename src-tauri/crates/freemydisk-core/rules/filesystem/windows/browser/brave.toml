@@ -8,6 +8,7 @@ verified_at = "2026-08-15"
 author = "FreeMyDisk Team"
 description = "Cached web data and shader cache from Brave Browser"
 platform = "windows"
+locking_processes = ["brave.exe"]
 
 [applicability]
 conditions = [

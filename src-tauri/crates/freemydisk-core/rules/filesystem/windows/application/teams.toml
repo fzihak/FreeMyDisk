@@ -8,6 +8,7 @@ verified_at = "2026-10-06"
 author = "FreeMyDisk Team"
 description = "Cached images, media, and Electron runtime cache from Microsoft Teams"
 platform = "windows"
+locking_processes = ["ms-teams.exe", "teams.exe"]
 
 [applicability]
 conditions = [

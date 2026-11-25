@@ -8,6 +8,7 @@ verified_at = "2026-10-06"
 author = "FreeMyDisk Team"
 description = "Launcher web cache, agent cache, and logs from Blizzard Battle.net"
 platform = "windows"
+locking_processes = ["battle.net.exe"]
 
 [applicability]
 conditions = [

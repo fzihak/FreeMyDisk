@@ -8,6 +8,7 @@ verified_at = "2026-08-15"
 author = "FreeMyDisk Team"
 description = "Cached web data and compiled bytecode from Microsoft Edge"
 platform = "windows"
+locking_processes = ["msedge.exe"]
 
 [applicability]
 conditions = [

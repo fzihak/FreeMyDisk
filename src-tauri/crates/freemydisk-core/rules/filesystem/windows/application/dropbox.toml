@@ -8,6 +8,7 @@ verified_at = "2026-10-06"
 author = "FreeMyDisk Team"
 description = "Temporary staging sync cache and thumbnail chunks from Dropbox desktop client"
 platform = "windows"
+locking_processes = ["dropbox.exe"]
 
 [applicability]
 conditions = [

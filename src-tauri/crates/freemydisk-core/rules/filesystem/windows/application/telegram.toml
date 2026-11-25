@@ -8,6 +8,7 @@ verified_at = "2026-10-01"
 author = "FreeMyDisk Team"
 description = "Cached voice messages, images and temp files in Telegram"
 platform = "windows"
+locking_processes = ["telegram.exe"]
 
 [applicability]
 conditions = [

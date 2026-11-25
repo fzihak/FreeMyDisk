@@ -8,6 +8,7 @@ verified_at = "2026-10-06"
 author = "FreeMyDisk Team"
 description = "Web view cache and temporary media cache from Skype for Desktop"
 platform = "windows"
+locking_processes = ["skype.exe"]
 
 [applicability]
 conditions = [

@@ -8,6 +8,7 @@ verified_at = "2026-08-15"
 author = "FreeMyDisk Team"
 description = "Cached media, web resources, and Service Worker storage from Slack"
 platform = "windows"
+locking_processes = ["slack.exe"]
 
 [applicability]
 conditions = [

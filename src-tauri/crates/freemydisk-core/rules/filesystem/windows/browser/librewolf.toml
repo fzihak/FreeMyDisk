@@ -8,6 +8,7 @@ verified_at = "2026-10-06"
 author = "FreeMyDisk Team"
 description = "Web cache and temp files from LibreWolf privacy browser"
 platform = "windows"
+locking_processes = ["librewolf.exe"]
 
 [applicability]
 conditions = [

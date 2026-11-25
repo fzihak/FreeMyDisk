@@ -8,6 +8,7 @@ verified_at = "2026-10-06"
 author = "FreeMyDisk Team"
 description = "Cached web pages, images, and compiled code cache from Vivaldi"
 platform = "windows"
+locking_processes = ["vivaldi.exe"]
 
 [applicability]
 conditions = [

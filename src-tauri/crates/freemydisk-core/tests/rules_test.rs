@@ -247,3 +247,23 @@ paths = [{{ path = "{}", matcher = "glob" }}]
     assert!(paths.contains(&old_file), "old file should be offered");
     assert!(!paths.contains(&new_file), "recent file must be kept");
 }
+
+#[test]
+fn test_builtin_rules_declare_locking_processes_by_exact_rule() {
+    let engine = {
+        let mut e = RuleEngine::new();
+        e.load_builtin_rules();
+        e
+    };
+    let find = |id: &str| {
+        engine
+            .rules()
+            .iter()
+            .find(|r| r.rule.id == id)
+            .map(|r| r.rule.locking_processes.clone())
+            .unwrap_or_default()
+    };
+    assert_eq!(find("windows_app_obsidian_cache"), vec!["obsidian.exe"]);
+    assert_eq!(find("windows_app_obs_cache"), vec!["obs64.exe"]);
+    assert!(find("windows_system_search_index_temp").is_empty());
+}

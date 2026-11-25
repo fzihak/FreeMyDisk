@@ -8,6 +8,7 @@ verified_at = "2026-08-15"
 author = "FreeMyDisk Team"
 description = "Cached model layer blobs and manifests managed by Ollama"
 platform = "windows"
+locking_processes = ["ollama.exe", "ollama app.exe"]
 
 [applicability]
 conditions = [

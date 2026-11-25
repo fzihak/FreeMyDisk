@@ -8,6 +8,7 @@ verified_at = "2026-10-01"
 author = "FreeMyDisk Team"
 description = "Rebuildable index caches, log dumps and symbol cache from JetBrains IDEs"
 platform = "windows"
+locking_processes = ["idea64.exe", "pycharm64.exe", "webstorm64.exe", "clion64.exe", "rider64.exe", "goland64.exe", "rustrover64.exe"]
 
 [applicability]
 conditions = [

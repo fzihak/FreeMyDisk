@@ -8,6 +8,7 @@ verified_at = "2026-10-06"
 author = "FreeMyDisk Team"
 description = "Electron GPU and HTTP web cache from Signal Desktop"
 platform = "windows"
+locking_processes = ["signal.exe"]
 
 [applicability]
 conditions = [
