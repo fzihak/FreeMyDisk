@@ -194,7 +194,7 @@ export const CleanupPage: React.FC = () => {
           rule_ids: Array.from(selectedRuleIds),
           dry_run: false,
           force_permanent: !alwaysTrashOverride,
-          close_locking_apps: true,
+          close_locking_apps: false,
         },
       });
 

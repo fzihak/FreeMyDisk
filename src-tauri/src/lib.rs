@@ -1,4 +1,6 @@
-use freemydisk_core::applications::{ApplicationLeftover, ApplicationService, InstalledAppInfo};
+use freemydisk_core::applications::{
+    ApplicationLeftover, ApplicationService, InstalledAppInfo, ProcessController,
+};
 use freemydisk_core::cleanup::cleaners::{
     AiModelAnalyzer, AiModelInfo, CondaCacheInfo, CondaCleaner, RustToolchainCleaner,
     RustToolchainScanResult,
@@ -750,7 +752,9 @@ async fn close_locking_process(
             let target = name.to_lowercase();
             let mut closed_any = false;
             for p in procs {
-                if p.name.to_lowercase() == target && platform.terminate_process(p.pid).is_ok() {
+                if p.name.to_lowercase() == target
+                    && ProcessController::graceful_terminate(p.pid, &p.name).unwrap_or(false)
+                {
                     closed_any = true;
                 }
             }
@@ -778,7 +782,7 @@ async fn close_all_locking_processes(
             let mut closed_count = 0;
             for p in procs {
                 if target_set.contains(&p.name.to_lowercase())
-                    && platform.terminate_process(p.pid).is_ok()
+                    && ProcessController::graceful_terminate(p.pid, &p.name).unwrap_or(false)
                 {
                     closed_count += 1;
                 }
@@ -849,11 +853,12 @@ async fn execute_cleanup_rules(
     };
 
     let is_dry_run = plan.as_ref().and_then(|p| p.dry_run).unwrap_or(false);
+    // Closing other apps can lose their unsaved work, so it only happens on request.
     let should_close_apps = !is_dry_run
         && plan
             .as_ref()
             .and_then(|p| p.close_locking_apps)
-            .unwrap_or(true);
+            .unwrap_or(false);
 
     // Dispose of exactly what the last scan found. Anything created since, or never
     // shown to the user, is left alone.
@@ -930,7 +935,9 @@ async fn execute_cleanup_rules(
                             .iter()
                             .filter(|p| p.name.eq_ignore_ascii_case(&p_name))
                         {
-                            if platform.terminate_process(p.pid).is_ok() {
+                            if ProcessController::graceful_terminate(p.pid, &p.name)
+                                .unwrap_or(false)
+                            {
                                 closed_any = true;
                             }
                         }
@@ -2190,7 +2197,7 @@ async fn close_running_browsers() -> Result<usize, String> {
             for p in procs {
                 let p_name = p.name.to_lowercase();
                 if target_exes.iter().any(|&t| t == p_name)
-                    && platform.terminate_process(p.pid).is_ok()
+                    && ProcessController::graceful_terminate(p.pid, &p.name).unwrap_or(false)
                 {
                     closed += 1;
                 }
