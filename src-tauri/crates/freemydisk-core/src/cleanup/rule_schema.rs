@@ -43,6 +43,10 @@ fn default_matcher() -> String {
 pub struct Targets {
     #[serde(default)]
     pub paths: Vec<TargetPath>,
+    /// Only items not modified for at least this many hours are cleaned. For a
+    /// folder, the newest file inside it counts.
+    #[serde(default)]
+    pub min_age_hours: Option<u64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

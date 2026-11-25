@@ -7,6 +7,7 @@ use crate::shared::progress::CancellationToken;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::time::{Duration, SystemTime};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RuleScanCandidate {
@@ -298,123 +299,27 @@ impl RuleEngine {
         // The frontend should show "+N more" when total_items > candidates.len().
         const MAX_PREVIEW_CANDIDATES: usize = 500;
 
+        let cutoff = rule
+            .targets
+            .min_age_hours
+            .map(|h| SystemTime::now() - Duration::from_secs(h * 3600));
+
         for target in &rule.targets.paths {
             if cancel.is_cancelled() {
                 return Err(CoreError::Cancelled);
             }
-
-            let expanded = expand_path_variables(&target.path);
-            let target_str = expanded.to_string_lossy().to_string();
-
-            if target_str.contains('*') {
-                let first_star = target_str.find('*').unwrap();
-                let prefix = &target_str[..first_star];
-                let base_dir = match prefix.rfind(['/', '\\']) {
-                    Some(idx) => PathBuf::from(&prefix[..idx]),
-                    None => PathBuf::from("."),
-                };
-
-                if base_dir.exists() {
-                    let base_dir_str = base_dir.to_string_lossy();
-                    let rel_pattern = if target_str.len() > base_dir_str.len() {
-                        &target_str[base_dir_str.len()..]
-                    } else {
-                        ""
-                    };
-                    let segment_count = rel_pattern
-                        .split(['/', '\\'])
-                        .filter(|s| !s.is_empty())
-                        .count();
-                    let max_depth = (segment_count + 3).clamp(4, 8);
-
-                    let walk = walkdir::WalkDir::new(&base_dir)
-                        .min_depth(1)
-                        .max_depth(max_depth)
-                        .into_iter();
-
-                    let mut matched_dirs: Vec<PathBuf> = Vec::new();
-
-                    for entry in walk.flatten() {
-                        if cancel.is_cancelled() {
-                            return Err(CoreError::Cancelled);
-                        }
-
-                        let path = entry.path();
-
-                        if matched_dirs.iter().any(|d| path.starts_with(d)) {
-                            continue;
-                        }
-
-                        let is_dir = entry.file_type().is_dir();
-                        let path_str = path.to_string_lossy();
-
-                        let is_match = glob_match(&target_str, &path_str)
-                            || (is_dir
-                                && (target_str.ends_with("/*") || target_str.ends_with(r"\*"))
-                                && path != base_dir
-                                && glob_match(&target_str[..target_str.len() - 2], &path_str));
-
-                        if is_match {
-                            if is_subpath_protected(path, &rule.disposal.protect_subpaths) {
-                                continue;
-                            }
-
-                            if ProtectedPathRegistry::is_protected_lexical(path) {
-                                continue;
-                            }
-
-                            if is_dir {
-                                matched_dirs.push(path.to_path_buf());
-                            }
-
-                            let (size, count) = if is_dir {
-                                calculate_dir_size_with_filter(
-                                    path,
-                                    &rule.disposal.protect_subpaths,
-                                )
-                            } else {
-                                (entry.metadata().map(|m| m.len()).unwrap_or(0), 1)
-                            };
-
-                            total_bytes += size;
-                            total_items += count.max(1);
-
-                            let candidate = RuleScanCandidate {
-                                path: path.to_path_buf(),
-                                size_bytes: size,
-                                is_dir,
-                                rule_id: rule.rule.id.clone(),
-                                rule_name: rule.rule.name.clone(),
-                                category: rule.rule.category.clone(),
-                                risk: rule.rule.risk.clone(),
-                                verified_rebuildable: rule.rule.verified_rebuildable,
-                                default_action: rule.disposal.default_action.clone(),
-                                protect_subpaths: rule.disposal.protect_subpaths.clone(),
-                            };
-                            if candidates.len() < MAX_PREVIEW_CANDIDATES {
-                                candidates.push(candidate.clone());
-                            }
-                            all_candidates.push(candidate);
-                        }
-                    }
+            for (path, is_dir) in Self::matching_paths(rule, &target.path, cancel)? {
+                let measured = measure(&path, is_dir, &rule.disposal.protect_subpaths);
+                if cutoff.is_some_and(|c| measured.newest > c) {
+                    continue;
                 }
-            } else if expanded.exists()
-                && !is_subpath_protected(&expanded, &rule.disposal.protect_subpaths)
-                && !ProtectedPathRegistry::is_protected_lexical(&expanded)
-            {
-                let is_dir = expanded.is_dir();
-                let (size, count) = if is_dir {
-                    calculate_dir_size_with_filter(&expanded, &rule.disposal.protect_subpaths)
-                } else {
-                    (expanded.metadata().map(|m| m.len()).unwrap_or(0), 1)
-                };
 
-                total_bytes += size;
-                total_items += count.max(1);
+                total_bytes += measured.size;
+                total_items += measured.count.max(1);
 
                 let candidate = RuleScanCandidate {
-                    path: expanded,
-                    size_bytes: size,
+                    path,
+                    size_bytes: measured.size,
                     is_dir,
                     rule_id: rule.rule.id.clone(),
                     rule_name: rule.rule.name.clone(),
@@ -446,6 +351,85 @@ impl RuleEngine {
             locking_process_name: None,
             all_candidates,
         })
+    }
+
+    /// Paths matched by one target pattern, skipping protected entries. Matched
+    /// folders are returned once; their contents are not listed separately.
+    fn matching_paths(
+        rule: &CleanupRuleDefinition,
+        pattern: &str,
+        cancel: &CancellationToken,
+    ) -> Result<Vec<(PathBuf, bool)>, CoreError> {
+        let protect = &rule.disposal.protect_subpaths;
+        let expanded = expand_path_variables(pattern);
+        let target_str = expanded.to_string_lossy().to_string();
+        let mut found = Vec::new();
+
+        let Some(first_star) = target_str.find('*') else {
+            if expanded.exists()
+                && !is_subpath_protected(&expanded, protect)
+                && !ProtectedPathRegistry::is_protected_lexical(&expanded)
+            {
+                let is_dir = expanded.is_dir();
+                found.push((expanded, is_dir));
+            }
+            return Ok(found);
+        };
+
+        let prefix = &target_str[..first_star];
+        let base_dir = match prefix.rfind(['/', '\\']) {
+            Some(idx) => PathBuf::from(&prefix[..idx]),
+            None => PathBuf::from("."),
+        };
+        if !base_dir.exists() {
+            return Ok(found);
+        }
+
+        let base_dir_str = base_dir.to_string_lossy();
+        let rel_pattern = target_str.get(base_dir_str.len()..).unwrap_or("");
+        let segment_count = rel_pattern
+            .split(['/', '\\'])
+            .filter(|s| !s.is_empty())
+            .count();
+        let max_depth = (segment_count + 3).clamp(4, 8);
+        let dir_pattern = target_str
+            .strip_suffix("/*")
+            .or_else(|| target_str.strip_suffix(r"\*"));
+
+        let mut matched_dirs: Vec<PathBuf> = Vec::new();
+        for entry in walkdir::WalkDir::new(&base_dir)
+            .min_depth(1)
+            .max_depth(max_depth)
+            .into_iter()
+            .flatten()
+        {
+            if cancel.is_cancelled() {
+                return Err(CoreError::Cancelled);
+            }
+            let path = entry.path();
+            if matched_dirs.iter().any(|d| path.starts_with(d)) {
+                continue;
+            }
+
+            let is_dir = entry.file_type().is_dir();
+            let path_str = path.to_string_lossy();
+            let is_match = glob_match(&target_str, &path_str)
+                || (is_dir
+                    && path != base_dir
+                    && dir_pattern.is_some_and(|p| glob_match(p, &path_str)));
+            if !is_match
+                || is_subpath_protected(path, protect)
+                || ProtectedPathRegistry::is_protected_lexical(path)
+            {
+                continue;
+            }
+
+            if is_dir {
+                matched_dirs.push(path.to_path_buf());
+            }
+            found.push((path.to_path_buf(), is_dir));
+        }
+        Ok(found)
     }
 
     pub fn scan_all_with_progress<F>(
@@ -482,161 +466,65 @@ impl RuleEngine {
         rule_ids: &[String],
         cancel: &CancellationToken,
     ) -> Result<Vec<RuleScanCandidate>, CoreError> {
-        let rule_id_set: std::collections::HashSet<&str> =
-            rule_ids.iter().map(|s| s.as_str()).collect();
-        let target_rules: Vec<&CleanupRuleDefinition> = self
+        let mut all = Vec::new();
+        for rule in self
             .rules
             .iter()
-            .filter(|r| rule_id_set.is_empty() || rule_id_set.contains(r.rule.id.as_str()))
-            .collect();
-
-        let mut all_candidates = Vec::new();
-
-        for rule in target_rules {
-            if cancel.is_cancelled() {
-                return Err(CoreError::Cancelled);
-            }
-            if !Self::is_applicable(rule) {
-                continue;
-            }
-
-            for target in &rule.targets.paths {
-                if cancel.is_cancelled() {
-                    return Err(CoreError::Cancelled);
-                }
-
-                let expanded = expand_path_variables(&target.path);
-                let target_str = expanded.to_string_lossy().to_string();
-
-                if target_str.contains('*') {
-                    let first_star = target_str.find('*').unwrap();
-                    let prefix = &target_str[..first_star];
-                    let base_dir = match prefix.rfind(['/', '\\']) {
-                        Some(idx) => PathBuf::from(&prefix[..idx]),
-                        None => PathBuf::from("."),
-                    };
-
-                    if base_dir.exists() {
-                        let base_dir_str = base_dir.to_string_lossy();
-                        let rel_pattern = if target_str.len() > base_dir_str.len() {
-                            &target_str[base_dir_str.len()..]
-                        } else {
-                            ""
-                        };
-                        let segment_count = rel_pattern
-                            .split(['/', '\\'])
-                            .filter(|s| !s.is_empty())
-                            .count();
-                        let max_depth = (segment_count + 3).clamp(4, 8);
-
-                        let walk = walkdir::WalkDir::new(&base_dir)
-                            .min_depth(1)
-                            .max_depth(max_depth)
-                            .into_iter();
-
-                        let mut matched_dirs: Vec<PathBuf> = Vec::new();
-
-                        for entry in walk.flatten() {
-                            if cancel.is_cancelled() {
-                                return Err(CoreError::Cancelled);
-                            }
-
-                            let path = entry.path();
-
-                            if matched_dirs.iter().any(|d| path.starts_with(d)) {
-                                continue;
-                            }
-
-                            let is_dir = entry.file_type().is_dir();
-                            let path_str = path.to_string_lossy();
-
-                            let is_match = glob_match(&target_str, &path_str)
-                                || (is_dir
-                                    && (target_str.ends_with("/*") || target_str.ends_with(r"\*"))
-                                    && path != base_dir
-                                    && glob_match(&target_str[..target_str.len() - 2], &path_str));
-
-                            if is_match {
-                                if is_subpath_protected(path, &rule.disposal.protect_subpaths) {
-                                    continue;
-                                }
-
-                                if ProtectedPathRegistry::is_protected_lexical(path) {
-                                    continue;
-                                }
-
-                                if is_dir {
-                                    matched_dirs.push(path.to_path_buf());
-                                }
-
-                                let (size, _) = if is_dir {
-                                    calculate_dir_size_with_filter(
-                                        path,
-                                        &rule.disposal.protect_subpaths,
-                                    )
-                                } else {
-                                    (entry.metadata().map(|m| m.len()).unwrap_or(0), 1)
-                                };
-
-                                all_candidates.push(RuleScanCandidate {
-                                    path: path.to_path_buf(),
-                                    size_bytes: size,
-                                    is_dir,
-                                    rule_id: rule.rule.id.clone(),
-                                    rule_name: rule.rule.name.clone(),
-                                    category: rule.rule.category.clone(),
-                                    risk: rule.rule.risk.clone(),
-                                    verified_rebuildable: rule.rule.verified_rebuildable,
-                                    default_action: rule.disposal.default_action.clone(),
-                                    protect_subpaths: rule.disposal.protect_subpaths.clone(),
-                                });
-                            }
-                        }
-                    }
-                } else if expanded.exists()
-                    && !is_subpath_protected(&expanded, &rule.disposal.protect_subpaths)
-                    && !ProtectedPathRegistry::is_protected_lexical(&expanded)
-                {
-                    let is_dir = expanded.is_dir();
-                    let (size, _) = if is_dir {
-                        calculate_dir_size_with_filter(&expanded, &rule.disposal.protect_subpaths)
-                    } else {
-                        (expanded.metadata().map(|m| m.len()).unwrap_or(0), 1)
-                    };
-
-                    all_candidates.push(RuleScanCandidate {
-                        path: expanded,
-                        size_bytes: size,
-                        is_dir,
-                        rule_id: rule.rule.id.clone(),
-                        rule_name: rule.rule.name.clone(),
-                        category: rule.rule.category.clone(),
-                        risk: rule.rule.risk.clone(),
-                        verified_rebuildable: rule.rule.verified_rebuildable,
-                        default_action: rule.disposal.default_action.clone(),
-                        protect_subpaths: rule.disposal.protect_subpaths.clone(),
-                    });
-                }
-            }
+            .filter(|r| rule_ids.is_empty() || rule_ids.contains(&r.rule.id))
+        {
+            all.extend(Self::scan_rule(rule, cancel)?.all_candidates);
         }
-
-        Ok(all_candidates)
+        Ok(all)
     }
 }
 
-fn calculate_dir_size_with_filter(dir: &Path, protect_patterns: &[String]) -> (u64, usize) {
-    let mut total = 0u64;
-    let mut count = 0usize;
-    let walk = walkdir::WalkDir::new(dir).min_depth(1).into_iter();
-    for entry in walk.flatten() {
+struct Measured {
+    size: u64,
+    count: usize,
+    /// Most recent modification time of the item (or anything inside a folder).
+    newest: SystemTime,
+}
+
+fn measure(path: &Path, is_dir: bool, protect_patterns: &[String]) -> Measured {
+    let modified = |m: &std::fs::Metadata| m.modified().unwrap_or(SystemTime::UNIX_EPOCH);
+    if !is_dir {
+        let meta = path.metadata().ok();
+        return Measured {
+            size: meta.as_ref().map(|m| m.len()).unwrap_or(0),
+            count: 1,
+            newest: meta
+                .as_ref()
+                .map(modified)
+                .unwrap_or(SystemTime::UNIX_EPOCH),
+        };
+    }
+
+    let mut out = Measured {
+        size: 0,
+        count: 0,
+        newest: path
+            .metadata()
+            .map(|m| modified(&m))
+            .unwrap_or(SystemTime::UNIX_EPOCH),
+    };
+    // The folder itself was already checked against the protected-path list, so its
+    // contents only need the rule's own protect_subpaths.
+    for entry in walkdir::WalkDir::new(path)
+        .min_depth(1)
+        .into_iter()
+        .flatten()
+    {
         let p = entry.path();
-        if is_subpath_protected(p, protect_patterns) || ProtectedPathRegistry::is_protected_lexical(p) {
+        if is_subpath_protected(p, protect_patterns) {
             continue;
         }
-        if entry.file_type().is_file() {
-            total += entry.metadata().map(|m| m.len()).unwrap_or(0);
-            count += 1;
+        if let Ok(meta) = entry.metadata() {
+            out.newest = out.newest.max(modified(&meta));
+            if entry.file_type().is_file() {
+                out.size += meta.len();
+                out.count += 1;
+            }
         }
     }
-    (total, count)
+    out
 }

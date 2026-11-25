@@ -15,6 +15,8 @@ conditions = [
 ]
 
 [targets]
+# Partial downloads changed within the last day may still be in progress.
+min_age_hours = 24
 paths = [
     { path = "${user_profile}/Downloads/*.crdownload", matcher = "glob" },
     { path = "${user_profile}/Downloads/*.part", matcher = "glob" },

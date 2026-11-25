@@ -198,3 +198,52 @@ fn test_live_candidates_and_plan() {
         "Reclaimable bytes should be > 0"
     );
 }
+
+#[test]
+fn test_min_age_hours_skips_recently_modified_items() {
+    use freemydisk_core::shared::progress::CancellationToken;
+    use std::time::{Duration, SystemTime};
+
+    let dir = tempdir().unwrap();
+    let old_file = dir.path().join("old.tmp");
+    let new_file = dir.path().join("new.tmp");
+    fs::write(&old_file, b"old").unwrap();
+    fs::write(&new_file, b"new").unwrap();
+    fs::File::options()
+        .write(true)
+        .open(&old_file)
+        .unwrap()
+        .set_modified(SystemTime::now() - Duration::from_secs(3 * 3600))
+        .unwrap();
+
+    let pattern = format!("{}/*", dir.path().to_string_lossy().replace('\\', "/"));
+    let toml = format!(
+        r#"
+[rule]
+id = "test_min_age"
+name = "Test"
+category = "system"
+risk = "safe"
+verified_rebuildable = false
+verified_at = "2026-11-26"
+author = "test"
+description = "test"
+platform = "any"
+
+[targets]
+min_age_hours = 1
+paths = [{{ path = "{}", matcher = "glob" }}]
+"#,
+        pattern
+    );
+    let rule = RuleEngine::parse_rule_toml(&toml).unwrap();
+    let summary = RuleEngine::scan_rule(&rule, &CancellationToken::new()).unwrap();
+
+    let paths: Vec<_> = summary
+        .all_candidates
+        .iter()
+        .map(|c| c.path.clone())
+        .collect();
+    assert!(paths.contains(&old_file), "old file should be offered");
+    assert!(!paths.contains(&new_file), "recent file must be kept");
+}
