@@ -295,11 +295,9 @@ export const ApplicationsPage: React.FC = () => {
   const handleUninstall = async (app: InstalledAppInfo) => {
     if (!app.uninstall_string) return;
     try {
-      await invoke("launch_uninstaller", {
-        uninstallString: app.uninstall_string,
-      });
+      await invoke("launch_uninstaller", { appId: app.id });
     } catch (e) {
-      console.error("Failed to launch uninstaller:", e);
+      toast.error(t.applications.uninstall, String(e));
     }
   };
 

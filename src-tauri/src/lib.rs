@@ -1856,23 +1856,22 @@ async fn clean_application_leftovers(paths: Vec<String>) -> Result<u64, String> 
 
 #[tauri::command]
 #[allow(non_snake_case)]
-fn launch_uninstaller(
-    uninstall_string: Option<String>,
-    uninstallString: Option<String>,
-) -> Result<(), String> {
-    let cmd = uninstall_string
-        .or(uninstallString)
-        .ok_or_else(|| "Missing uninstall command string".to_string())?;
-    ApplicationService::new().launch_uninstaller(&cmd)
+async fn launch_uninstaller(app_id: Option<String>, appId: Option<String>) -> Result<(), String> {
+    let id = app_id
+        .or(appId)
+        .ok_or_else(|| "Missing application id".to_string())?;
+    tauri::async_runtime::spawn_blocking(move || ApplicationService::new().launch_uninstaller(&id))
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
 #[allow(non_snake_case)]
-fn launch_app_uninstaller(
-    uninstall_string: Option<String>,
-    uninstallString: Option<String>,
+async fn launch_app_uninstaller(
+    app_id: Option<String>,
+    appId: Option<String>,
 ) -> Result<(), String> {
-    launch_uninstaller(uninstall_string, uninstallString)
+    launch_uninstaller(app_id, appId).await
 }
 
 #[tauri::command]
@@ -1964,17 +1963,18 @@ async fn uninstall_and_scan(
 
 #[tauri::command]
 #[allow(non_snake_case)]
-fn launch_silent_uninstaller(
-    uninstall_string: Option<String>,
-    uninstallString: Option<String>,
-    install_dir: Option<String>,
-    installDir: Option<String>,
+async fn launch_silent_uninstaller(
+    app_id: Option<String>,
+    appId: Option<String>,
 ) -> Result<(), String> {
-    let cmd = uninstall_string
-        .or(uninstallString)
-        .ok_or_else(|| "Missing uninstall command string".to_string())?;
-    let dir = install_dir.or(installDir);
-    ApplicationService::new().launch_silent_uninstaller(&cmd, dir.as_deref())
+    let id = app_id
+        .or(appId)
+        .ok_or_else(|| "Missing application id".to_string())?;
+    tauri::async_runtime::spawn_blocking(move || {
+        ApplicationService::new().launch_silent_uninstaller(&id)
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]

@@ -120,19 +120,34 @@ impl ApplicationService {
         UninstallOrchestrator::uninstall_and_scan_silent(&target_app)
     }
 
-    pub fn launch_uninstaller(&self, uninstall_string: &str) -> Result<(), String> {
+    /// Resolves an installed application by id. The uninstall command is always taken
+    /// from the system's own registration, never from the caller.
+    fn find_application(&self, app_id: &str) -> Result<InstalledAppInfo, String> {
+        self.list_applications()?
+            .into_iter()
+            .find(|a| a.id == app_id)
+            .ok_or_else(|| "The selected application is no longer installed.".to_string())
+    }
+
+    pub fn launch_uninstaller(&self, app_id: &str) -> Result<(), String> {
+        let app = self.find_application(app_id)?;
+        let cmd = app
+            .uninstall_string
+            .as_deref()
+            .ok_or_else(|| format!("'{}' has no registered uninstaller.", app.name))?;
         self.platform
-            .launch_uninstaller(uninstall_string)
+            .launch_uninstaller(cmd)
             .map_err(|e| e.to_string())
     }
 
-    pub fn launch_silent_uninstaller(
-        &self,
-        uninstall_string: &str,
-        install_dir: Option<&str>,
-    ) -> Result<(), String> {
+    pub fn launch_silent_uninstaller(&self, app_id: &str) -> Result<(), String> {
+        let app = self.find_application(app_id)?;
+        let cmd = app
+            .uninstall_string
+            .as_deref()
+            .ok_or_else(|| format!("'{}' has no registered uninstaller.", app.name))?;
         self.platform
-            .launch_silent_uninstaller(uninstall_string, install_dir)
+            .launch_silent_uninstaller(cmd, app.install_location.as_deref())
             .map_err(|e| e.to_string())
     }
 
