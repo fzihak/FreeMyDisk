@@ -165,9 +165,20 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
     ? Math.round((volumeUsedBytes / volumeTotalBytes) * 100)
     : 0;
 
-  const totalCleanableBytes = useMemo(() => {
-    return ruleSummaries.reduce((acc, r) => acc + r.total_bytes, 0);
-  }, [ruleSummaries]);
+  const quickCleanRules = useMemo(
+    () =>
+      ruleSummaries.filter(
+        (r) =>
+          r.rule_id !== "windows_recycle_bin" &&
+          r.risk === "safe" &&
+          (r.total_bytes > 0 || r.total_items > 0)
+      ),
+    [ruleSummaries]
+  );
+  const totalCleanableBytes = useMemo(
+    () => quickCleanRules.reduce((acc, r) => acc + r.total_bytes, 0),
+    [quickCleanRules]
+  );
 
   const cleanupProgress = useScanProgress("cleanup");
   const { initProgressListener } = useScanProgressStore();
@@ -218,10 +229,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
     if (totalCleanableBytes === 0) return;
     setCleaning(true);
 
-    const cleanableRules = ruleSummaries.filter((r) => r.total_bytes > 0 || r.total_items > 0);
-    const ruleIdsToClean = cleanableRules.length > 0
-      ? cleanableRules.map((r) => r.rule_id)
-      : ruleSummaries.map((r) => r.rule_id);
+    const ruleIdsToClean = quickCleanRules.map((r) => r.rule_id);
 
     try {
       const summary = await invoke<DisposalSummary>("execute_cleanup_rules", {
@@ -229,7 +237,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
           rule_ids: ruleIdsToClean,
           dry_run: false,
           force_permanent: !alwaysTrashOverride,
-          close_locking_apps: true,
+          close_locking_apps: false,
         },
       });
 
