@@ -243,61 +243,23 @@ impl DisposalEngine {
                         successful_items += 1;
                     }
                     Err(e) => {
-                        // Rebuildable cache fallback: if OS Trash fails on safe rebuildable temporary data,
-                        // gracefully fall back to tolerant permanent deletion so disk space is actually reclaimed.
-                        if item.verified_rebuildable
-                            && (item.risk == "safe" || item.risk == "recoverable")
-                        {
-                            log::info!(
-                                "Recycle Bin unavailable for rebuildable item '{}', falling back to tolerant permanent disposal: {}",
-                                path.display(),
-                                e
-                            );
-                            let (freed, err) = execute_tolerant_permanent_delete(path, cancel);
-                            if freed > 0 || err.is_none() {
-                                let actual_freed = if freed > 0 { freed } else { item.size_bytes };
-                                let _ = journal.mark_completed(journal_id);
-                                results.push(DisposalItemResult {
-                                    path: path.clone(),
-                                    success: true,
-                                    bytes_freed: actual_freed,
-                                    route_used: "permanent".to_string(),
-                                    error: None,
-                                });
-                                total_freed_bytes += actual_freed;
-                                successful_items += 1;
-                            } else {
-                                let err_msg = err.unwrap_or_else(|| e.to_string());
-                                let _ = journal.mark_failed(journal_id, &err_msg);
-                                results.push(DisposalItemResult {
-                                    path: path.clone(),
-                                    success: false,
-                                    bytes_freed: 0,
-                                    route_used: "trash".to_string(),
-                                    error: Some(err_msg),
-                                });
-                                failed_trash.push(path.clone());
-                                failed_items += 1;
-                            }
-                        } else {
-                            // User documents, personal files, or caution items:
-                            // Strictly preserve safety invariant and record for manual decision.
-                            log::warn!(
-                                "Trash failed for '{}'. Refusing automatic permanent deletion. Error: {}",
-                                path.display(),
-                                e
-                            );
-                            let _ = journal.mark_failed(journal_id, "trash_unavailable");
-                            results.push(DisposalItemResult {
-                                path: path.clone(),
-                                success: false,
-                                bytes_freed: 0,
-                                route_used: "trash".to_string(),
-                                error: Some("trash_unavailable".to_string()),
-                            });
-                            failed_trash.push(path.clone());
-                            failed_items += 1;
-                        }
+                        // Never fall back to permanent deletion: the item is reported so the
+                        // user can decide explicitly (retry trash or force delete).
+                        log::warn!(
+                            "Trash failed for '{}'. Refusing automatic permanent deletion. Error: {}",
+                            path.display(),
+                            e
+                        );
+                        let _ = journal.mark_failed(journal_id, "trash_unavailable");
+                        results.push(DisposalItemResult {
+                            path: path.clone(),
+                            success: false,
+                            bytes_freed: 0,
+                            route_used: "trash".to_string(),
+                            error: Some("trash_unavailable".to_string()),
+                        });
+                        failed_trash.push(path.clone());
+                        failed_items += 1;
                     }
                 }
             }
