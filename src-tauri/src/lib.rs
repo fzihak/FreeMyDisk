@@ -22,7 +22,8 @@ use freemydisk_platform::{
     get_platform, PlatformApplications, PlatformFilesystem, PlatformRebootQueue, StorageVolumeInfo,
 };
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::collections::HashSet;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter, Manager, State};
 
@@ -149,6 +150,43 @@ async fn docker_prune(prune_type: String) -> Result<u64, String> {
 
 #[derive(Default, Clone)]
 pub struct ScanCancellationState(pub Arc<Mutex<Option<CancellationToken>>>);
+
+/// Paths whose move to the Recycle Bin failed during this session.
+/// Permanent deletion is only accepted for these paths, so the webview cannot
+/// request permanent deletion of an arbitrary location.
+#[derive(Default, Clone)]
+pub struct FailedTrashRegistry(Arc<Mutex<HashSet<PathBuf>>>);
+
+impl FailedTrashRegistry {
+    fn key(path: &Path) -> PathBuf {
+        PathBuf::from(
+            freemydisk_core::shared::paths::normalize_path(path)
+                .to_string_lossy()
+                .to_lowercase(),
+        )
+    }
+
+    fn record_item(&self, result: &DisposalItemResult) {
+        let mut set = self.0.lock().unwrap_or_else(|e| e.into_inner());
+        let key = Self::key(&result.path);
+        if result.success {
+            set.remove(&key);
+        } else if result.route_used == "trash" {
+            set.insert(key);
+        }
+    }
+
+    fn record_summary(&self, summary: &DisposalSummary) {
+        for result in &summary.results {
+            self.record_item(result);
+        }
+    }
+
+    fn contains(&self, path: &Path) -> bool {
+        let set = self.0.lock().unwrap_or_else(|e| e.into_inner());
+        set.contains(&Self::key(path))
+    }
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RecoveryStatus {
@@ -721,9 +759,10 @@ async fn execute_cleanup_plan(
     candidates: Vec<RuleScanCandidate>,
     always_trash: bool,
 ) -> Result<DisposalSummary, String> {
+    let failed_trash = app.state::<FailedTrashRegistry>().inner().clone();
     let app_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
     let lock_dir = get_lock_dir(&app)?;
-    tauri::async_runtime::spawn_blocking(move || {
+    let res = tauri::async_runtime::spawn_blocking(move || {
         let _bg_guard = freemydisk_platform::io_priority::BackgroundExecutionGuard::enter();
         let journal_path = app_dir.join("journal.db");
         let journal = CrashRecoveryJournal::open(&journal_path).map_err(|e| e.to_string())?;
@@ -751,7 +790,11 @@ async fn execute_cleanup_plan(
         res
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(|e| e.to_string())?;
+    if let Ok(ref r) = res {
+        failed_trash.record_summary(r);
+    }
+    res
 }
 
 #[derive(Debug, Deserialize)]
@@ -779,6 +822,7 @@ async fn execute_cleanup_rules(
     alwaysTrash: Option<bool>,
     plan: Option<CleanupPlanInput>,
 ) -> Result<DisposalSummary, String> {
+    let failed_trash = app.state::<FailedTrashRegistry>().inner().clone();
     let effective_rule_ids = if let Some(ids) = rule_ids.or(ruleIds) {
         ids
     } else if let Some(p) = &plan {
@@ -810,7 +854,7 @@ async fn execute_cleanup_rules(
 
     let app_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
     let lock_dir = get_lock_dir(&app)?;
-    tauri::async_runtime::spawn_blocking(move || {
+    let res = tauri::async_runtime::spawn_blocking(move || {
         let _bg_guard = freemydisk_platform::io_priority::BackgroundExecutionGuard::enter();
         let journal_path = app_dir.join("journal.db");
         let journal = CrashRecoveryJournal::open(&journal_path).map_err(|e| e.to_string())?;
@@ -997,14 +1041,19 @@ async fn execute_cleanup_rules(
         Ok(summary)
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(|e| e.to_string())?;
+    if let Ok(ref r) = res {
+        failed_trash.record_summary(r);
+    }
+    res
 }
 
 #[tauri::command]
 async fn retry_failed_trash(app: AppHandle, path: String) -> Result<DisposalItemResult, String> {
+    let failed_trash = app.state::<FailedTrashRegistry>().inner().clone();
     let app_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
     let lock_dir = get_lock_dir(&app)?;
-    tauri::async_runtime::spawn_blocking(move || {
+    let res = tauri::async_runtime::spawn_blocking(move || {
         let journal_path = app_dir.join("journal.db");
         let journal = CrashRecoveryJournal::open(&journal_path).map_err(|e| e.to_string())?;
         let platform = get_platform();
@@ -1037,7 +1086,11 @@ async fn retry_failed_trash(app: AppHandle, path: String) -> Result<DisposalItem
             .ok_or_else(|| "Failed to execute retry".to_string())
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(|e| e.to_string())?;
+    if let Ok(ref r) = res {
+        failed_trash.record_item(r);
+    }
+    res
 }
 
 #[tauri::command]
@@ -1045,19 +1098,31 @@ async fn force_delete_permanently(
     app: AppHandle,
     path: String,
 ) -> Result<DisposalItemResult, String> {
+    let failed_trash = app.state::<FailedTrashRegistry>().inner().clone();
+    let pb = PathBuf::from(path);
+    if !failed_trash.contains(&pb) {
+        return Err(
+            "Permanent delete is only available for items that could not be moved to the Recycle Bin."
+                .to_string(),
+        );
+    }
+
     let app_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
     let lock_dir = get_lock_dir(&app)?;
-    tauri::async_runtime::spawn_blocking(move || {
+    let res = tauri::async_runtime::spawn_blocking(move || {
         let journal_path = app_dir.join("journal.db");
         let journal = CrashRecoveryJournal::open(&journal_path).map_err(|e| e.to_string())?;
         let platform = get_platform();
-        let pb = PathBuf::from(path);
 
         DisposalEngine::execute_manual_permanent_delete(&pb, &journal, &platform, &lock_dir)
             .map_err(|e| e.to_string())
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(|e| e.to_string())?;
+    if let Ok(ref r) = res {
+        failed_trash.record_item(r);
+    }
+    res
 }
 
 #[tauri::command]
@@ -1325,9 +1390,10 @@ async fn scan_large_files(
 
 #[tauri::command]
 async fn trash_large_file(app: AppHandle, path: String) -> Result<DisposalItemResult, String> {
+    let failed_trash = app.state::<FailedTrashRegistry>().inner().clone();
     let app_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
     let lock_dir = get_lock_dir(&app)?;
-    tauri::async_runtime::spawn_blocking(move || {
+    let res = tauri::async_runtime::spawn_blocking(move || {
         let journal_path = app_dir.join("journal.db");
         let journal = CrashRecoveryJournal::open(&journal_path).map_err(|e| e.to_string())?;
         let platform = get_platform();
@@ -1336,7 +1402,11 @@ async fn trash_large_file(app: AppHandle, path: String) -> Result<DisposalItemRe
             .map_err(|e| e.to_string())
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(|e| e.to_string())?;
+    if let Ok(ref r) = res {
+        failed_trash.record_item(r);
+    }
+    res
 }
 
 #[tauri::command]
@@ -1347,10 +1417,11 @@ async fn trash_large_files(
     file_paths: Option<Vec<String>>,
     filePaths: Option<Vec<String>>,
 ) -> Result<DisposalSummary, String> {
+    let failed_trash = app.state::<FailedTrashRegistry>().inner().clone();
     let effective_paths = paths.or(file_paths).or(filePaths).unwrap_or_default();
     let app_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
     let lock_dir = get_lock_dir(&app)?;
-    tauri::async_runtime::spawn_blocking(move || {
+    let res = tauri::async_runtime::spawn_blocking(move || {
         let journal_path = app_dir.join("journal.db");
         let journal = CrashRecoveryJournal::open(&journal_path).map_err(|e| e.to_string())?;
         let platform = get_platform();
@@ -1384,7 +1455,11 @@ async fn trash_large_files(
         .map_err(|e| e.to_string())
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(|e| e.to_string())?;
+    if let Ok(ref r) = res {
+        failed_trash.record_summary(r);
+    }
+    res
 }
 
 #[tauri::command]
@@ -1484,10 +1559,11 @@ async fn trash_duplicate_folders(
     folder_paths: Option<Vec<String>>,
     folderPaths: Option<Vec<String>>,
 ) -> Result<DisposalSummary, String> {
+    let failed_trash = app.state::<FailedTrashRegistry>().inner().clone();
     let effective_paths = paths.or(folder_paths).or(folderPaths).unwrap_or_default();
     let app_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
     let lock_dir = get_lock_dir(&app)?;
-    tauri::async_runtime::spawn_blocking(move || {
+    let res = tauri::async_runtime::spawn_blocking(move || {
         let journal_path = app_dir.join("journal.db");
         let journal = CrashRecoveryJournal::open(&journal_path).map_err(|e| e.to_string())?;
         let platform = get_platform();
@@ -1500,7 +1576,11 @@ async fn trash_duplicate_folders(
         .map_err(|e| e.to_string())
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(|e| e.to_string())?;
+    if let Ok(ref r) = res {
+        failed_trash.record_summary(r);
+    }
+    res
 }
 
 #[tauri::command]
@@ -1581,11 +1661,12 @@ async fn clean_project_artifacts(
     artifact_paths: Option<Vec<String>>,
     artifactPaths: Option<Vec<String>>,
 ) -> Result<DisposalSummary, String> {
+    let failed_trash = app.state::<FailedTrashRegistry>().inner().clone();
     let paths = artifact_paths.or(artifactPaths).unwrap_or_default();
     let app_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
     let lock_dir = get_lock_dir(&app)?;
 
-    tauri::async_runtime::spawn_blocking(move || {
+    let res = tauri::async_runtime::spawn_blocking(move || {
         let journal_path = app_dir.join("journal.db");
         let journal = CrashRecoveryJournal::open(&journal_path).map_err(|e| e.to_string())?;
         let platform = get_platform();
@@ -1598,7 +1679,11 @@ async fn clean_project_artifacts(
         .map_err(|e| e.to_string())
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(|e| e.to_string())?;
+    if let Ok(ref r) = res {
+        failed_trash.record_summary(r);
+    }
+    res
 }
 
 #[tauri::command]
@@ -1610,10 +1695,11 @@ async fn trash_duplicate_files(
     filePaths: Option<Vec<String>>,
     groups: Option<Vec<DuplicateGroup>>,
 ) -> Result<DisposalSummary, String> {
+    let failed_trash = app.state::<FailedTrashRegistry>().inner().clone();
     let effective_paths = paths.or(file_paths).or(filePaths);
     let app_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
     let lock_dir = get_lock_dir(&app)?;
-    tauri::async_runtime::spawn_blocking(move || {
+    let res = tauri::async_runtime::spawn_blocking(move || {
         let journal_path = app_dir.join("journal.db");
         let journal = CrashRecoveryJournal::open(&journal_path).map_err(|e| e.to_string())?;
         let platform = get_platform();
@@ -1688,7 +1774,11 @@ async fn trash_duplicate_files(
         }
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(|e| e.to_string())?;
+    if let Ok(ref r) = res {
+        failed_trash.record_summary(r);
+    }
+    res
 }
 
 #[tauri::command]
@@ -1976,30 +2066,6 @@ async fn execute_elevated_action(
     tauri::async_runtime::spawn_blocking(move || {
         freemydisk_core::system_maintenance::ElevatedClient::execute_action(&operation, &payload)
             .map_err(|e| e.to_string())
-    })
-    .await
-    .map_err(|e| e.to_string())?
-}
-
-#[tauri::command]
-async fn secure_shred_path(path: String, passes: Option<u32>) -> Result<u64, String> {
-    tauri::async_runtime::spawn_blocking(move || {
-        let p = std::path::PathBuf::from(&path);
-        let opts = passes.map(|p_cnt| freemydisk_core::cleanup::shredder::ShredOptions {
-            passes: p_cnt,
-            ..Default::default()
-        });
-
-        if p.is_dir() {
-            let cancel = freemydisk_core::shared::progress::CancellationToken::new();
-            let (freed, _) =
-                freemydisk_core::cleanup::shredder::secure_shred_directory(&p, opts, &cancel)
-                    .map_err(|e| e.to_string())?;
-            Ok(freed)
-        } else {
-            freemydisk_core::cleanup::shredder::secure_shred_file(&p, opts)
-                .map_err(|e| e.to_string())
-        }
     })
     .await
     .map_err(|e| e.to_string())?
@@ -2383,6 +2449,7 @@ pub fn run() {
             Ok(())
         })
         .manage(ScanCancellationState::default())
+        .manage(FailedTrashRegistry::default())
         .invoke_handler(tauri::generate_handler![
             trim_process_memory,
             get_power_state,
@@ -2464,7 +2531,6 @@ pub fn run() {
             clean_conda_cache,
             is_elevated_process,
             execute_elevated_action,
-            secure_shred_path,
             remediate_interrupted_session,
             force_terminate_uninstaller,
             track_uninstaller_watchdog,
