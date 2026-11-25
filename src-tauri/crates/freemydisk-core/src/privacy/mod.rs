@@ -1,4 +1,4 @@
-use freemydisk_platform::{get_platform, PlatformFilesystem, PlatformPrivacy, RawBrowserProfile};
+use freemydisk_platform::{get_platform, PlatformPrivacy, RawBrowserProfile};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
@@ -39,25 +39,17 @@ pub struct PrivacyScanResult {
 
 pub struct PrivacyService {
     platform: Box<dyn PlatformPrivacy>,
-    fs_platform: Box<dyn PlatformFilesystem>,
 }
 
 impl PrivacyService {
     pub fn new() -> Self {
         Self {
             platform: Box::new(get_platform()),
-            fs_platform: Box::new(get_platform()),
         }
     }
 
-    pub fn with_platform(
-        platform: Box<dyn PlatformPrivacy>,
-        fs_platform: Box<dyn PlatformFilesystem>,
-    ) -> Self {
-        Self {
-            platform,
-            fs_platform,
-        }
+    pub fn with_platform(platform: Box<dyn PlatformPrivacy>) -> Self {
+        Self { platform }
     }
 
     pub fn scan_privacy_items(&self) -> Result<PrivacyScanResult, String> {
@@ -241,17 +233,23 @@ impl PrivacyService {
                     continue;
                 }
 
-                let (size, _) = calculate_path_metrics(path);
-                // Trash-First invariant
-                if self.fs_platform.trash_path(path).is_ok() {
-                    total_reclaimed += size;
-                } else if item.category == PrivacyCategoryKind::Cache {
-                    // For rebuildable cache folders and files, fall back to tolerant removal
-                    let cancel = crate::shared::progress::CancellationToken::new();
-                    let (freed, _) =
-                        crate::cleanup::disposal::execute_tolerant_permanent_delete(path, &cancel);
-                    total_reclaimed += if freed > 0 { freed } else { size };
+                // Privacy data is deleted, not moved to the Recycle Bin: the user asked
+                // for it to be gone, and a Recycle Bin copy would stay recoverable.
+                if let Err(e) =
+                    crate::cleanup::protected_paths::ProtectedPathRegistry::assert_safe_for_disposal(
+                        path,
+                    )
+                {
+                    log::warn!("Skipping protected privacy path {}: {}", path.display(), e);
+                    continue;
                 }
+                let cancel = crate::shared::progress::CancellationToken::new();
+                let (freed, err) =
+                    crate::cleanup::disposal::execute_tolerant_permanent_delete(path, &cancel);
+                if let Some(e) = err {
+                    log::warn!("Privacy item not fully removed {}: {}", path.display(), e);
+                }
+                total_reclaimed += freed;
             }
         }
 

@@ -1,9 +1,5 @@
 use freemydisk_core::privacy::{PrivacyCategoryKind, PrivacyService};
-use freemydisk_platform::{
-    FileIdentity, PlatformError, PlatformFilesystem, PlatformPrivacy, RawBrowserProfile,
-    StorageVolumeInfo,
-};
-use std::path::{Path, PathBuf};
+use freemydisk_platform::{PlatformError, PlatformPrivacy, RawBrowserProfile};
 use std::sync::{Arc, Mutex};
 
 struct MockPrivacyPlatform {
@@ -19,41 +15,6 @@ impl PlatformPrivacy for MockPrivacyPlatform {
     fn clean_system_activity_traces(&self) -> Result<u64, PlatformError> {
         *self.cleaned_activity_called.lock().unwrap() = true;
         Ok(1024 * 1024)
-    }
-}
-
-struct MockFsPlatform {
-    trashed: Arc<Mutex<Vec<PathBuf>>>,
-}
-
-impl PlatformFilesystem for MockFsPlatform {
-    fn trash_path(&self, path: &Path) -> Result<(), PlatformError> {
-        self.trashed.lock().unwrap().push(path.to_path_buf());
-        Ok(())
-    }
-
-    fn is_cloud_placeholder(&self, _path: &Path) -> Result<bool, PlatformError> {
-        Ok(false)
-    }
-
-    fn get_file_identity(&self, _path: &Path) -> Result<FileIdentity, PlatformError> {
-        Ok(FileIdentity {
-            device_id: 1,
-            file_index: 1,
-            link_count: 1,
-            is_reparse_or_symlink: false,
-        })
-    }
-
-    fn acquire_cross_process_lock(
-        &self,
-        _lock_path: &Path,
-    ) -> Result<Box<dyn std::any::Any + Send + Sync>, PlatformError> {
-        Ok(Box::new(()))
-    }
-
-    fn list_volumes(&self) -> Result<Vec<StorageVolumeInfo>, PlatformError> {
-        Ok(Vec::new())
     }
 }
 
@@ -77,17 +38,12 @@ fn test_privacy_scanning_and_cleaning() {
     }];
 
     let cleaned_activity = Arc::new(Mutex::new(false));
-    let trashed_paths = Arc::new(Mutex::new(Vec::new()));
 
     let priv_platform = Box::new(MockPrivacyPlatform {
         profiles: mock_profiles,
         cleaned_activity_called: Arc::clone(&cleaned_activity),
     });
-    let fs_platform = Box::new(MockFsPlatform {
-        trashed: Arc::clone(&trashed_paths),
-    });
-
-    let service = PrivacyService::with_platform(priv_platform, fs_platform);
+    let service = PrivacyService::with_platform(priv_platform);
     let scan_res = service
         .scan_privacy_items()
         .expect("Scan privacy items should succeed");
@@ -116,7 +72,8 @@ fn test_privacy_scanning_and_cleaning() {
 
     assert!(reclaimed > 0);
     assert!(*cleaned_activity.lock().unwrap());
-    assert!(!trashed_paths.lock().unwrap().is_empty());
+    // Privacy data is deleted outright, not left recoverable in the Recycle Bin.
+    assert!(!cache_dir.join("data_0").exists());
 }
 
 #[test]
@@ -191,11 +148,7 @@ fn test_firefox_places_bookmark_preservation() {
         profiles: mock_profiles,
         cleaned_activity_called: Arc::new(Mutex::new(false)),
     });
-    let fs_platform = Box::new(MockFsPlatform {
-        trashed: Arc::new(Mutex::new(Vec::new())),
-    });
-
-    let service = PrivacyService::with_platform(priv_platform, fs_platform);
+    let service = PrivacyService::with_platform(priv_platform);
     let scan = service.scan_privacy_items().unwrap();
     let history_item = scan
         .items
