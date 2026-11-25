@@ -370,26 +370,8 @@ impl AiModelAnalyzer {
             return;
         }
 
-        // Check project sessions
-        let projects_dir = claude_dir.join("projects");
-        if projects_dir.exists() {
-            let size = Self::calculate_dir_size(&projects_dir);
-            if size > 1_000_000 {
-                // Only flag if > 1MB
-                results.push(AiModelInfo {
-                    id: "claudecode:projects".to_string(),
-                    name: "Claude Code Project Session Histories".to_string(),
-                    provider: "claudecode".to_string(),
-                    path: projects_dir.to_string_lossy().to_string(),
-                    size_bytes: size,
-                    modified_at: None,
-                    description: Some(
-                        "Cached subagent transcripts and project execution state".to_string(),
-                    ),
-                    is_directory: true,
-                });
-            }
-        }
+        // `.claude/projects` is not reported: it holds conversation history and
+        // per-project memory, which is user data rather than cache.
 
         // Check telemetry/cache
         let cache_dir = claude_dir.join("cache");
