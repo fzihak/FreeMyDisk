@@ -5,11 +5,11 @@ use freemydisk_core::cleanup::cleaners::{
 };
 use freemydisk_core::cleanup::disposal::{DisposalEngine, DisposalItemResult, DisposalSummary};
 use freemydisk_core::cleanup::plan::CleanupPlan;
-use freemydisk_core::cleanup::rule_engine::{RuleEngine, RuleScanCandidate, RuleScanSummary};
+use freemydisk_core::cleanup::rule_engine::{RuleEngine, RuleScanSummary};
 use freemydisk_core::filesystem::journal::{CrashRecoveryJournal, JournalRecord};
 use freemydisk_core::optimization::{OptimizationOverview, OptimizationService};
 use freemydisk_core::privacy::{PrivacyScanResult, PrivacyService};
-use freemydisk_core::shared::progress::{AppScanProgress, CancellationToken};
+use freemydisk_core::shared::progress::AppScanProgress;
 use freemydisk_core::startup::{StartupItem, StartupService};
 use freemydisk_core::storage::analyzer::{StorageAnalyzer, StorageTreeNode};
 use freemydisk_core::storage::duplicates::{
@@ -30,7 +30,7 @@ use tauri::{AppHandle, Emitter, Manager, State};
 mod services;
 mod state;
 use services::application_icon::{ApplicationIcon, ApplicationIconService};
-use state::{JournalState, OperationGuard, OperationRegistry, PANIC_JOURNAL};
+use state::{JournalState, OperationGuard, OperationRegistry, RuleScanCache, PANIC_JOURNAL};
 
 /// Trims the physical memory working set for both FreeMyDisk and any child processes
 /// (such as WebView2 renderer/GPU processes), purging inactive pages back to Windows.
@@ -637,6 +637,7 @@ fn detect_locking_process(
 async fn scan_cleanup_rules(app: AppHandle) -> Result<Vec<RuleScanSummary>, String> {
     let operation = begin_operation(&app, "cleanup");
     let cancel = operation.token();
+    let scan_cache = app.state::<RuleScanCache>().inner().clone();
     let app_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
     let app_emitter = app.clone();
     tauri::async_runtime::spawn_blocking(move || {
@@ -686,6 +687,7 @@ async fn scan_cleanup_rules(app: AppHandle) -> Result<Vec<RuleScanSummary>, Stri
                             candidates: Vec::new(),
                             is_locked_by_process: false,
                             locking_process_name: None,
+                            all_candidates: Vec::new(),
                         },
                     );
                 }
@@ -704,6 +706,13 @@ async fn scan_cleanup_rules(app: AppHandle) -> Result<Vec<RuleScanSummary>, Stri
                 }
             }
         }
+
+        scan_cache.replace(
+            summaries
+                .iter_mut()
+                .map(|s| (s.rule_id.clone(), std::mem::take(&mut s.all_candidates)))
+                .collect(),
+        );
 
         let total_bytes: u64 = summaries.iter().map(|s| s.total_bytes).sum();
         let _ = app_emitter.emit(
@@ -783,48 +792,6 @@ async fn close_all_locking_processes(
     .map_err(|e| e.to_string())?
 }
 
-#[tauri::command]
-async fn execute_cleanup_plan(
-    app: AppHandle,
-    candidates: Vec<RuleScanCandidate>,
-    always_trash: bool,
-) -> Result<DisposalSummary, String> {
-    let journal = get_journal(&app)?;
-    let failed_trash = app.state::<FailedTrashRegistry>().inner().clone();
-    let lock_dir = get_lock_dir(&app)?;
-    let res = tauri::async_runtime::spawn_blocking(move || {
-        let _bg_guard = freemydisk_platform::io_priority::BackgroundExecutionGuard::enter();
-        let platform = get_platform();
-        let cancel = CancellationToken::new();
-        let plan = CleanupPlan::from_candidates(candidates);
-        let res = DisposalEngine::execute_plan(
-            &plan.items,
-            &platform,
-            &journal,
-            &lock_dir,
-            always_trash,
-            &cancel,
-        )
-        .map_err(|e| e.to_string());
-
-        if let Ok(ref s) = res {
-            if s.total_freed_bytes >= 5 * 1024 * 1024 * 1024 {
-                freemydisk_platform::storage_optim::trigger_background_trim_if_ssd('C');
-            }
-            let _ = platform.refresh_shell();
-        }
-
-        trim_process_working_set();
-        res
-    })
-    .await
-    .map_err(|e| e.to_string())?;
-    if let Ok(ref r) = res {
-        failed_trash.record_summary(r);
-    }
-    res
-}
-
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct CleanupPlanInput {
@@ -852,8 +819,10 @@ async fn execute_cleanup_rules(
 ) -> Result<DisposalSummary, String> {
     let operation = begin_operation(&app, "disposal");
     let cancel = operation.token();
-    let journal = get_journal(&app)?;
     let failed_trash = app.state::<FailedTrashRegistry>().inner().clone();
+    let scan_cache = app.state::<RuleScanCache>().inner().clone();
+    let journal = get_journal(&app)?;
+
     let effective_rule_ids = if let Some(ids) = rule_ids.or(ruleIds) {
         ids
     } else if let Some(p) = &plan {
@@ -861,6 +830,9 @@ async fn execute_cleanup_rules(
     } else {
         Vec::new()
     };
+    if effective_rule_ids.is_empty() {
+        return Err("Select at least one cleanup rule.".to_string());
+    }
 
     let effective_always_trash = if let Some(at) = always_trash.or(alwaysTrash) {
         at
@@ -883,54 +855,58 @@ async fn execute_cleanup_rules(
             .and_then(|p| p.close_locking_apps)
             .unwrap_or(true);
 
-    let app_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    // Dispose of exactly what the last scan found. Anything created since, or never
+    // shown to the user, is left alone.
+    let candidates = if is_dry_run {
+        scan_cache.peek(&effective_rule_ids)
+    } else {
+        scan_cache.take(&effective_rule_ids).map_err(|missing| {
+            format!(
+                "Scan again before cleaning: {} selected rule(s) have no current scan results.",
+                missing.len()
+            )
+        })?
+    };
+    let empty_recycle_bin = effective_rule_ids
+        .iter()
+        .any(|id| id == "windows_recycle_bin");
+
     let lock_dir = get_lock_dir(&app)?;
     let res = tauri::async_runtime::spawn_blocking(move || {
         let _bg_guard = freemydisk_platform::io_priority::BackgroundExecutionGuard::enter();
         let platform = get_platform();
 
-        // If dry_run simulation, do not modify files, do not close apps, do not empty recycle bin
         if is_dry_run {
-            let custom_rules_dir = app_dir.join("custom_rules");
-            let mut engine = RuleEngine::new();
-            let _ = engine.load_custom_rules_from_dir(&custom_rules_dir);
-            let candidates = engine
-                .scan_all_candidates(&effective_rule_ids, &cancel)
-                .map_err(|e| e.to_string())?;
-
-            let mut total_bytes = 0u64;
-            let mut results = Vec::new();
-
-            #[cfg(target_os = "windows")]
-            if effective_rule_ids
+            let mut results: Vec<DisposalItemResult> = candidates
                 .iter()
-                .any(|id| id == "windows_recycle_bin")
-            {
-                use freemydisk_platform::windows::maintenance::WindowsSystemMaintenanceHandler;
-                if let Ok((bin_bytes, _)) = WindowsSystemMaintenanceHandler::query_recycle_bin() {
-                    total_bytes += bin_bytes;
-                    results.push(DisposalItemResult {
-                        path: PathBuf::from(r"C:\$Recycle.Bin"),
-                        success: true,
-                        bytes_freed: bin_bytes,
-                        route_used: "dry_run".to_string(),
-                        error: None,
-                    });
-                }
-            }
-
-            for c in &candidates {
-                total_bytes += c.size_bytes;
-                results.push(DisposalItemResult {
+                .map(|c| DisposalItemResult {
                     path: c.path.clone(),
                     success: true,
                     bytes_freed: c.size_bytes,
                     route_used: "dry_run".to_string(),
                     error: None,
-                });
+                })
+                .collect();
+
+            #[cfg(target_os = "windows")]
+            if empty_recycle_bin {
+                use freemydisk_platform::windows::maintenance::WindowsSystemMaintenanceHandler;
+                if let Ok((bin_bytes, _)) = WindowsSystemMaintenanceHandler::query_recycle_bin() {
+                    results.insert(
+                        0,
+                        DisposalItemResult {
+                            path: recycle_bin_path(),
+                            success: true,
+                            bytes_freed: bin_bytes,
+                            route_used: "dry_run".to_string(),
+                            error: None,
+                        },
+                    );
+                }
             }
 
             let total_items = results.len();
+            let total_bytes = results.iter().map(|r| r.bytes_freed).sum();
             trim_process_working_set();
             return Ok(DisposalSummary {
                 session_id: "dry-run-simulation".to_string(),
@@ -943,40 +919,33 @@ async fn execute_cleanup_rules(
             });
         }
 
-        // 1. Optionally close locking applications before deleting their caches
         if should_close_apps {
             let mut closed_any = false;
             if let Ok(procs) = platform.list_running_processes() {
                 let proc_set: std::collections::HashSet<String> =
-                    procs.into_iter().map(|p| p.name.to_lowercase()).collect();
+                    procs.iter().map(|p| p.name.to_lowercase()).collect();
                 for r_id in &effective_rule_ids {
                     if let Some(p_name) = detect_locking_process(r_id, &proc_set) {
-                        if let Ok(live_procs) = platform.list_running_processes() {
-                            for p in live_procs {
-                                if p.name.eq_ignore_ascii_case(&p_name)
-                                    && platform.terminate_process(p.pid).is_ok()
-                                {
-                                    closed_any = true;
-                                }
+                        for p in procs
+                            .iter()
+                            .filter(|p| p.name.eq_ignore_ascii_case(&p_name))
+                        {
+                            if platform.terminate_process(p.pid).is_ok() {
+                                closed_any = true;
                             }
                         }
                     }
                 }
             }
             if closed_any {
-                // Brief pause so Windows OS flushes and releases all locks on memory-mapped cache databases
+                // Give Windows a moment to release locks on memory-mapped cache files.
                 std::thread::sleep(std::time::Duration::from_millis(300));
             }
         }
 
-        // 2. Special handler for Windows Recycle Bin if requested
-        let mut recycle_bin_freed = 0u64;
-        let mut recycle_bin_success = false;
+        let mut recycle_bin_result = None;
         #[cfg(target_os = "windows")]
-        if effective_rule_ids
-            .iter()
-            .any(|id| id == "windows_recycle_bin")
-        {
+        if empty_recycle_bin {
             use freemydisk_platform::windows::maintenance::WindowsSystemMaintenanceHandler;
             let initial = WindowsSystemMaintenanceHandler::query_recycle_bin()
                 .map(|(b, _)| b)
@@ -992,17 +961,15 @@ async fn execute_cleanup_rules(
                 .map(|(b, _)| b)
                 .unwrap_or(0);
             let freed = initial.saturating_sub(after);
-            recycle_bin_freed = if freed > 0 { freed } else { initial };
-            recycle_bin_success = true;
+            recycle_bin_result = Some(DisposalItemResult {
+                path: recycle_bin_path(),
+                success: true,
+                bytes_freed: if freed > 0 { freed } else { initial },
+                route_used: "permanent".to_string(),
+                error: None,
+            });
         }
 
-        // 3. Scan and execute filesystem rule candidates
-        let custom_rules_dir = app_dir.join("custom_rules");
-        let mut engine = RuleEngine::new();
-        let _ = engine.load_custom_rules_from_dir(&custom_rules_dir);
-        let candidates = engine
-            .scan_all_candidates(&effective_rule_ids, &cancel)
-            .map_err(|e| e.to_string())?;
         let plan = CleanupPlan::from_candidates(candidates);
         let app_emit_cb = app.clone();
         let mut summary = DisposalEngine::execute_plan_with_progress(
@@ -1030,21 +997,15 @@ async fn execute_cleanup_rules(
         )
         .map_err(|e| e.to_string())?;
 
-        // 4. Merge Recycle Bin results if emptied
-        if recycle_bin_success {
-            summary.total_freed_bytes += recycle_bin_freed;
-            summary.successful_items += 1;
+        if let Some(result) = recycle_bin_result {
+            summary.total_freed_bytes += result.bytes_freed;
             summary.total_requested_items += 1;
-            summary.results.insert(
-                0,
-                DisposalItemResult {
-                    path: PathBuf::from(r"C:\$Recycle.Bin"),
-                    success: true,
-                    bytes_freed: recycle_bin_freed,
-                    route_used: "permanent".to_string(),
-                    error: None,
-                },
-            );
+            if result.success {
+                summary.successful_items += 1;
+            } else {
+                summary.failed_items += 1;
+            }
+            summary.results.insert(0, result);
         }
 
         if summary.total_freed_bytes >= 5 * 1024 * 1024 * 1024 {
@@ -1074,6 +1035,11 @@ async fn execute_cleanup_rules(
         failed_trash.record_summary(r);
     }
     res
+}
+
+fn recycle_bin_path() -> PathBuf {
+    let drive = std::env::var("SystemDrive").unwrap_or_else(|_| "C:".to_string());
+    PathBuf::from(format!(r"{}\$Recycle.Bin", drive.trim_end_matches('\\')))
 }
 
 #[tauri::command]
@@ -2502,6 +2468,7 @@ pub fn run() {
             Ok(())
         })
         .manage(OperationRegistry::default())
+        .manage(RuleScanCache::default())
         .manage(FailedTrashRegistry::default())
         .manage(LeftoverScanRegistry::default())
         .invoke_handler(tauri::generate_handler![
@@ -2515,7 +2482,6 @@ pub fn run() {
             list_pending_reboot_deletions,
             cancel_pending_reboot_deletion,
             scan_cleanup_rules,
-            execute_cleanup_plan,
             execute_cleanup_rules,
             retry_failed_trash,
             force_delete_permanently,

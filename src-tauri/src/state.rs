@@ -1,5 +1,6 @@
 //! Process-wide state shared by IPC commands.
 
+use freemydisk_core::cleanup::rule_engine::RuleScanCandidate;
 use freemydisk_core::filesystem::journal::CrashRecoveryJournal;
 use freemydisk_core::shared::progress::CancellationToken;
 use std::collections::HashMap;
@@ -76,6 +77,46 @@ impl Drop for OperationGuard {
     }
 }
 
+/// Items found by the last cleanup scan, per rule. Cleanup only disposes of
+/// these, so files created after the scan, or never shown to the user, are left alone.
+#[derive(Default, Clone)]
+pub struct RuleScanCache(Arc<Mutex<HashMap<String, Vec<RuleScanCandidate>>>>);
+
+impl RuleScanCache {
+    pub fn replace(&self, entries: HashMap<String, Vec<RuleScanCandidate>>) {
+        *lock(&self.0) = entries;
+    }
+
+    /// Takes the cached candidates for `rule_ids`. Returns the ids that have no
+    /// cached scan as the error.
+    pub fn take(&self, rule_ids: &[String]) -> Result<Vec<RuleScanCandidate>, Vec<String>> {
+        let mut cache = lock(&self.0);
+        let missing: Vec<String> = rule_ids
+            .iter()
+            .filter(|id| !cache.contains_key(id.as_str()))
+            .cloned()
+            .collect();
+        if !missing.is_empty() {
+            return Err(missing);
+        }
+        Ok(rule_ids
+            .iter()
+            .filter_map(|id| cache.remove(id))
+            .flatten()
+            .collect())
+    }
+
+    pub fn peek(&self, rule_ids: &[String]) -> Vec<RuleScanCandidate> {
+        let cache = lock(&self.0);
+        rule_ids
+            .iter()
+            .filter_map(|id| cache.get(id))
+            .flatten()
+            .cloned()
+            .collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -99,5 +140,20 @@ mod tests {
         assert_eq!(ops.active_count(), 1);
         assert_eq!(ops.cancel(Some("storage")), 1);
         assert!(second.token().is_cancelled());
+    }
+
+    #[test]
+    fn scan_cache_refuses_rules_without_a_current_scan() {
+        let cache = RuleScanCache::default();
+        cache.replace(HashMap::from([("chrome".to_string(), Vec::new())]));
+        assert_eq!(
+            cache.take(&["chrome".to_string(), "edge".to_string()]),
+            Err(vec!["edge".to_string()])
+        );
+        assert!(cache.take(&["chrome".to_string()]).is_ok());
+        assert!(
+            cache.take(&["chrome".to_string()]).is_err(),
+            "results are used once"
+        );
     }
 }

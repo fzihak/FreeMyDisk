@@ -38,6 +38,10 @@ pub struct RuleScanSummary {
     pub is_locked_by_process: bool,
     #[serde(default)]
     pub locking_process_name: Option<String>,
+    /// Every matched item, not capped like `candidates`. Kept on the Rust side so a
+    /// cleanup acts on exactly what was scanned; never sent to the webview.
+    #[serde(skip)]
+    pub all_candidates: Vec<RuleScanCandidate>,
 }
 
 pub struct RuleEngine {
@@ -281,10 +285,12 @@ impl RuleEngine {
                 candidates: Vec::new(),
                 is_locked_by_process: false,
                 locking_process_name: None,
+                all_candidates: Vec::new(),
             });
         }
 
         let mut candidates = Vec::new();
+        let mut all_candidates = Vec::new();
         let mut total_bytes = 0u64;
         let mut total_items = 0usize;
         // Preview is capped to avoid excessive memory use.
@@ -373,20 +379,22 @@ impl RuleEngine {
                             total_bytes += size;
                             total_items += count.max(1);
 
+                            let candidate = RuleScanCandidate {
+                                path: path.to_path_buf(),
+                                size_bytes: size,
+                                is_dir,
+                                rule_id: rule.rule.id.clone(),
+                                rule_name: rule.rule.name.clone(),
+                                category: rule.rule.category.clone(),
+                                risk: rule.rule.risk.clone(),
+                                verified_rebuildable: rule.rule.verified_rebuildable,
+                                default_action: rule.disposal.default_action.clone(),
+                                protect_subpaths: rule.disposal.protect_subpaths.clone(),
+                            };
                             if candidates.len() < MAX_PREVIEW_CANDIDATES {
-                                candidates.push(RuleScanCandidate {
-                                    path: path.to_path_buf(),
-                                    size_bytes: size,
-                                    is_dir,
-                                    rule_id: rule.rule.id.clone(),
-                                    rule_name: rule.rule.name.clone(),
-                                    category: rule.rule.category.clone(),
-                                    risk: rule.rule.risk.clone(),
-                                    verified_rebuildable: rule.rule.verified_rebuildable,
-                                    default_action: rule.disposal.default_action.clone(),
-                                    protect_subpaths: rule.disposal.protect_subpaths.clone(),
-                                });
+                                candidates.push(candidate.clone());
                             }
+                            all_candidates.push(candidate);
                         }
                     }
                 }
@@ -404,20 +412,22 @@ impl RuleEngine {
                 total_bytes += size;
                 total_items += count.max(1);
 
+                let candidate = RuleScanCandidate {
+                    path: expanded,
+                    size_bytes: size,
+                    is_dir,
+                    rule_id: rule.rule.id.clone(),
+                    rule_name: rule.rule.name.clone(),
+                    category: rule.rule.category.clone(),
+                    risk: rule.rule.risk.clone(),
+                    verified_rebuildable: rule.rule.verified_rebuildable,
+                    default_action: rule.disposal.default_action.clone(),
+                    protect_subpaths: rule.disposal.protect_subpaths.clone(),
+                };
                 if candidates.len() < MAX_PREVIEW_CANDIDATES {
-                    candidates.push(RuleScanCandidate {
-                        path: expanded,
-                        size_bytes: size,
-                        is_dir,
-                        rule_id: rule.rule.id.clone(),
-                        rule_name: rule.rule.name.clone(),
-                        category: rule.rule.category.clone(),
-                        risk: rule.rule.risk.clone(),
-                        verified_rebuildable: rule.rule.verified_rebuildable,
-                        default_action: rule.disposal.default_action.clone(),
-                        protect_subpaths: rule.disposal.protect_subpaths.clone(),
-                    });
+                    candidates.push(candidate.clone());
                 }
+                all_candidates.push(candidate);
             }
         }
 
@@ -434,6 +444,7 @@ impl RuleEngine {
             candidates,
             is_locked_by_process: false,
             locking_process_name: None,
+            all_candidates,
         })
     }
 
