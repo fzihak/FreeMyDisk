@@ -692,33 +692,12 @@ fn compute_partial_hash(path: &Path, size: u64) -> Result<String, std::io::Error
     Ok(hasher.finalize().to_hex().to_string())
 }
 
+/// Streams the file through BLAKE3 with buffered reads. Memory-mapping is avoided:
+/// if another process truncates a mapped file, Windows raises an in-page error
+/// that would crash the app.
 fn compute_full_hash(path: &Path) -> Result<String, std::io::Error> {
     let file = File::open(path)?;
-    let metadata = file.metadata()?;
-    let len = metadata.len();
-
     let mut hasher = blake3::Hasher::new();
-
-    // Memory-mapped fast path for files between 64KB and 1GB:
-    // Hashes directly from OS page cache with zero kernel-to-user buffer copying
-    if (65536..=1_073_741_824).contains(&len) {
-        if let Ok(mmap) = unsafe { memmap2::Mmap::map(&file) } {
-            hasher.update(&mmap[..]);
-            return Ok(hasher.finalize().to_hex().to_string());
-        }
-    }
-
-    // High-throughput streaming fallback with 256KB buffer
-    let mut file = file;
-    let mut buffer = [0u8; 262144];
-
-    loop {
-        let bytes_read = file.read(&mut buffer)?;
-        if bytes_read == 0 {
-            break;
-        }
-        hasher.update(&buffer[..bytes_read]);
-    }
-
+    hasher.update_reader(std::io::BufReader::with_capacity(1 << 20, file))?;
     Ok(hasher.finalize().to_hex().to_string())
 }

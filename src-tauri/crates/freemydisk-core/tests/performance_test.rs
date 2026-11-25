@@ -53,28 +53,22 @@ fn test_usn_volume_index_graceful_fallback() {
 }
 
 #[test]
-fn test_memory_mapped_and_streaming_hash_consistency() {
+fn test_buffered_streaming_hash_matches_in_memory_hash() {
     let dir = tempdir().unwrap();
     let file_path = dir.path().join("test_hash_payload.bin");
 
-    // Create a 128 KB file (fits within the 64KB - 1GB memmap2 fast-path)
+    // Larger than the 1 MiB read buffer so the stream is read in several chunks.
     let mut file = File::create(&file_path).unwrap();
-    let payload = vec![0xABu8; 131072];
+    let payload: Vec<u8> = (0..3 * 1024 * 1024 + 17).map(|i| (i % 251) as u8).collect();
     file.write_all(&payload).unwrap();
     file.flush().unwrap();
     drop(file);
 
-    // Compute expected hash using blake3 directly
+    let expected_hash = blake3::hash(&payload).to_hex().to_string();
+
+    let reader = std::io::BufReader::with_capacity(1 << 20, File::open(&file_path).unwrap());
     let mut hasher = blake3::Hasher::new();
-    hasher.update(&payload);
-    let expected_hash = hasher.finalize().to_hex().to_string();
+    hasher.update_reader(reader).unwrap();
 
-    // Verify memmap2 hashing path on file
-    let file_read = File::open(&file_path).unwrap();
-    let mmap = unsafe { memmap2::Mmap::map(&file_read) }.unwrap();
-    let mut mmap_hasher = blake3::Hasher::new();
-    mmap_hasher.update(&mmap[..]);
-    let mmap_hash = mmap_hasher.finalize().to_hex().to_string();
-
-    assert_eq!(expected_hash, mmap_hash);
+    assert_eq!(expected_hash, hasher.finalize().to_hex().to_string());
 }
