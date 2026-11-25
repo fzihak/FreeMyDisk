@@ -98,3 +98,33 @@ fn test_volume_roots_and_profile_folders_cannot_be_disposed() {
         );
     }
 }
+
+#[cfg(target_os = "windows")]
+#[test]
+fn test_rule_approved_system_caches_are_disposable_but_their_folders_are_not() {
+    use std::path::PathBuf;
+
+    let win = PathBuf::from(std::env::var("SystemRoot").unwrap_or_else(|_| r"C:\Windows".into()));
+    let download = win.join(r"SoftwareDistribution\Download");
+
+    assert!(!ProtectedPathRegistry::is_protected(
+        &download.join("a1b2c3")
+    ));
+    assert!(!ProtectedPathRegistry::is_protected(
+        &win.join(r"System32\winevt\Logs\Archive-Application-2026.evtx")
+    ));
+    assert!(!ProtectedPathRegistry::is_protected(
+        &win.join("MEMORY.DMP")
+    ));
+
+    assert!(ProtectedPathRegistry::is_protected(&download));
+    assert!(ProtectedPathRegistry::is_protected(
+        &win.join(r"System32\winevt\Logs\Security.evtx")
+    ));
+    assert!(ProtectedPathRegistry::is_protected(
+        &win.join(r"SoftwareDistribution\DataStore")
+    ));
+    assert!(ProtectedPathRegistry::is_protected(
+        &download.join(r"..\..\System32")
+    ));
+}

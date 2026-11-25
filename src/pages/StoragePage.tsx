@@ -213,7 +213,10 @@ export const StoragePage: React.FC = () => {
 
   const handleCancelScan = async () => {
     try {
-      await invoke("cancel_active_scan");
+      await Promise.all([
+        invoke("cancel_active_scan", { kind: "storage" }),
+        invoke("cancel_active_scan", { kind: "heavy_folders" }),
+      ]);
     } catch (e) {
       console.error("Failed to cancel scan:", e);
     } finally {

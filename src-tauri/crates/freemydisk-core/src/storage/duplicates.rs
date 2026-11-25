@@ -1,6 +1,6 @@
 pub use super::folder_agg::{DuplicateFolderEntry, DuplicateFolderGroup, FolderAggregator};
 pub use super::hash_cache::{CachedHash, HashCache};
-use crate::cleanup::disposal::{DisposalEngine, DisposalSummary};
+use crate::cleanup::disposal::{DisposalEngine, DisposalItemResult, DisposalSummary};
 use crate::cleanup::plan::CleanupPlanItem;
 use crate::cleanup::protected_paths::ProtectedPathRegistry;
 use crate::filesystem::journal::CrashRecoveryJournal;
@@ -539,8 +539,11 @@ impl DuplicateDetector {
         }
     }
 
-    /// Safely moves all selected duplicates to the OS Trash.
-    /// Uses the standard DisposalEngine with default Trash action and zero permanent delete fallback.
+    /// Moves the selected copies of each group to the Recycle Bin.
+    ///
+    /// The groups come from the UI, so they are re-checked here: every group must
+    /// keep at least one existing copy, and each selected file is re-hashed and must
+    /// still match the kept copy. Files that fail either check are not touched.
     pub fn batch_trash_duplicates(
         groups: &[DuplicateGroup],
         platform: &dyn PlatformFilesystem,
@@ -549,33 +552,63 @@ impl DuplicateDetector {
         cancel: &CancellationToken,
     ) -> Result<DisposalSummary, CoreError> {
         let mut items = Vec::new();
+        let mut rejected = Vec::new();
 
         for group in groups {
-            for file in &group.files {
-                if file.selected {
-                    let canon = dunce::canonicalize(&file.path)
-                        .unwrap_or_else(|_| dunce::simplified(&file.path).to_path_buf());
+            let selected: Vec<&DuplicateFileEntry> =
+                group.files.iter().filter(|f| f.selected).collect();
+            if selected.is_empty() {
+                continue;
+            }
 
-                    items.push(CleanupPlanItem {
-                        original_path: file.path.clone(),
-                        canonical_path: canon,
-                        size_bytes: file.size_bytes,
-                        is_dir: false,
-                        matched_rules: vec!["duplicate_finder".to_string()],
-                        default_action: "trash".to_string(),
-                        verified_rebuildable: false,
-                        protect_subpaths: Vec::new(),
-                        risk: "safe".to_string(),
-                    });
+            let keeper = group.files.iter().find(|f| !f.selected && f.path.is_file());
+            let keeper_hash = keeper.and_then(|k| compute_full_hash(&k.path).ok());
+            let Some(keeper_hash) = keeper_hash else {
+                for file in &selected {
+                    rejected.push(reject(&file.path, "At least one copy must be kept"));
+                }
+                continue;
+            };
+
+            for file in selected {
+                if cancel.is_cancelled() {
+                    break;
+                }
+                match compute_full_hash(&file.path) {
+                    Ok(hash) if hash == keeper_hash => {
+                        let size = file
+                            .path
+                            .metadata()
+                            .map(|m| m.len())
+                            .unwrap_or(file.size_bytes);
+                        items.push(CleanupPlanItem {
+                            original_path: file.path.clone(),
+                            canonical_path: dunce::canonicalize(&file.path)
+                                .unwrap_or_else(|_| dunce::simplified(&file.path).to_path_buf()),
+                            size_bytes: size,
+                            is_dir: false,
+                            matched_rules: vec!["duplicate_finder".to_string()],
+                            default_action: "trash".to_string(),
+                            verified_rebuildable: false,
+                            protect_subpaths: Vec::new(),
+                            risk: "safe".to_string(),
+                        });
+                    }
+                    Ok(_) => rejected.push(reject(&file.path, "File changed since the scan")),
+                    Err(_) => rejected.push(reject(&file.path, "File could not be read")),
                 }
             }
         }
 
-        DisposalEngine::execute_plan(
+        let mut summary = DisposalEngine::execute_plan(
             &items, platform, journal, lock_dir,
             true, // Always Trash override for duplicate cleanup
             cancel,
-        )
+        )?;
+        summary.total_requested_items += rejected.len();
+        summary.failed_items += rejected.len();
+        summary.results.extend(rejected);
+        Ok(summary)
     }
 
     /// Safely moves all selected duplicate directories to the OS Trash.
@@ -613,6 +646,16 @@ impl DuplicateDetector {
             &items, platform, journal, lock_dir, true, // Always OS Recycle Bin
             cancel,
         )
+    }
+}
+
+fn reject(path: &Path, reason: &str) -> DisposalItemResult {
+    DisposalItemResult {
+        path: path.to_path_buf(),
+        success: false,
+        bytes_freed: 0,
+        route_used: "rejected".to_string(),
+        error: Some(reason.to_string()),
     }
 }
 

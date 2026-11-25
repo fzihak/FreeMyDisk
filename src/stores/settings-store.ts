@@ -1,90 +1,102 @@
 import { create } from "zustand";
 
-interface SettingsState {
+type Theme = "dark" | "night" | "light";
+
+interface PersistedSettings {
   autoCheckUpdates: boolean;
   alwaysTrashOverride: boolean;
   largeFileThresholdMb: number;
   confirmBeforeDelete: boolean;
-  theme: "dark" | "night" | "light";
+  theme: Theme;
+}
 
+interface SettingsState extends PersistedSettings {
   setAutoCheckUpdates: (val: boolean) => void;
   setAlwaysTrashOverride: (val: boolean) => void;
   setLargeFileThresholdMb: (val: number) => void;
   setConfirmBeforeDelete: (val: boolean) => void;
-  setTheme: (val: "dark" | "night" | "light") => void;
+  setTheme: (val: Theme) => void;
 }
 
-export const useSettingsStore = create<SettingsState>((set) => {
-  const savedSettings = localStorage.getItem("freemydisk_settings");
-  const parsed = savedSettings ? JSON.parse(savedSettings) : {};
-  const initialTheme: "dark" | "night" | "light" =
-    parsed.theme === "light" || parsed.theme === "night" || parsed.theme === "dark"
-      ? parsed.theme
-      : "dark";
+const STORAGE_KEY = "freemydisk_settings";
 
-  if (typeof document !== "undefined") {
-    document.documentElement.setAttribute("data-theme", initialTheme);
-    if (initialTheme === "light") {
-      document.documentElement.classList.remove("dark");
-    } else {
-      document.documentElement.classList.add("dark");
-    }
+const DEFAULTS: PersistedSettings = {
+  autoCheckUpdates: true,
+  alwaysTrashOverride: true,
+  largeFileThresholdMb: 500,
+  confirmBeforeDelete: true,
+  theme: "dark",
+};
+
+/** Reads saved settings, ignoring missing, corrupt or wrongly typed values. */
+function loadSettings(): PersistedSettings {
+  let saved: Record<string, unknown> = {};
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    const parsed: unknown = raw ? JSON.parse(raw) : {};
+    if (parsed && typeof parsed === "object") saved = parsed as Record<string, unknown>;
+  } catch {
+    saved = {};
   }
 
+  const bool = (key: keyof PersistedSettings) =>
+    typeof saved[key] === "boolean" ? (saved[key] as boolean) : (DEFAULTS[key] as boolean);
+
   return {
-    autoCheckUpdates: parsed.autoCheckUpdates ?? true,
-    alwaysTrashOverride: parsed.alwaysTrashOverride ?? true,
-    largeFileThresholdMb: parsed.largeFileThresholdMb ?? 500,
-    confirmBeforeDelete: parsed.confirmBeforeDelete ?? true,
-    theme: initialTheme,
+    autoCheckUpdates: bool("autoCheckUpdates"),
+    alwaysTrashOverride: bool("alwaysTrashOverride"),
+    confirmBeforeDelete: bool("confirmBeforeDelete"),
+    largeFileThresholdMb:
+      typeof saved.largeFileThresholdMb === "number" && saved.largeFileThresholdMb > 0
+        ? saved.largeFileThresholdMb
+        : DEFAULTS.largeFileThresholdMb,
+    theme:
+      saved.theme === "light" || saved.theme === "night" || saved.theme === "dark"
+        ? saved.theme
+        : DEFAULTS.theme,
+  };
+}
 
-    setAutoCheckUpdates: (val: boolean) => {
-      set({ autoCheckUpdates: val });
-      localStorage.setItem(
-        "freemydisk_settings",
-        JSON.stringify({ ...parsed, autoCheckUpdates: val })
-      );
-    },
+function applyTheme(theme: Theme) {
+  if (typeof document === "undefined") return;
+  document.documentElement.setAttribute("data-theme", theme);
+  document.documentElement.classList.toggle("dark", theme !== "light");
+}
 
-    setAlwaysTrashOverride: (val: boolean) => {
-      set({ alwaysTrashOverride: val });
-      localStorage.setItem(
-        "freemydisk_settings",
-        JSON.stringify({ ...parsed, alwaysTrashOverride: val })
-      );
-    },
+export const useSettingsStore = create<SettingsState>((set, get) => {
+  const initial = loadSettings();
+  applyTheme(initial.theme);
 
-    setLargeFileThresholdMb: (val: number) => {
-      set({ largeFileThresholdMb: val });
+  /** Applies a change and saves the full current settings, so earlier changes are kept. */
+  const update = (patch: Partial<PersistedSettings>) => {
+    set(patch);
+    const { autoCheckUpdates, alwaysTrashOverride, largeFileThresholdMb, confirmBeforeDelete, theme } =
+      get();
+    try {
       localStorage.setItem(
-        "freemydisk_settings",
-        JSON.stringify({ ...parsed, largeFileThresholdMb: val })
+        STORAGE_KEY,
+        JSON.stringify({
+          autoCheckUpdates,
+          alwaysTrashOverride,
+          largeFileThresholdMb,
+          confirmBeforeDelete,
+          theme,
+        })
       );
-    },
+    } catch {
+      // Storage can be unavailable (quota, private mode); the in-memory value still applies.
+    }
+  };
 
-    setConfirmBeforeDelete: (val: boolean) => {
-      set({ confirmBeforeDelete: val });
-      localStorage.setItem(
-        "freemydisk_settings",
-        JSON.stringify({ ...parsed, confirmBeforeDelete: val })
-      );
-    },
-
-    setTheme: (val: "dark" | "night" | "light") => {
-      set({ theme: val });
-      if (typeof document !== "undefined") {
-        document.documentElement.setAttribute("data-theme", val);
-        if (val === "light") {
-          document.documentElement.classList.remove("dark");
-        } else {
-          document.documentElement.classList.add("dark");
-        }
-      }
-      localStorage.setItem(
-        "freemydisk_settings",
-        JSON.stringify({ ...parsed, theme: val })
-      );
+  return {
+    ...initial,
+    setAutoCheckUpdates: (val) => update({ autoCheckUpdates: val }),
+    setAlwaysTrashOverride: (val) => update({ alwaysTrashOverride: val }),
+    setLargeFileThresholdMb: (val) => update({ largeFileThresholdMb: val }),
+    setConfirmBeforeDelete: (val) => update({ confirmBeforeDelete: val }),
+    setTheme: (val) => {
+      applyTheme(val);
+      update({ theme: val });
     },
   };
 });
-

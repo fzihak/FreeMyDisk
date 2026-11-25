@@ -247,6 +247,7 @@ export const bn: TranslationSchema = {
     "autoSelectRules": "অটো সিলেক্ট নিয়ম",
     "selectAllDuplicates": "সকল ডুপ্লিকেট কপি নির্বাচন করুন",
     "keepNewest": "নতুনটি রাখুন",
+    "keepOneCopy": "প্রতিটি ফাইলের অন্তত একটি কপি রাখুন।",
     "keepOldest": "পুরোনোটি রাখুন",
     "keepShortestPath": "ছোট পাথের ফাইলটি রাখুন",
     "trashSelected": "নির্বাচিতগুলো রিসাইকেল বিনে পাঠান",

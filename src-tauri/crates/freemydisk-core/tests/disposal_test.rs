@@ -241,3 +241,81 @@ fn test_extra_safe_override_forces_trash_route() {
         "Always Trash override did not force trash route!"
     );
 }
+
+#[test]
+fn test_protected_entries_inside_a_matched_folder_are_kept() {
+    let temp = tempdir().unwrap();
+    let profile = temp.path().join("Default");
+    fs::create_dir_all(profile.join("Cache")).unwrap();
+    fs::write(profile.join("Cache").join("f_001"), b"cache").unwrap();
+    fs::write(profile.join("Cookies"), b"session cookies").unwrap();
+
+    let journal = CrashRecoveryJournal::open(&temp.path().join("journal.db")).unwrap();
+    let lock_dir = temp.path().join("locks");
+    let platform = MockDisposalPlatform::new(false);
+    let cancel = CancellationToken::new();
+
+    let plan_item = CleanupPlanItem {
+        original_path: profile.clone(),
+        canonical_path: profile.clone(),
+        size_bytes: 20,
+        is_dir: true,
+        matched_rules: vec!["browser_rule".to_string()],
+        default_action: "trash".to_string(),
+        verified_rebuildable: true,
+        protect_subpaths: vec!["*/Cookies*".to_string()],
+        risk: "safe".to_string(),
+    };
+
+    DisposalEngine::execute_plan(&[plan_item], &platform, &journal, &lock_dir, true, &cancel)
+        .unwrap();
+
+    assert!(
+        profile.join("Cookies").exists(),
+        "Protected file was removed"
+    );
+    assert!(
+        !profile.join("Cache").exists(),
+        "Unprotected sibling was kept"
+    );
+}
+
+#[test]
+fn test_permanent_route_goes_through_staging_and_leaves_nothing_behind() {
+    let temp = tempdir().unwrap();
+    let cache_dir = temp.path().join("shader_cache");
+    fs::create_dir_all(cache_dir.join("sub")).unwrap();
+    fs::write(cache_dir.join("sub").join("blob.bin"), vec![1u8; 64]).unwrap();
+
+    let journal = CrashRecoveryJournal::open(&temp.path().join("journal.db")).unwrap();
+    let lock_dir = temp.path().join("locks");
+    let platform = MockDisposalPlatform::new(true);
+    let cancel = CancellationToken::new();
+
+    let plan_item = CleanupPlanItem {
+        original_path: cache_dir.clone(),
+        canonical_path: cache_dir.clone(),
+        size_bytes: 64,
+        is_dir: true,
+        matched_rules: vec!["shader_rule".to_string()],
+        default_action: "permanent".to_string(),
+        verified_rebuildable: true,
+        protect_subpaths: Vec::new(),
+        risk: "safe".to_string(),
+    };
+
+    let summary =
+        DisposalEngine::execute_plan(&[plan_item], &platform, &journal, &lock_dir, false, &cancel)
+            .unwrap();
+
+    assert_eq!(summary.successful_items, 1);
+    assert_eq!(summary.results[0].route_used, "permanent");
+    assert!(!cache_dir.exists());
+    let leftovers: Vec<_> = fs::read_dir(temp.path())
+        .unwrap()
+        .flatten()
+        .filter(|e| e.file_name().to_string_lossy().starts_with(".fmd-staging-"))
+        .collect();
+    assert!(leftovers.is_empty(), "Staging folder was left behind");
+    assert!(journal.list_in_flight().unwrap().is_empty());
+}

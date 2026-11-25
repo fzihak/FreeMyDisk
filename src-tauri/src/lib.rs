@@ -1,15 +1,17 @@
-use freemydisk_core::applications::{ApplicationLeftover, ApplicationService, InstalledAppInfo};
+use freemydisk_core::applications::{
+    ApplicationLeftover, ApplicationService, InstalledAppInfo, ProcessController,
+};
 use freemydisk_core::cleanup::cleaners::{
     AiModelAnalyzer, AiModelInfo, CondaCacheInfo, CondaCleaner, RustToolchainCleaner,
     RustToolchainScanResult,
 };
 use freemydisk_core::cleanup::disposal::{DisposalEngine, DisposalItemResult, DisposalSummary};
 use freemydisk_core::cleanup::plan::CleanupPlan;
-use freemydisk_core::cleanup::rule_engine::{RuleEngine, RuleScanCandidate, RuleScanSummary};
+use freemydisk_core::cleanup::rule_engine::{RuleEngine, RuleScanSummary};
 use freemydisk_core::filesystem::journal::{CrashRecoveryJournal, JournalRecord};
 use freemydisk_core::optimization::{OptimizationOverview, OptimizationService};
 use freemydisk_core::privacy::{PrivacyScanResult, PrivacyService};
-use freemydisk_core::shared::progress::{AppScanProgress, CancellationToken};
+use freemydisk_core::shared::progress::AppScanProgress;
 use freemydisk_core::startup::{StartupItem, StartupService};
 use freemydisk_core::storage::analyzer::{StorageAnalyzer, StorageTreeNode};
 use freemydisk_core::storage::duplicates::{
@@ -28,7 +30,9 @@ use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter, Manager, State};
 
 mod services;
+mod state;
 use services::application_icon::{ApplicationIcon, ApplicationIconService};
+use state::{JournalState, OperationGuard, OperationRegistry, RuleScanCache, PANIC_JOURNAL};
 
 /// Trims the physical memory working set for both FreeMyDisk and any child processes
 /// (such as WebView2 renderer/GPU processes), purging inactive pages back to Windows.
@@ -148,9 +152,6 @@ async fn docker_prune(prune_type: String) -> Result<u64, String> {
     .map_err(|e| e.to_string())?
 }
 
-#[derive(Default, Clone)]
-pub struct ScanCancellationState(pub Arc<Mutex<Option<CancellationToken>>>);
-
 /// Leftover paths and registry keys returned by leftover scans in this session.
 /// Cleanup only accepts these, so the webview cannot ask for arbitrary deletions.
 #[derive(Default, Clone)]
@@ -231,9 +232,11 @@ pub struct RecoveryStatus {
 }
 
 fn get_journal(app: &AppHandle) -> Result<CrashRecoveryJournal, String> {
-    let app_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
-    let journal_path = app_dir.join("journal.db");
-    CrashRecoveryJournal::open(&journal_path).map_err(|e| e.to_string())
+    app.state::<JournalState>().0.clone()
+}
+
+fn begin_operation(app: &AppHandle, kind: &str) -> OperationGuard {
+    app.state::<OperationRegistry>().begin(kind)
 }
 
 fn get_lock_dir(app: &AppHandle) -> Result<PathBuf, String> {
@@ -266,10 +269,8 @@ async fn get_cleanup_history(
     app: AppHandle,
     limit: Option<usize>,
 ) -> Result<Vec<JournalRecord>, String> {
-    let app_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let journal = get_journal(&app)?;
     tauri::async_runtime::spawn_blocking(move || {
-        let journal_path = app_dir.join("journal.db");
-        let journal = CrashRecoveryJournal::open(&journal_path).map_err(|e| e.to_string())?;
         journal
             .list_recent_history(limit.unwrap_or(100))
             .map_err(|e| e.to_string())
@@ -280,14 +281,10 @@ async fn get_cleanup_history(
 
 #[tauri::command]
 async fn clear_cleanup_history(app: AppHandle) -> Result<usize, String> {
-    let app_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
-    tauri::async_runtime::spawn_blocking(move || {
-        let journal_path = app_dir.join("journal.db");
-        let journal = CrashRecoveryJournal::open(&journal_path).map_err(|e| e.to_string())?;
-        journal.clear_history().map_err(|e| e.to_string())
-    })
-    .await
-    .map_err(|e| e.to_string())?
+    let journal = get_journal(&app)?;
+    tauri::async_runtime::spawn_blocking(move || journal.clear_history().map_err(|e| e.to_string()))
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
@@ -325,10 +322,8 @@ fn check_disk_space_guard(target_path: String, required_bytes: u64) -> Result<()
 async fn remediate_interrupted_session(
     app: AppHandle,
 ) -> Result<Vec<freemydisk_core::filesystem::journal::RemediationResult>, String> {
-    let app_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let journal = get_journal(&app)?;
     tauri::async_runtime::spawn_blocking(move || {
-        let journal_path = app_dir.join("journal.db");
-        let journal = CrashRecoveryJournal::open(&journal_path).map_err(|e| e.to_string())?;
         journal
             .remediate_staged_crashes()
             .map_err(|e| e.to_string())
@@ -642,6 +637,9 @@ fn detect_locking_process(
 
 #[tauri::command]
 async fn scan_cleanup_rules(app: AppHandle) -> Result<Vec<RuleScanSummary>, String> {
+    let operation = begin_operation(&app, "cleanup");
+    let cancel = operation.token();
+    let scan_cache = app.state::<RuleScanCache>().inner().clone();
     let app_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
     let app_emitter = app.clone();
     tauri::async_runtime::spawn_blocking(move || {
@@ -649,7 +647,6 @@ async fn scan_cleanup_rules(app: AppHandle) -> Result<Vec<RuleScanSummary>, Stri
         let mut engine = RuleEngine::new();
         let custom_rules_dir = app_dir.join("custom_rules");
         let _ = engine.load_custom_rules_from_dir(&custom_rules_dir);
-        let cancel = CancellationToken::new();
 
         let app_emit_cb = app_emitter.clone();
         let mut summaries = engine
@@ -686,12 +683,15 @@ async fn scan_cleanup_rules(app: AppHandle) -> Result<Vec<RuleScanSummary>, Stri
                             risk: "safe".to_string(),
                             verified_rebuildable: true,
                             default_action: "permanent".to_string(),
-                            default_selected: true,
+                            // Emptying the Recycle Bin destroys files the user deleted
+                            // earlier, so it is never selected automatically.
+                            default_selected: false,
                             total_bytes: bin_bytes,
                             total_items: bin_count as usize,
                             candidates: Vec::new(),
                             is_locked_by_process: false,
                             locking_process_name: None,
+                            all_candidates: Vec::new(),
                         },
                     );
                 }
@@ -710,6 +710,13 @@ async fn scan_cleanup_rules(app: AppHandle) -> Result<Vec<RuleScanSummary>, Stri
                 }
             }
         }
+
+        scan_cache.replace(
+            summaries
+                .iter_mut()
+                .map(|s| (s.rule_id.clone(), std::mem::take(&mut s.all_candidates)))
+                .collect(),
+        );
 
         let total_bytes: u64 = summaries.iter().map(|s| s.total_bytes).sum();
         let _ = app_emitter.emit(
@@ -747,7 +754,9 @@ async fn close_locking_process(
             let target = name.to_lowercase();
             let mut closed_any = false;
             for p in procs {
-                if p.name.to_lowercase() == target && platform.terminate_process(p.pid).is_ok() {
+                if p.name.to_lowercase() == target
+                    && ProcessController::graceful_terminate(p.pid, &p.name).unwrap_or(false)
+                {
                     closed_any = true;
                 }
             }
@@ -775,7 +784,7 @@ async fn close_all_locking_processes(
             let mut closed_count = 0;
             for p in procs {
                 if target_set.contains(&p.name.to_lowercase())
-                    && platform.terminate_process(p.pid).is_ok()
+                    && ProcessController::graceful_terminate(p.pid, &p.name).unwrap_or(false)
                 {
                     closed_count += 1;
                 }
@@ -787,50 +796,6 @@ async fn close_all_locking_processes(
     })
     .await
     .map_err(|e| e.to_string())?
-}
-
-#[tauri::command]
-async fn execute_cleanup_plan(
-    app: AppHandle,
-    candidates: Vec<RuleScanCandidate>,
-    always_trash: bool,
-) -> Result<DisposalSummary, String> {
-    let failed_trash = app.state::<FailedTrashRegistry>().inner().clone();
-    let app_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
-    let lock_dir = get_lock_dir(&app)?;
-    let res = tauri::async_runtime::spawn_blocking(move || {
-        let _bg_guard = freemydisk_platform::io_priority::BackgroundExecutionGuard::enter();
-        let journal_path = app_dir.join("journal.db");
-        let journal = CrashRecoveryJournal::open(&journal_path).map_err(|e| e.to_string())?;
-        let platform = get_platform();
-        let cancel = CancellationToken::new();
-        let plan = CleanupPlan::from_candidates(candidates);
-        let res = DisposalEngine::execute_plan(
-            &plan.items,
-            &platform,
-            &journal,
-            &lock_dir,
-            always_trash,
-            &cancel,
-        )
-        .map_err(|e| e.to_string());
-
-        if let Ok(ref s) = res {
-            if s.total_freed_bytes >= 5 * 1024 * 1024 * 1024 {
-                freemydisk_platform::storage_optim::trigger_background_trim_if_ssd('C');
-            }
-            let _ = platform.refresh_shell();
-        }
-
-        trim_process_working_set();
-        res
-    })
-    .await
-    .map_err(|e| e.to_string())?;
-    if let Ok(ref r) = res {
-        failed_trash.record_summary(r);
-    }
-    res
 }
 
 #[derive(Debug, Deserialize)]
@@ -858,7 +823,12 @@ async fn execute_cleanup_rules(
     alwaysTrash: Option<bool>,
     plan: Option<CleanupPlanInput>,
 ) -> Result<DisposalSummary, String> {
+    let operation = begin_operation(&app, "disposal");
+    let cancel = operation.token();
     let failed_trash = app.state::<FailedTrashRegistry>().inner().clone();
+    let scan_cache = app.state::<RuleScanCache>().inner().clone();
+    let journal = get_journal(&app)?;
+
     let effective_rule_ids = if let Some(ids) = rule_ids.or(ruleIds) {
         ids
     } else if let Some(p) = &plan {
@@ -866,6 +836,9 @@ async fn execute_cleanup_rules(
     } else {
         Vec::new()
     };
+    if effective_rule_ids.is_empty() {
+        return Err("Select at least one cleanup rule.".to_string());
+    }
 
     let effective_always_trash = if let Some(at) = always_trash.or(alwaysTrash) {
         at
@@ -882,63 +855,65 @@ async fn execute_cleanup_rules(
     };
 
     let is_dry_run = plan.as_ref().and_then(|p| p.dry_run).unwrap_or(false);
+    // Closing other apps can lose their unsaved work, so it only happens on request.
     let should_close_apps = !is_dry_run
         && plan
             .as_ref()
             .and_then(|p| p.close_locking_apps)
-            .unwrap_or(true);
+            .unwrap_or(false);
 
-    let app_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    // Dispose of exactly what the last scan found. Anything created since, or never
+    // shown to the user, is left alone.
+    let candidates = if is_dry_run {
+        scan_cache.peek(&effective_rule_ids)
+    } else {
+        scan_cache.take(&effective_rule_ids).map_err(|missing| {
+            format!(
+                "Scan again before cleaning: {} selected rule(s) have no current scan results.",
+                missing.len()
+            )
+        })?
+    };
+    let empty_recycle_bin = effective_rule_ids
+        .iter()
+        .any(|id| id == "windows_recycle_bin");
+
     let lock_dir = get_lock_dir(&app)?;
     let res = tauri::async_runtime::spawn_blocking(move || {
         let _bg_guard = freemydisk_platform::io_priority::BackgroundExecutionGuard::enter();
-        let journal_path = app_dir.join("journal.db");
-        let journal = CrashRecoveryJournal::open(&journal_path).map_err(|e| e.to_string())?;
         let platform = get_platform();
-        let cancel = CancellationToken::new();
 
-        // If dry_run simulation, do not modify files, do not close apps, do not empty recycle bin
         if is_dry_run {
-            let custom_rules_dir = app_dir.join("custom_rules");
-            let mut engine = RuleEngine::new();
-            let _ = engine.load_custom_rules_from_dir(&custom_rules_dir);
-            let candidates = engine
-                .scan_all_candidates(&effective_rule_ids, &cancel)
-                .map_err(|e| e.to_string())?;
-
-            let mut total_bytes = 0u64;
-            let mut results = Vec::new();
-
-            #[cfg(target_os = "windows")]
-            if effective_rule_ids
+            let mut results: Vec<DisposalItemResult> = candidates
                 .iter()
-                .any(|id| id == "windows_recycle_bin")
-            {
-                use freemydisk_platform::windows::maintenance::WindowsSystemMaintenanceHandler;
-                if let Ok((bin_bytes, _)) = WindowsSystemMaintenanceHandler::query_recycle_bin() {
-                    total_bytes += bin_bytes;
-                    results.push(DisposalItemResult {
-                        path: PathBuf::from(r"C:\$Recycle.Bin"),
-                        success: true,
-                        bytes_freed: bin_bytes,
-                        route_used: "dry_run".to_string(),
-                        error: None,
-                    });
-                }
-            }
-
-            for c in &candidates {
-                total_bytes += c.size_bytes;
-                results.push(DisposalItemResult {
+                .map(|c| DisposalItemResult {
                     path: c.path.clone(),
                     success: true,
                     bytes_freed: c.size_bytes,
                     route_used: "dry_run".to_string(),
                     error: None,
-                });
+                })
+                .collect();
+
+            #[cfg(target_os = "windows")]
+            if empty_recycle_bin {
+                use freemydisk_platform::windows::maintenance::WindowsSystemMaintenanceHandler;
+                if let Ok((bin_bytes, _)) = WindowsSystemMaintenanceHandler::query_recycle_bin() {
+                    results.insert(
+                        0,
+                        DisposalItemResult {
+                            path: recycle_bin_path(),
+                            success: true,
+                            bytes_freed: bin_bytes,
+                            route_used: "dry_run".to_string(),
+                            error: None,
+                        },
+                    );
+                }
             }
 
             let total_items = results.len();
+            let total_bytes = results.iter().map(|r| r.bytes_freed).sum();
             trim_process_working_set();
             return Ok(DisposalSummary {
                 session_id: "dry-run-simulation".to_string(),
@@ -951,66 +926,38 @@ async fn execute_cleanup_rules(
             });
         }
 
-        // 1. Optionally close locking applications before deleting their caches
         if should_close_apps {
             let mut closed_any = false;
             if let Ok(procs) = platform.list_running_processes() {
                 let proc_set: std::collections::HashSet<String> =
-                    procs.into_iter().map(|p| p.name.to_lowercase()).collect();
+                    procs.iter().map(|p| p.name.to_lowercase()).collect();
                 for r_id in &effective_rule_ids {
                     if let Some(p_name) = detect_locking_process(r_id, &proc_set) {
-                        if let Ok(live_procs) = platform.list_running_processes() {
-                            for p in live_procs {
-                                if p.name.eq_ignore_ascii_case(&p_name)
-                                    && platform.terminate_process(p.pid).is_ok()
-                                {
-                                    closed_any = true;
-                                }
+                        for p in procs
+                            .iter()
+                            .filter(|p| p.name.eq_ignore_ascii_case(&p_name))
+                        {
+                            if ProcessController::graceful_terminate(p.pid, &p.name)
+                                .unwrap_or(false)
+                            {
+                                closed_any = true;
                             }
                         }
                     }
                 }
             }
             if closed_any {
-                // Brief pause so Windows OS flushes and releases all locks on memory-mapped cache databases
+                // Give Windows a moment to release locks on memory-mapped cache files.
                 std::thread::sleep(std::time::Duration::from_millis(300));
             }
         }
 
-        // 2. Special handler for Windows Recycle Bin if requested
-        let mut recycle_bin_freed = 0u64;
-        let mut recycle_bin_success = false;
-        #[cfg(target_os = "windows")]
-        if effective_rule_ids
-            .iter()
-            .any(|id| id == "windows_recycle_bin")
-        {
-            use freemydisk_platform::windows::maintenance::WindowsSystemMaintenanceHandler;
-            let initial = WindowsSystemMaintenanceHandler::query_recycle_bin()
-                .map(|(b, _)| b)
-                .unwrap_or(0);
-            unsafe {
-                use windows_sys::Win32::UI::Shell::{
-                    SHEmptyRecycleBinW, SHERB_NOCONFIRMATION, SHERB_NOPROGRESSUI, SHERB_NOSOUND,
-                };
-                let flags = SHERB_NOCONFIRMATION | SHERB_NOPROGRESSUI | SHERB_NOSOUND;
-                let _ = SHEmptyRecycleBinW(std::ptr::null_mut(), std::ptr::null(), flags);
-            }
-            let after = WindowsSystemMaintenanceHandler::query_recycle_bin()
-                .map(|(b, _)| b)
-                .unwrap_or(0);
-            let freed = initial.saturating_sub(after);
-            recycle_bin_freed = if freed > 0 { freed } else { initial };
-            recycle_bin_success = true;
-        }
+        let recycle_bin_result = if empty_recycle_bin {
+            empty_recycle_bin_journaled(&journal)
+        } else {
+            None
+        };
 
-        // 3. Scan and execute filesystem rule candidates
-        let custom_rules_dir = app_dir.join("custom_rules");
-        let mut engine = RuleEngine::new();
-        let _ = engine.load_custom_rules_from_dir(&custom_rules_dir);
-        let candidates = engine
-            .scan_all_candidates(&effective_rule_ids, &cancel)
-            .map_err(|e| e.to_string())?;
         let plan = CleanupPlan::from_candidates(candidates);
         let app_emit_cb = app.clone();
         let mut summary = DisposalEngine::execute_plan_with_progress(
@@ -1038,21 +985,15 @@ async fn execute_cleanup_rules(
         )
         .map_err(|e| e.to_string())?;
 
-        // 4. Merge Recycle Bin results if emptied
-        if recycle_bin_success {
-            summary.total_freed_bytes += recycle_bin_freed;
-            summary.successful_items += 1;
+        if let Some(result) = recycle_bin_result {
+            summary.total_freed_bytes += result.bytes_freed;
             summary.total_requested_items += 1;
-            summary.results.insert(
-                0,
-                DisposalItemResult {
-                    path: PathBuf::from(r"C:\$Recycle.Bin"),
-                    success: true,
-                    bytes_freed: recycle_bin_freed,
-                    route_used: "permanent".to_string(),
-                    error: None,
-                },
-            );
+            if result.success {
+                summary.successful_items += 1;
+            } else {
+                summary.failed_items += 1;
+            }
+            summary.results.insert(0, result);
         }
 
         if summary.total_freed_bytes >= 5 * 1024 * 1024 * 1024 {
@@ -1084,16 +1025,68 @@ async fn execute_cleanup_rules(
     res
 }
 
+fn recycle_bin_path() -> PathBuf {
+    let drive = std::env::var("SystemDrive").unwrap_or_else(|_| "C:".to_string());
+    PathBuf::from(format!(r"{}\$Recycle.Bin", drive.trim_end_matches('\\')))
+}
+
+/// Empties the Recycle Bin, records it in the journal and reports only the bytes
+/// that actually left the bin.
+#[cfg(target_os = "windows")]
+fn empty_recycle_bin_journaled(journal: &CrashRecoveryJournal) -> Option<DisposalItemResult> {
+    use freemydisk_platform::windows::maintenance::WindowsSystemMaintenanceHandler;
+    use windows_sys::Win32::UI::Shell::{
+        SHEmptyRecycleBinW, SHERB_NOCONFIRMATION, SHERB_NOPROGRESSUI, SHERB_NOSOUND,
+    };
+
+    let path = recycle_bin_path();
+    let session_id = format!("recycle-bin-{}", uuid::Uuid::new_v4());
+    let journal_id = journal
+        .write_intent(&session_id, &path, None, "empty_recycle_bin")
+        .ok();
+
+    let before = WindowsSystemMaintenanceHandler::query_recycle_bin()
+        .map(|(b, _)| b)
+        .unwrap_or(0);
+    let flags = SHERB_NOCONFIRMATION | SHERB_NOPROGRESSUI | SHERB_NOSOUND;
+    let hresult = unsafe { SHEmptyRecycleBinW(std::ptr::null_mut(), std::ptr::null(), flags) };
+    let after = WindowsSystemMaintenanceHandler::query_recycle_bin()
+        .map(|(b, _)| b)
+        .unwrap_or(before);
+    let freed = before.saturating_sub(after);
+    let success = hresult >= 0;
+
+    if let Some(id) = journal_id {
+        let _ = if success {
+            journal.mark_completed(id)
+        } else {
+            journal.mark_failed(id, &format!("hresult_0x{:08X}", hresult as u32))
+        };
+    }
+
+    Some(DisposalItemResult {
+        path,
+        success,
+        bytes_freed: freed,
+        route_used: "permanent".to_string(),
+        error: (!success).then(|| "The Recycle Bin could not be emptied.".to_string()),
+    })
+}
+
+#[cfg(not(target_os = "windows"))]
+fn empty_recycle_bin_journaled(_journal: &CrashRecoveryJournal) -> Option<DisposalItemResult> {
+    None
+}
+
 #[tauri::command]
 async fn retry_failed_trash(app: AppHandle, path: String) -> Result<DisposalItemResult, String> {
+    let operation = begin_operation(&app, "disposal");
+    let cancel = operation.token();
+    let journal = get_journal(&app)?;
     let failed_trash = app.state::<FailedTrashRegistry>().inner().clone();
-    let app_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
     let lock_dir = get_lock_dir(&app)?;
     let res = tauri::async_runtime::spawn_blocking(move || {
-        let journal_path = app_dir.join("journal.db");
-        let journal = CrashRecoveryJournal::open(&journal_path).map_err(|e| e.to_string())?;
         let platform = get_platform();
-        let cancel = CancellationToken::new();
 
         let pb = PathBuf::from(&path);
         let size = pb.metadata().map(|m| m.len()).unwrap_or(0);
@@ -1134,6 +1127,8 @@ async fn force_delete_permanently(
     app: AppHandle,
     path: String,
 ) -> Result<DisposalItemResult, String> {
+    let _operation = begin_operation(&app, "disposal");
+    let journal = get_journal(&app)?;
     let failed_trash = app.state::<FailedTrashRegistry>().inner().clone();
     let pb = PathBuf::from(path);
     if !failed_trash.contains(&pb) {
@@ -1143,11 +1138,8 @@ async fn force_delete_permanently(
         );
     }
 
-    let app_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
     let lock_dir = get_lock_dir(&app)?;
     let res = tauri::async_runtime::spawn_blocking(move || {
-        let journal_path = app_dir.join("journal.db");
-        let journal = CrashRecoveryJournal::open(&journal_path).map_err(|e| e.to_string())?;
         let platform = get_platform();
 
         DisposalEngine::execute_manual_permanent_delete(&pb, &journal, &platform, &lock_dir)
@@ -1168,14 +1160,8 @@ fn get_storage_volumes() -> Result<Vec<StorageVolumeInfo>, String> {
 }
 
 #[tauri::command]
-fn cancel_active_scan(cancel_state: State<'_, ScanCancellationState>) -> bool {
-    let mut guard = cancel_state.0.lock().unwrap();
-    if let Some(token) = guard.take() {
-        token.cancel();
-        true
-    } else {
-        false
-    }
+fn cancel_active_scan(ops: State<'_, OperationRegistry>, kind: Option<String>) -> bool {
+    ops.cancel(kind.as_deref()) > 0
 }
 
 #[tauri::command]
@@ -1189,17 +1175,14 @@ async fn get_application_icons(paths: Vec<String>) -> Result<Vec<ApplicationIcon
 #[allow(non_snake_case)]
 async fn scan_storage_tree(
     app: AppHandle,
-    cancel_state: State<'_, ScanCancellationState>,
+    ops: State<'_, OperationRegistry>,
     path: String,
     max_depth: Option<usize>,
     maxDepth: Option<usize>,
 ) -> Result<StorageTreeNode, String> {
     let effective_depth = max_depth.or(maxDepth).unwrap_or(3);
-    let cancel = CancellationToken::new();
-    {
-        let mut guard = cancel_state.0.lock().unwrap();
-        *guard = Some(cancel.clone());
-    }
+    let operation = ops.begin("storage");
+    let cancel = operation.token();
     let cancel_for_task = cancel.clone();
 
     let _ = app.emit(
@@ -1225,11 +1208,6 @@ async fn scan_storage_tree(
     .await
     .map_err(|e| e.to_string())?;
 
-    {
-        let mut guard = cancel_state.0.lock().unwrap();
-        *guard = None;
-    }
-
     if let Ok(ref tree) = res {
         let _ = app.emit(
             "scan-progress",
@@ -1253,12 +1231,12 @@ async fn scan_storage_tree(
 #[allow(non_snake_case)]
 async fn scan_directory_storage(
     app: AppHandle,
-    cancel_state: State<'_, ScanCancellationState>,
+    ops: State<'_, OperationRegistry>,
     path: String,
     max_depth: Option<usize>,
     maxDepth: Option<usize>,
 ) -> Result<StorageTreeNode, String> {
-    scan_storage_tree(app, cancel_state, path, max_depth, maxDepth).await
+    scan_storage_tree(app, ops, path, max_depth, maxDepth).await
 }
 
 #[tauri::command]
@@ -1274,7 +1252,7 @@ fn export_storage_scan(tree: StorageTreeNode, format: String) -> Result<String, 
 #[allow(non_snake_case)]
 async fn scan_heavy_folders(
     app: AppHandle,
-    cancel_state: State<'_, ScanCancellationState>,
+    ops: State<'_, OperationRegistry>,
     root: String,
     min_size_bytes: Option<u64>,
     minSizeBytes: Option<u64>,
@@ -1282,11 +1260,8 @@ async fn scan_heavy_folders(
     let effective_min = min_size_bytes
         .or(minSizeBytes)
         .unwrap_or(1024 * 1024 * 1024);
-    let cancel = CancellationToken::new();
-    {
-        let mut guard = cancel_state.0.lock().unwrap();
-        *guard = Some(cancel.clone());
-    }
+    let operation = ops.begin("heavy_folders");
+    let cancel = operation.token();
     let cancel_for_task = cancel.clone();
     let app_emitter = app.clone();
     let res = tauri::async_runtime::spawn_blocking(move || {
@@ -1318,11 +1293,6 @@ async fn scan_heavy_folders(
     .await
     .map_err(|e| e.to_string())?;
 
-    {
-        let mut guard = cancel_state.0.lock().unwrap();
-        *guard = None;
-    }
-
     if let Ok(ref result) = res {
         let _ = app.emit(
             "scan-progress",
@@ -1346,7 +1316,7 @@ async fn scan_heavy_folders(
 #[allow(non_snake_case, clippy::too_many_arguments)]
 async fn scan_large_files(
     app: AppHandle,
-    cancel_state: State<'_, ScanCancellationState>,
+    ops: State<'_, OperationRegistry>,
     roots: Option<Vec<String>>,
     root: Option<String>,
     root_path: Option<String>,
@@ -1365,11 +1335,8 @@ async fn scan_large_files(
     }
 
     let effective_min = min_size_bytes.or(minSizeBytes).unwrap_or(100 * 1024 * 1024);
-    let cancel = CancellationToken::new();
-    {
-        let mut guard = cancel_state.0.lock().unwrap();
-        *guard = Some(cancel.clone());
-    }
+    let operation = ops.begin("large_files");
+    let cancel = operation.token();
     let cancel_for_task = cancel.clone();
     let app_emitter = app.clone();
     let res = tauri::async_runtime::spawn_blocking(move || {
@@ -1400,11 +1367,6 @@ async fn scan_large_files(
     .await
     .map_err(|e| e.to_string())?;
 
-    {
-        let mut guard = cancel_state.0.lock().unwrap();
-        *guard = None;
-    }
-
     if let Ok(ref result) = res {
         let _ = app.emit(
             "scan-progress",
@@ -1426,12 +1388,11 @@ async fn scan_large_files(
 
 #[tauri::command]
 async fn trash_large_file(app: AppHandle, path: String) -> Result<DisposalItemResult, String> {
+    let _operation = begin_operation(&app, "disposal");
+    let journal = get_journal(&app)?;
     let failed_trash = app.state::<FailedTrashRegistry>().inner().clone();
-    let app_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
     let lock_dir = get_lock_dir(&app)?;
     let res = tauri::async_runtime::spawn_blocking(move || {
-        let journal_path = app_dir.join("journal.db");
-        let journal = CrashRecoveryJournal::open(&journal_path).map_err(|e| e.to_string())?;
         let platform = get_platform();
         let pb = PathBuf::from(path);
         LargeFilesScanner::trash_large_file(&pb, &platform, &journal, &lock_dir)
@@ -1453,13 +1414,12 @@ async fn trash_large_files(
     file_paths: Option<Vec<String>>,
     filePaths: Option<Vec<String>>,
 ) -> Result<DisposalSummary, String> {
+    let _operation = begin_operation(&app, "disposal");
+    let journal = get_journal(&app)?;
     let failed_trash = app.state::<FailedTrashRegistry>().inner().clone();
     let effective_paths = paths.or(file_paths).or(filePaths).unwrap_or_default();
-    let app_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
     let lock_dir = get_lock_dir(&app)?;
     let res = tauri::async_runtime::spawn_blocking(move || {
-        let journal_path = app_dir.join("journal.db");
-        let journal = CrashRecoveryJournal::open(&journal_path).map_err(|e| e.to_string())?;
         let platform = get_platform();
         let pbs: Vec<PathBuf> = effective_paths.into_iter().map(PathBuf::from).collect();
         let app_clone = app.clone();
@@ -1502,7 +1462,7 @@ async fn trash_large_files(
 #[allow(non_snake_case, clippy::too_many_arguments)]
 async fn scan_duplicate_files(
     app: AppHandle,
-    cancel_state: State<'_, ScanCancellationState>,
+    ops: State<'_, OperationRegistry>,
     roots: Option<Vec<String>>,
     root: Option<String>,
     root_path: Option<String>,
@@ -1522,11 +1482,8 @@ async fn scan_duplicate_files(
 
     let app_data = app.path().app_data_dir().ok();
     let effective_min = min_size_bytes.or(minSizeBytes).unwrap_or(1024 * 1024);
-    let cancel = CancellationToken::new();
-    {
-        let mut guard = cancel_state.0.lock().unwrap();
-        *guard = Some(cancel.clone());
-    }
+    let operation = ops.begin("duplicates");
+    let cancel = operation.token();
     let cancel_for_task = cancel.clone();
     let app_emitter = app.clone();
     let res = tauri::async_runtime::spawn_blocking(move || {
@@ -1563,11 +1520,6 @@ async fn scan_duplicate_files(
     .await
     .map_err(|e| e.to_string())?;
 
-    {
-        let mut guard = cancel_state.0.lock().unwrap();
-        *guard = None;
-    }
-
     if let Ok(ref result) = res {
         let _ = app.emit(
             "scan-progress",
@@ -1595,15 +1547,14 @@ async fn trash_duplicate_folders(
     folder_paths: Option<Vec<String>>,
     folderPaths: Option<Vec<String>>,
 ) -> Result<DisposalSummary, String> {
+    let operation = begin_operation(&app, "disposal");
+    let cancel = operation.token();
+    let journal = get_journal(&app)?;
     let failed_trash = app.state::<FailedTrashRegistry>().inner().clone();
     let effective_paths = paths.or(folder_paths).or(folderPaths).unwrap_or_default();
-    let app_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
     let lock_dir = get_lock_dir(&app)?;
     let res = tauri::async_runtime::spawn_blocking(move || {
-        let journal_path = app_dir.join("journal.db");
-        let journal = CrashRecoveryJournal::open(&journal_path).map_err(|e| e.to_string())?;
         let platform = get_platform();
-        let cancel = CancellationToken::new();
 
         let pbs: Vec<PathBuf> = effective_paths.into_iter().map(PathBuf::from).collect();
         DuplicateDetector::batch_trash_duplicate_folders(
@@ -1623,7 +1574,7 @@ async fn trash_duplicate_folders(
 #[allow(non_snake_case)]
 async fn scan_project_artifacts(
     app: AppHandle,
-    cancel_state: State<'_, ScanCancellationState>,
+    ops: State<'_, OperationRegistry>,
     roots: Option<Vec<String>>,
     min_size_bytes: Option<u64>,
     minSizeBytes: Option<u64>,
@@ -1635,11 +1586,8 @@ async fn scan_project_artifacts(
         .map(PathBuf::from)
         .collect();
 
-    let cancel = CancellationToken::new();
-    {
-        let mut guard = cancel_state.0.lock().unwrap();
-        *guard = Some(cancel.clone());
-    }
+    let operation = ops.begin("projects");
+    let cancel = operation.token();
     let cancel_for_task = cancel.clone();
 
     let _ = app.emit(
@@ -1665,11 +1613,6 @@ async fn scan_project_artifacts(
     })
     .await
     .map_err(|e| e.to_string())?;
-
-    {
-        let mut guard = cancel_state.0.lock().unwrap();
-        *guard = None;
-    }
 
     if let Ok(ref result) = res {
         let _ = app.emit(
@@ -1697,16 +1640,15 @@ async fn clean_project_artifacts(
     artifact_paths: Option<Vec<String>>,
     artifactPaths: Option<Vec<String>>,
 ) -> Result<DisposalSummary, String> {
+    let operation = begin_operation(&app, "disposal");
+    let cancel = operation.token();
+    let journal = get_journal(&app)?;
     let failed_trash = app.state::<FailedTrashRegistry>().inner().clone();
     let paths = artifact_paths.or(artifactPaths).unwrap_or_default();
-    let app_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
     let lock_dir = get_lock_dir(&app)?;
 
     let res = tauri::async_runtime::spawn_blocking(move || {
-        let journal_path = app_dir.join("journal.db");
-        let journal = CrashRecoveryJournal::open(&journal_path).map_err(|e| e.to_string())?;
         let platform = get_platform();
-        let cancel = CancellationToken::new();
 
         let path_bufs: Vec<PathBuf> = paths.into_iter().map(PathBuf::from).collect();
         freemydisk_core::cleanup::project_artifacts::ProjectArtifactScanner::clean_artifacts(
@@ -1723,91 +1665,19 @@ async fn clean_project_artifacts(
 }
 
 #[tauri::command]
-#[allow(non_snake_case)]
 async fn trash_duplicate_files(
     app: AppHandle,
-    paths: Option<Vec<String>>,
-    file_paths: Option<Vec<String>>,
-    filePaths: Option<Vec<String>>,
-    groups: Option<Vec<DuplicateGroup>>,
+    groups: Vec<DuplicateGroup>,
 ) -> Result<DisposalSummary, String> {
+    let operation = begin_operation(&app, "disposal");
+    let cancel = operation.token();
+    let journal = get_journal(&app)?;
     let failed_trash = app.state::<FailedTrashRegistry>().inner().clone();
-    let effective_paths = paths.or(file_paths).or(filePaths);
-    let app_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
     let lock_dir = get_lock_dir(&app)?;
     let res = tauri::async_runtime::spawn_blocking(move || {
-        let journal_path = app_dir.join("journal.db");
-        let journal = CrashRecoveryJournal::open(&journal_path).map_err(|e| e.to_string())?;
         let platform = get_platform();
-        let cancel = CancellationToken::new();
-
-        if let Some(p_list) = effective_paths {
-            let items: Vec<freemydisk_core::cleanup::plan::CleanupPlanItem> = p_list
-                .into_iter()
-                .map(|p| {
-                    let pb = PathBuf::from(&p);
-                    let size = pb.metadata().map(|m| m.len()).unwrap_or(0);
-                    let canon = dunce::canonicalize(&pb)
-                        .unwrap_or_else(|_| dunce::simplified(&pb).to_path_buf());
-                    freemydisk_core::cleanup::plan::CleanupPlanItem {
-                        original_path: pb,
-                        canonical_path: canon,
-                        size_bytes: size,
-                        is_dir: false,
-                        matched_rules: vec!["duplicate_finder".to_string()],
-                        default_action: "trash".to_string(),
-                        verified_rebuildable: false,
-                        protect_subpaths: Vec::new(),
-                        risk: "safe".to_string(),
-                    }
-                })
-                .collect();
-
-            let app_clone = app.clone();
-            DisposalEngine::execute_plan_with_progress(
-                &items,
-                &platform,
-                &journal,
-                &lock_dir,
-                true,
-                &cancel,
-                move |idx, total, path, freed| {
-                    let pct = if total > 0 {
-                        ((idx as f32 / total as f32) * 100.0) as u8
-                    } else {
-                        100
-                    };
-                    let _ = app_clone.emit(
-                        "scan-progress",
-                        AppScanProgress {
-                            scan_type: "disposal".to_string(),
-                            stage: format!("Recycling duplicate files ({}/{})", idx, total),
-                            percent: pct.min(100),
-                            items_scanned: idx as u64,
-                            current_path: path.to_string_lossy().to_string(),
-                            bytes_found: freed,
-                            is_complete: idx >= total,
-                        },
-                    );
-                },
-            )
+        DuplicateDetector::batch_trash_duplicates(&groups, &platform, &journal, &lock_dir, &cancel)
             .map_err(|e| e.to_string())
-        } else if let Some(g_list) = groups {
-            DuplicateDetector::batch_trash_duplicates(
-                &g_list, &platform, &journal, &lock_dir, &cancel,
-            )
-            .map_err(|e| e.to_string())
-        } else {
-            Ok(DisposalSummary {
-                session_id: uuid::Uuid::new_v4().to_string(),
-                total_requested_items: 0,
-                successful_items: 0,
-                failed_items: 0,
-                total_freed_bytes: 0,
-                results: Vec::new(),
-                failed_trash_paths: Vec::new(),
-            })
-        }
     })
     .await
     .map_err(|e| e.to_string())?;
@@ -1953,6 +1823,8 @@ async fn clean_leftovers_safe(
     include_registry: Option<bool>,
     includeRegistry: Option<bool>,
 ) -> Result<freemydisk_core::applications::LeftoverCleanSummary, String> {
+    let _operation = begin_operation(&app, "disposal");
+    let journal = get_journal(&app)?;
     let incl_reg = include_registry.or(includeRegistry).unwrap_or(true);
     let scanned = app.state::<LeftoverScanRegistry>().inner().clone();
     let (known, unknown) = scanned.partition(&paths);
@@ -1966,12 +1838,9 @@ async fn clean_leftovers_safe(
         return Err("Run a leftover scan before cleaning.".to_string());
     }
 
-    let app_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
     let lock_dir = get_lock_dir(&app)?;
     let res = tauri::async_runtime::spawn_blocking(move || {
         let _bg_guard = freemydisk_platform::io_priority::BackgroundExecutionGuard::enter();
-        let journal =
-            CrashRecoveryJournal::open(&app_dir.join("journal.db")).map_err(|e| e.to_string())?;
         let platform = get_platform();
         freemydisk_core::applications::LeftoverScanner::clean_items(
             &known, incl_reg, &platform, &journal, &lock_dir,
@@ -2286,7 +2155,7 @@ async fn close_running_browsers() -> Result<usize, String> {
             for p in procs {
                 let p_name = p.name.to_lowercase();
                 if target_exes.iter().any(|&t| t == p_name)
-                    && platform.terminate_process(p.pid).is_ok()
+                    && ProcessController::graceful_terminate(p.pid, &p.name).unwrap_or(false)
                 {
                     closed += 1;
                 }
@@ -2411,6 +2280,33 @@ async fn clean_conda_cache() -> Result<u64, String> {
     .map_err(|e| e.to_string())?
 }
 
+/// Hides the window, cancels running scans and disposals, waits for them to stop
+/// at an item boundary, flushes the journal and exits.
+fn shut_down_gracefully(app: &AppHandle) {
+    static SHUTTING_DOWN: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+    if SHUTTING_DOWN.swap(true, std::sync::atomic::Ordering::SeqCst) {
+        return;
+    }
+
+    for window in app.webview_windows().values() {
+        let _ = window.hide();
+    }
+    let ops = app.state::<OperationRegistry>().inner().clone();
+    ops.cancel(None);
+
+    let app = app.clone();
+    std::thread::spawn(move || {
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(60);
+        while ops.active_count() > 0 && std::time::Instant::now() < deadline {
+            std::thread::sleep(std::time::Duration::from_millis(100));
+        }
+        if let Ok(journal) = get_journal(&app) {
+            let _ = journal.checkpoint_wal();
+        }
+        app.exit(0);
+    });
+}
+
 pub fn run() {
     // 0. Install Global Panic Hook for Crash Recovery and symbolicated diagnostics (§12.1)
     let default_hook = std::panic::take_hook();
@@ -2428,16 +2324,9 @@ pub fn run() {
             .map(|l| format!("{}:{}:{}", l.file(), l.line(), l.column()))
             .unwrap_or_else(|| "unknown location".to_string());
 
-        // 1. Emergency flush of WAL journal to disk
-        if let Ok(local_app_data) = std::env::var("LOCALAPPDATA") {
-            let journal_path = std::path::PathBuf::from(&local_app_data)
-                .join("FreeMyDisk")
-                .join("journal.db");
-            if journal_path.exists() {
-                if let Ok(journal) = CrashRecoveryJournal::open(&journal_path) {
-                    let _ = journal.emergency_flush();
-                }
-            }
+        // 1. Emergency flush of the WAL journal the app is actually using
+        if let Some(journal) = PANIC_JOURNAL.get() {
+            let _ = journal.emergency_flush();
         }
 
         // 2. Save structured symbolicated crash dump report to %LOCALAPPDATA%\FreeMyDisk\crash_reports
@@ -2482,6 +2371,21 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
+            let journal = app
+                .path()
+                .app_data_dir()
+                .map_err(|e| e.to_string())
+                .and_then(|dir| {
+                    CrashRecoveryJournal::open(&dir.join("journal.db")).map_err(|e| e.to_string())
+                });
+            match &journal {
+                Ok(j) => {
+                    let _ = PANIC_JOURNAL.set(j.clone());
+                }
+                Err(e) => log::error!("Crash recovery journal unavailable: {}", e),
+            }
+            app.manage(JournalState(journal));
+
             // Self-Healing on Boot (§12.3):
             // Check dirty shutdown and auto-remediate stranded staging files
             if let Ok(journal) = get_journal(app.handle()) {
@@ -2501,10 +2405,12 @@ pub fn run() {
                 let _ = window.show();
                 let _ = window.set_focus();
 
-                // Handle window close cleanly & auto-trim working set on window blur (focus lost)
-                window.on_window_event(|event| match event {
-                    tauri::WindowEvent::CloseRequested { .. } => {
-                        std::process::exit(0);
+                // Close stops running work cleanly; blur trims the working set.
+                let handle = app.handle().clone();
+                window.on_window_event(move |event| match event {
+                    tauri::WindowEvent::CloseRequested { api, .. } => {
+                        api.prevent_close();
+                        shut_down_gracefully(&handle);
                     }
                     tauri::WindowEvent::Focused(false) => {
                         trim_process_working_set();
@@ -2526,7 +2432,8 @@ pub fn run() {
             }
             Ok(())
         })
-        .manage(ScanCancellationState::default())
+        .manage(OperationRegistry::default())
+        .manage(RuleScanCache::default())
         .manage(FailedTrashRegistry::default())
         .manage(LeftoverScanRegistry::default())
         .invoke_handler(tauri::generate_handler![
@@ -2540,7 +2447,6 @@ pub fn run() {
             list_pending_reboot_deletions,
             cancel_pending_reboot_deletion,
             scan_cleanup_rules,
-            execute_cleanup_plan,
             execute_cleanup_rules,
             retry_failed_trash,
             force_delete_permanently,

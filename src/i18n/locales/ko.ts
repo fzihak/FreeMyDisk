@@ -247,6 +247,7 @@ export const ko: TranslationSchema = {
     "autoSelectRules": "자동 선택 규칙",
     "selectAllDuplicates": "모든 중복 복사본 선택",
     "keepNewest": "최신 파일 유지",
+    "keepOneCopy": "각 파일의 사본을 하나 이상 남겨 두세요.",
     "keepOldest": "가장 오래된 파일 유지",
     "keepShortestPath": "가장 짧은 경로 유지",
     "trashSelected": "선택 항목 휴지통으로 이동",

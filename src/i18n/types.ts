@@ -322,6 +322,7 @@ export interface TranslationSchema {
     autoSelectRules: string;
     selectAllDuplicates: string;
     keepNewest: string;
+    keepOneCopy: string;
     keepOldest: string;
     keepShortestPath: string;
     trashSelected: string;

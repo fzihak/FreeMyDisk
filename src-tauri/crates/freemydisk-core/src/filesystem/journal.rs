@@ -50,6 +50,9 @@ impl CrashRecoveryJournal {
         }
 
         let conn = Connection::open(db_path)?;
+        // The GUI, CLI and background tasks share this file; wait for locks instead
+        // of failing with "database is locked".
+        conn.busy_timeout(std::time::Duration::from_secs(5))?;
         conn.pragma_update(None, "journal_mode", "WAL")?;
         conn.pragma_update(None, "synchronous", "NORMAL")?;
 
@@ -106,6 +109,10 @@ impl CrashRecoveryJournal {
         Ok(journal)
     }
 
+    fn lock(&self) -> std::sync::MutexGuard<'_, Connection> {
+        self.conn.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
     pub fn write_intent(
         &self,
         session_id: &str,
@@ -113,7 +120,7 @@ impl CrashRecoveryJournal {
         staging_path: Option<&Path>,
         planned_action: &str,
     ) -> Result<i64, CoreError> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.lock();
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap_or_default()
@@ -132,7 +139,7 @@ impl CrashRecoveryJournal {
     }
 
     pub fn mark_completed(&self, id: i64) -> Result<(), CoreError> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.lock();
         conn.execute(
             "UPDATE disposal_journal SET status = 'completed' WHERE id = ?1;",
             params![id],
@@ -140,8 +147,18 @@ impl CrashRecoveryJournal {
         Ok(())
     }
 
+    /// Records that an item was deleted in place, without a staging copy.
+    pub fn clear_staging(&self, id: i64) -> Result<(), CoreError> {
+        let conn = self.lock();
+        conn.execute(
+            "UPDATE disposal_journal SET staging_path = NULL WHERE id = ?1;",
+            params![id],
+        )?;
+        Ok(())
+    }
+
     pub fn mark_failed(&self, id: i64, error_code: &str) -> Result<(), CoreError> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.lock();
         let status = format!("failed: {}", error_code);
         conn.execute(
             "UPDATE disposal_journal SET status = ?1 WHERE id = ?2;",
@@ -151,7 +168,7 @@ impl CrashRecoveryJournal {
     }
 
     pub fn list_in_flight(&self) -> Result<Vec<JournalRecord>, CoreError> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.lock();
         let mut stmt = conn.prepare(
             "SELECT id, session_id, target_path, staging_path, planned_action, timestamp, status
              FROM disposal_journal
@@ -180,7 +197,7 @@ impl CrashRecoveryJournal {
 
     /// Single-show dismiss: marks all current in_flight rows as acknowledged so the alert does not repeat.
     pub fn acknowledge_in_flight(&self) -> Result<usize, CoreError> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.lock();
         let changed = conn.execute(
             "UPDATE disposal_journal SET status = 'acknowledged' WHERE status = 'in_flight';",
             [],
@@ -207,7 +224,7 @@ impl CrashRecoveryJournal {
                                 e
                             );
                         } else {
-                            let conn = self.conn.lock().unwrap();
+                            let conn = self.lock();
                             conn.execute(
                                 "UPDATE disposal_journal SET status = 'restored_from_staging' WHERE id = ?1;",
                                 params![record.id],
@@ -223,7 +240,7 @@ impl CrashRecoveryJournal {
                         }
                     } else {
                         // Branch B: Conflict! Target already recreated by system/app. Never overwrite!
-                        let conn = self.conn.lock().unwrap();
+                        let conn = self.lock();
                         conn.execute(
                             "UPDATE disposal_journal SET status = 'requires_manual_review' WHERE id = ?1;",
                             params![record.id],
@@ -299,7 +316,7 @@ impl CrashRecoveryJournal {
 
     /// Terminal resolution for manual review conflicts.
     pub fn mark_resolved_manual(&self, id: i64) -> Result<(), CoreError> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.lock();
         conn.execute(
             "UPDATE disposal_journal SET status = 'resolved_manual' WHERE id = ?1;",
             params![id],
@@ -309,14 +326,14 @@ impl CrashRecoveryJournal {
 
     /// Checkpoints SQLite WAL to merge journal transactions and release disk space.
     pub fn checkpoint_wal(&self) -> Result<(), CoreError> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.lock();
         let _ = conn.execute_batch("PRAGMA wal_checkpoint(PASSIVE);");
         Ok(())
     }
 
     /// Retention policy: purge terminal status rows older than 30 days.
     pub fn purge_old_records(&self, days_retention: u32) -> Result<usize, CoreError> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.lock();
         let cutoff = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap_or_default()
@@ -345,7 +362,7 @@ impl CrashRecoveryJournal {
 
     /// Retrieves the most recent cleanup operation records.
     pub fn list_recent_history(&self, limit: usize) -> Result<Vec<JournalRecord>, CoreError> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.lock();
         let mut stmt = conn.prepare(
             "SELECT id, session_id, target_path, staging_path, planned_action, timestamp, status
              FROM disposal_journal
@@ -375,7 +392,7 @@ impl CrashRecoveryJournal {
 
     /// Clears historical cleanup records (preserves in_flight records).
     pub fn clear_history(&self) -> Result<usize, CoreError> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.lock();
         let cleared = conn.execute(
             "DELETE FROM disposal_journal WHERE status != 'in_flight';",
             [],
@@ -385,7 +402,8 @@ impl CrashRecoveryJournal {
 
     /// Issues an emergency SQLite WAL checkpoint to ensure all journal data is synchronized to disk before shutdown or panic.
     pub fn emergency_flush(&self) -> Result<(), CoreError> {
-        if let Ok(conn) = self.conn.lock() {
+        // try_lock: the panicking thread may already hold the connection.
+        if let Ok(conn) = self.conn.try_lock() {
             let _ = conn.execute("PRAGMA wal_checkpoint(FULL);", []);
         }
         Ok(())
@@ -393,7 +411,7 @@ impl CrashRecoveryJournal {
 
     /// Runs SQLite PRAGMA integrity_check to verify database file consistency.
     pub fn check_integrity(&self) -> Result<String, CoreError> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.lock();
         let mut stmt = conn.prepare("PRAGMA integrity_check;")?;
         let res: String = stmt.query_row([], |row| row.get(0))?;
         Ok(res)
@@ -449,7 +467,7 @@ impl CrashRecoveryJournal {
         files: u64,
         bytes: u64,
     ) -> Result<(), CoreError> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.lock();
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap_or_default()
@@ -473,7 +491,7 @@ impl CrashRecoveryJournal {
         &self,
         scan_id: &str,
     ) -> Result<Option<(String, String, u64, u64)>, CoreError> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.lock();
         let mut stmt = conn.prepare(
             "SELECT scan_type, last_scanned_path, files_scanned, bytes_scanned FROM scan_checkpoints WHERE scan_id = ?1;",
         )?;
@@ -491,7 +509,7 @@ impl CrashRecoveryJournal {
 
     /// Clears a completed scan checkpoint.
     pub fn clear_scan_checkpoint(&self, scan_id: &str) -> Result<(), CoreError> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.lock();
         conn.execute(
             "DELETE FROM scan_checkpoints WHERE scan_id = ?1;",
             params![scan_id],
@@ -507,7 +525,7 @@ impl CrashRecoveryJournal {
         backup_path: &Path,
         retention_hours: u32,
     ) -> Result<i64, CoreError> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.lock();
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap_or_default()
@@ -532,7 +550,7 @@ impl CrashRecoveryJournal {
     pub fn list_active_undo_backups(
         &self,
     ) -> Result<Vec<(i64, String, PathBuf, PathBuf)>, CoreError> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.lock();
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap_or_default()

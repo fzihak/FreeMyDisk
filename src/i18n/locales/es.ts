@@ -247,6 +247,7 @@ export const es: TranslationSchema = {
     "autoSelectRules": "Reglas de autoselección:",
     "selectAllDuplicates": "Seleccionar todos los duplicados",
     "keepNewest": "Conservar el más reciente (seleccionar antiguos)",
+    "keepOneCopy": "Conserve al menos una copia de cada archivo.",
     "keepOldest": "Conservar el más antiguo (seleccionar nuevos)",
     "keepShortestPath": "Conservar ruta más corta",
     "trashSelected": "Mover duplicados a la Papelera",

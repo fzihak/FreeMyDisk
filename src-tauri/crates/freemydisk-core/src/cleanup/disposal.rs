@@ -1,4 +1,4 @@
-use crate::cleanup::matchers::is_subpath_protected;
+use crate::cleanup::matchers::{contains_protected_subpath, is_subpath_protected};
 use crate::cleanup::plan::CleanupPlanItem;
 use crate::cleanup::protected_paths::ProtectedPathRegistry;
 use crate::filesystem::journal::CrashRecoveryJournal;
@@ -83,6 +83,8 @@ impl DisposalEngine {
                 CoreError::LockBusy
             })?;
 
+        let plan_items = expand_protected_dirs(plan_items);
+
         let mut results = Vec::new();
         let mut failed_trash = Vec::new();
         let mut total_freed_bytes = 0u64;
@@ -101,11 +103,6 @@ impl DisposalEngine {
                 continue;
             }
 
-            if is_subpath_protected(path, &item.protect_subpaths) {
-                log::warn!("Protected subpath hard filter excised: {}", path.display());
-                continue;
-            }
-
             if let Err(e) = ProtectedPathRegistry::assert_safe_for_disposal(path) {
                 log::error!("Safety violation refused for {}: {}", path.display(), e);
                 results.push(DisposalItemResult {
@@ -113,25 +110,6 @@ impl DisposalEngine {
                     success: false,
                     bytes_freed: 0,
                     route_used: "rejected".to_string(),
-                    error: Some(e.to_string()),
-                });
-                failed_items += 1;
-                continue;
-            }
-
-            // Disk Space Exhaustion Circuit Breaker (§12.4):
-            // Blocks staging mutations if the volume free space is dangerously low (< 500 MB)
-            if let Err(e) = CrashRecoveryJournal::check_disk_space_guard(path, 0) {
-                log::warn!(
-                    "Disk space circuit breaker engaged for {}: {}",
-                    path.display(),
-                    e
-                );
-                results.push(DisposalItemResult {
-                    path: path.clone(),
-                    success: false,
-                    bytes_freed: 0,
-                    route_used: "aborted_low_space".to_string(),
                     error: Some(e.to_string()),
                 });
                 failed_items += 1;
@@ -202,7 +180,13 @@ impl DisposalEngine {
             }
 
             if route_is_permanent {
-                let (freed, err) = execute_tolerant_permanent_delete(path, cancel);
+                let (freed, err) = delete_through_staging(
+                    path,
+                    staging_path.as_deref(),
+                    journal,
+                    journal_id,
+                    cancel,
+                );
                 if freed > 0 || err.is_none() {
                     let actual_freed = if freed > 0 { freed } else { item.size_bytes };
                     let _ = journal.mark_completed(journal_id);
@@ -321,7 +305,8 @@ impl DisposalEngine {
             journal.write_intent(&session_id, path, Some(&staging_path), "permanent")?;
 
         let cancel = CancellationToken::new();
-        let (freed, err) = execute_tolerant_permanent_delete(path, &cancel);
+        let (freed, err) =
+            delete_through_staging(path, Some(&staging_path), journal, journal_id, &cancel);
         if freed > 0 || err.is_none() {
             let actual_freed = if freed > 0 { freed } else { size };
             let _ = journal.mark_completed(journal_id);
@@ -344,6 +329,95 @@ impl DisposalEngine {
             })
         }
     }
+}
+
+/// Splits folder items that contain entries matching `protect_subpaths` into their
+/// unprotected children, so protected entries stay on disk. Items that are
+/// protected themselves are dropped.
+fn expand_protected_dirs(items: &[CleanupPlanItem]) -> Vec<CleanupPlanItem> {
+    let mut out = Vec::with_capacity(items.len());
+    for item in items {
+        push_unprotected(item, &item.original_path, &mut out);
+    }
+    out
+}
+
+fn push_unprotected(template: &CleanupPlanItem, path: &Path, out: &mut Vec<CleanupPlanItem>) {
+    if is_subpath_protected(path, &template.protect_subpaths) {
+        log::info!("Keeping protected path: {}", path.display());
+        return;
+    }
+
+    let splittable = path.is_dir()
+        && !ProtectedPathRegistry::is_reparse_point(path)
+        && contains_protected_subpath(path, &template.protect_subpaths);
+    if !splittable {
+        if path == template.original_path {
+            out.push(template.clone());
+        } else {
+            out.push(CleanupPlanItem {
+                original_path: path.to_path_buf(),
+                canonical_path: crate::shared::paths::normalize_path(path),
+                size_bytes: measure_size(path),
+                is_dir: path.is_dir(),
+                ..template.clone()
+            });
+        }
+        return;
+    }
+
+    if let Ok(entries) = fs::read_dir(path) {
+        for entry in entries.flatten() {
+            push_unprotected(template, &entry.path(), out);
+        }
+    }
+}
+
+fn measure_size(path: &Path) -> u64 {
+    if path.is_dir() {
+        walkdir::WalkDir::new(path)
+            .min_depth(1)
+            .into_iter()
+            .filter_map(Result::ok)
+            .filter(|e| e.file_type().is_file())
+            .filter_map(|e| e.metadata().ok().map(|m| m.len()))
+            .sum()
+    } else {
+        path.symlink_metadata().map(|m| m.len()).unwrap_or(0)
+    }
+}
+
+/// Renames `path` to its staging name before deleting it, so a crash leaves a
+/// restorable copy that the journal can put back. Whatever cannot be deleted is
+/// restored to the original location. When the rename is refused (for example,
+/// a folder with open files), the item is deleted in place.
+fn delete_through_staging(
+    path: &Path,
+    staging: Option<&Path>,
+    journal: &CrashRecoveryJournal,
+    journal_id: i64,
+    cancel: &CancellationToken,
+) -> (u64, Option<String>) {
+    let Some(staged) = staging.filter(|s| fs::rename(path, s).is_ok()) else {
+        let _ = journal.clear_staging(journal_id);
+        return execute_tolerant_permanent_delete(path, cancel);
+    };
+
+    let (freed, err) = execute_tolerant_permanent_delete(staged, cancel);
+    if staged.exists() {
+        if let Err(e) = fs::rename(staged, path) {
+            log::error!(
+                "Could not restore partially deleted '{}' from staging: {}",
+                path.display(),
+                e
+            );
+        } else {
+            let _ = journal.clear_staging(journal_id);
+        }
+        let reason = err.unwrap_or_else(|| "Some files could not be deleted".to_string());
+        return (freed, Some(reason));
+    }
+    (freed, err)
 }
 
 fn generate_staging_path(target: &Path) -> PathBuf {

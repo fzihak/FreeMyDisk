@@ -86,6 +86,7 @@ interface DisposalSummary {
   failed_items: number;
   total_freed_bytes: number;
   failed_trash_paths: string[];
+  results: { path: string; success: boolean; error: string | null }[];
 }
 
 export const DuplicatesPage: React.FC = () => {
@@ -143,7 +144,7 @@ export const DuplicatesPage: React.FC = () => {
 
   const handleCancelScan = async () => {
     try {
-      await invoke("cancel_active_scan");
+      await invoke("cancel_active_scan", { kind: "duplicates" });
       setScanning(false);
     } catch (e) {
       console.error("Failed to cancel scan:", e);
@@ -166,6 +167,13 @@ export const DuplicatesPage: React.FC = () => {
 
   const toggleSelectFile = (groupId: string, path: string) => {
     if (!scanResult) return;
+    const target = scanResult.groups.find((g) => g.group_id === groupId);
+    const file = target?.files.find((f) => f.path === path);
+    const unselectedLeft = target ? target.files.filter((f) => !f.selected).length : 0;
+    if (file && !file.selected && unselectedLeft <= 1) {
+      toast.warning(t.duplicates.keepOneCopy);
+      return;
+    }
     const nextGroups = scanResult.groups.map((group) => {
       if (group.group_id !== groupId) return group;
       return {
@@ -234,25 +242,22 @@ export const DuplicatesPage: React.FC = () => {
 
   const handleTrashSelected = async () => {
     if (!scanResult) return;
-    const selectedPaths: string[] = [];
-    scanResult.groups.forEach((g) => {
-      g.files.forEach((f) => {
-        if (f.selected) selectedPaths.push(f.path);
-      });
-    });
-
-    if (selectedPaths.length === 0) return;
+    const groupsToTrash = scanResult.groups.filter((g) => g.files.some((f) => f.selected));
+    if (groupsToTrash.length === 0) return;
 
     setTrashing(true);
     try {
+      // The backend re-checks every group: one copy is kept and each selected file
+      // must still match it byte for byte.
       const summary = await invoke<DisposalSummary>("trash_duplicate_files", {
-        paths: selectedPaths,
+        groups: groupsToTrash,
       });
       setDisposalSummary(summary);
 
       const normalize = (p: string) => p.replace(/\\/g, "/").toLowerCase();
-      const failedSet = new Set((summary.failed_trash_paths || []).map(normalize));
-      const successfulSet = new Set(selectedPaths.filter((p) => !failedSet.has(normalize(p))).map(normalize));
+      const successfulSet = new Set(
+        summary.results.filter((r) => r.success).map((r) => normalize(r.path))
+      );
       const nextGroups = scanResult.groups
         .map((group) => {
           const remainingFiles = group.files.filter((f) => !successfulSet.has(normalize(f.path)));
@@ -272,6 +277,12 @@ export const DuplicatesPage: React.FC = () => {
         groups: nextGroups,
       });
 
+      if (summary.failed_items > 0) {
+        toast.warning(
+          t.cleanup.trashFailedTitle,
+          `${summary.failed_items} / ${summary.total_requested_items}`
+        );
+      }
       toast.success(
         "Duplicates Recycled",
         `Safely moved ${summary.successful_items} duplicate file(s) to Recycle Bin (${formatBytes(summary.total_freed_bytes)} reclaimed).`

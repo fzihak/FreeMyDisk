@@ -247,6 +247,7 @@ export const ja: TranslationSchema = {
     "autoSelectRules": "自動選択ルール",
     "selectAllDuplicates": "重複コピーを全選択",
     "keepNewest": "最新ファイルを残す",
+    "keepOneCopy": "各ファイルのコピーを少なくとも 1 つ残してください。",
     "keepOldest": "最古ファイルを残す",
     "keepShortestPath": "最も浅いパスを残す",
     "trashSelected": "選択項目をごみ箱へ",

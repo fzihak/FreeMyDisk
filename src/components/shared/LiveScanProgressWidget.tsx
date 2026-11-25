@@ -63,7 +63,7 @@ export const LiveScanProgressWidget: React.FC<LiveScanProgressWidgetProps> = ({
       onCancel();
     } else {
       try {
-        await invoke<boolean>("cancel_active_scan");
+        await invoke<boolean>("cancel_active_scan", { kind: scanType });
       } catch (e) {
         console.error("Failed to cancel active scan:", e);
       }

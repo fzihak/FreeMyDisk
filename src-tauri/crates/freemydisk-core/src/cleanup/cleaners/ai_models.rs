@@ -370,26 +370,8 @@ impl AiModelAnalyzer {
             return;
         }
 
-        // Check project sessions
-        let projects_dir = claude_dir.join("projects");
-        if projects_dir.exists() {
-            let size = Self::calculate_dir_size(&projects_dir);
-            if size > 1_000_000 {
-                // Only flag if > 1MB
-                results.push(AiModelInfo {
-                    id: "claudecode:projects".to_string(),
-                    name: "Claude Code Project Session Histories".to_string(),
-                    provider: "claudecode".to_string(),
-                    path: projects_dir.to_string_lossy().to_string(),
-                    size_bytes: size,
-                    modified_at: None,
-                    description: Some(
-                        "Cached subagent transcripts and project execution state".to_string(),
-                    ),
-                    is_directory: true,
-                });
-            }
-        }
+        // `.claude/projects` is not reported: it holds conversation history and
+        // per-project memory, which is user data rather than cache.
 
         // Check telemetry/cache
         let cache_dir = claude_dir.join("cache");
@@ -466,32 +448,70 @@ impl AiModelAnalyzer {
         Ok(size_freed)
     }
 
-    /// Verifies whether the path is located inside safe AI storage directories.
+    /// Folders the scanner reports from. Model stores only allow entries inside them;
+    /// cache folders may also be removed as a whole.
+    fn approved_roots() -> (Vec<PathBuf>, Vec<PathBuf>) {
+        let home = std::env::var("USERPROFILE")
+            .or_else(|_| std::env::var("HOME"))
+            .map(PathBuf::from)
+            .ok();
+        let mut model_roots = Vec::new();
+        let mut cache_roots = Vec::new();
+
+        model_roots.push(
+            std::env::var("OLLAMA_MODELS")
+                .map(PathBuf::from)
+                .ok()
+                .or_else(|| home.as_ref().map(|h| h.join(".ollama").join("models")))
+                .unwrap_or_default(),
+        );
+        if let Ok(hf) = std::env::var("HF_HOME") {
+            model_roots.push(PathBuf::from(hf).join("hub"));
+        }
+        if let Ok(hf) = std::env::var("HUGGINGFACE_HUB_CACHE") {
+            model_roots.push(PathBuf::from(hf));
+        }
+        if let Ok(local) = std::env::var("LOCALAPPDATA") {
+            model_roots.push(PathBuf::from(local).join("nomic.ai").join("GPT4All"));
+        }
+        if let Some(home) = &home {
+            model_roots.push(home.join(".cache").join("lm-studio").join("models"));
+            model_roots.push(home.join(".lmstudio").join("models"));
+            model_roots.push(home.join(".cache").join("huggingface").join("hub"));
+            model_roots.push(home.join("jan").join("models"));
+            model_roots.push(home.join(r"AppData\Local\Jan\models"));
+            model_roots.push(home.join(r"AppData\Roaming\Jan\models"));
+            cache_roots.push(home.join(".claude").join("cache"));
+            cache_roots.push(home.join(".gemini").join("browser_recordings"));
+        }
+
+        let canonical = |roots: Vec<PathBuf>| -> Vec<PathBuf> {
+            roots
+                .into_iter()
+                .filter(|r| !r.as_os_str().is_empty())
+                .filter_map(|r| dunce::canonicalize(r).ok())
+                .collect()
+        };
+        (canonical(model_roots), canonical(cache_roots))
+    }
+
+    /// True when `path` resolves inside a folder the AI scanner reports from.
+    /// Paths are canonicalised first, so `..` segments and links cannot escape.
     pub fn is_safe_ai_path(path: &Path) -> bool {
-        let path_str = path.to_string_lossy().to_lowercase();
+        let (model_roots, cache_roots) = Self::approved_roots();
+        Self::is_within_roots(path, &model_roots, &cache_roots)
+    }
 
-        let safe_fragments = [
-            ".ollama\\models",
-            ".ollama/models",
-            ".cache\\lm-studio\\models",
-            ".cache/lm-studio/models",
-            ".lmstudio\\models",
-            ".lmstudio/models",
-            ".cache\\huggingface\\hub",
-            ".cache/huggingface/hub",
-            "nomic.ai\\gpt4all",
-            "nomic.ai/gpt4all",
-            "jan\\models",
-            "jan/models",
-            ".claude\\projects",
-            ".claude/projects",
-            ".claude\\cache",
-            ".claude/cache",
-            ".gemini\\browser_recordings",
-            ".gemini/browser_recordings",
-        ];
-
-        safe_fragments.iter().any(|frag| path_str.contains(frag))
+    /// True when `path` resolves strictly inside one of `model_roots`, or inside
+    /// (or equal to) one of `cache_roots`. Roots must already be canonical.
+    pub fn is_within_roots(path: &Path, model_roots: &[PathBuf], cache_roots: &[PathBuf]) -> bool {
+        let Ok(resolved) = dunce::canonicalize(path) else {
+            return false;
+        };
+        model_roots
+            .iter()
+            .any(|root| resolved != *root && resolved.starts_with(root))
+            || cache_roots.iter().any(|root| resolved.starts_with(root))
     }
 
     pub fn calculate_dir_size(dir: &Path) -> u64 {

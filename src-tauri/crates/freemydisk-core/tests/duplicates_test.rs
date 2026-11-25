@@ -265,3 +265,74 @@ fn test_duplicate_folder_aggregation() {
     assert!(res2.cache_hits > 0, "Second scan must produce cache hits");
     assert_eq!(res2.total_folder_groups, 1);
 }
+
+fn entry(path: &Path, selected: bool) -> freemydisk_core::storage::duplicates::DuplicateFileEntry {
+    freemydisk_core::storage::duplicates::DuplicateFileEntry {
+        path: path.to_path_buf(),
+        size_bytes: fs::metadata(path).map(|m| m.len()).unwrap_or(0),
+        modified_at: 0,
+        device_id: 0,
+        file_index: 0,
+        is_hardlink_or_clone: false,
+        selected,
+    }
+}
+
+fn group(
+    files: Vec<freemydisk_core::storage::duplicates::DuplicateFileEntry>,
+) -> freemydisk_core::storage::duplicates::DuplicateGroup {
+    freemydisk_core::storage::duplicates::DuplicateGroup {
+        group_id: "g".to_string(),
+        hash: "client-supplied-value-is-ignored".to_string(),
+        file_size: files[0].size_bytes,
+        files,
+        potential_savings_bytes: 0,
+    }
+}
+
+#[test]
+fn test_trash_duplicates_never_removes_every_copy_or_changed_files() {
+    let dir = tempdir().unwrap();
+    let a = dir.path().join("a.bin");
+    let b = dir.path().join("b.bin");
+    let c = dir.path().join("c.bin");
+    fs::write(&a, b"same content").unwrap();
+    fs::write(&b, b"same content").unwrap();
+    fs::write(&c, b"edited after scan").unwrap();
+
+    let journal = freemydisk_core::filesystem::journal::CrashRecoveryJournal::open(
+        &dir.path().join("journal.db"),
+    )
+    .unwrap();
+    let lock_dir = dir.path().join("locks");
+    let platform = MockHardlinkPlatform::new();
+    let cancel = CancellationToken::new();
+
+    // Every copy selected: nothing may be removed.
+    let all_selected = group(vec![entry(&a, true), entry(&b, true)]);
+    let summary = DuplicateDetector::batch_trash_duplicates(
+        &[all_selected],
+        &platform,
+        &journal,
+        &lock_dir,
+        &cancel,
+    )
+    .unwrap();
+    assert_eq!(summary.successful_items, 0);
+    assert_eq!(summary.failed_items, 2);
+
+    // A selected file whose content no longer matches the kept copy is left alone.
+    let changed = group(vec![entry(&a, false), entry(&b, true), entry(&c, true)]);
+    let summary = DuplicateDetector::batch_trash_duplicates(
+        &[changed],
+        &platform,
+        &journal,
+        &lock_dir,
+        &cancel,
+    )
+    .unwrap();
+    assert_eq!(summary.successful_items, 1);
+    assert_eq!(summary.failed_items, 1);
+    let rejected = summary.results.iter().find(|r| !r.success).unwrap();
+    assert_eq!(rejected.path, c);
+}
