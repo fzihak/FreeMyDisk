@@ -5,6 +5,7 @@ import { useSettingsStore } from "@/stores/settings-store";
 import { useI18nStore } from "@/i18n";
 import { toast } from "@/stores/toast-store";
 import { useScanProgress, useScanProgressStore } from "@/stores/scan-progress-store";
+import { describeDisposal } from "@/utils/disposal";
 import {
   Storage24Filled,
   Delete20Filled,
@@ -63,7 +64,7 @@ interface DisposalSummary {
   successful_items?: number;
   failed_items?: number;
   total_freed_bytes: number;
-  bytes_freed?: number;
+  recycled_bytes?: number;
 }
 
 interface EmergencyRescueResult {
@@ -235,14 +236,10 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
         },
       });
 
-      const freed = summary.total_freed_bytes ?? summary.bytes_freed ?? 0;
-      setReclaimedBytes(freed);
+      setReclaimedBytes(summary.total_freed_bytes + (summary.recycled_bytes ?? 0));
       setRuleSummaries([]);
       loadInitialData();
-      toast.success(
-        t.cleanup.cleanComplete,
-        `${formatBytes(freed)} ${t.dashboard.reclaimedNotice}`
-      );
+      toast.success(t.cleanup.cleanComplete, describeDisposal(summary, t, formatBytes));
     } catch (e) {
       console.error("Instant clean failed:", e);
       toast.error(t.common.error, String(e));

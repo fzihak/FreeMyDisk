@@ -177,6 +177,7 @@ export interface TranslationSchema {
     cleaningProgress: string;
     cleanComplete: string;
     reclaimedSpace: string;
+    movedToRecycleBin: string;
     filesCleaned: string;
     failedTrash: string;
     allCleanTitle: string;

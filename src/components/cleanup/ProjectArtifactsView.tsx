@@ -18,6 +18,7 @@ import {
   ChevronDown16Regular,
   ChevronRight16Regular,
 } from "@fluentui/react-icons";
+import { describeDisposal } from "@/utils/disposal";
 
 export interface ProjectArtifact {
   path: string;
@@ -55,6 +56,7 @@ interface DisposalSummary {
   successful_items: number;
   failed_items: number;
   total_freed_bytes: number;
+  recycled_bytes?: number;
   failed_trash_paths: string[];
 }
 
@@ -201,7 +203,7 @@ export const ProjectArtifactsView: React.FC = () => {
 
       toast.success(
         "Artifacts Recycled",
-        `Safely moved ${summary.successful_items} artifact directory/file(s) to Recycle Bin (${formatBytes(summary.total_freed_bytes)} reclaimed).`
+        `${summary.successful_items} ${t.common.items} · ${describeDisposal(summary, t, formatBytes)}`
       );
     } catch (e) {
       console.error("Cleanup error:", e);
@@ -345,7 +347,7 @@ export const ProjectArtifactsView: React.FC = () => {
             <div>
               <div className="text-xs font-semibold text-emerald-400">{t.projectArtifacts.cleanupCompleteTitle}</div>
               <div className="text-[11px] text-emerald-400/80 font-ibm-mono tabular-nums">
-                {disposalSummary.successful_items} {t.common.items} • {formatBytes(disposalSummary.total_freed_bytes)} {t.cleanup.reclaimedSpace}
+                {disposalSummary.successful_items} {t.common.items} • {describeDisposal(disposalSummary, t, formatBytes)}
               </div>
             </div>
           </div>

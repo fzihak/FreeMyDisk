@@ -920,6 +920,8 @@ async fn execute_cleanup_rules(
                 total_freed_bytes: total_bytes,
                 successful_items: total_items,
                 failed_items: 0,
+                skipped_items: 0,
+                recycled_bytes: 0,
                 total_requested_items: total_items,
                 results,
                 failed_trash_paths: Vec::new(),

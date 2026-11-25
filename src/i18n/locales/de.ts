@@ -150,6 +150,7 @@ export const de: TranslationSchema = {
     "cleaningProgress": "Bereinigung läuft...",
     "cleanComplete": "Bereinigung abgeschlossen",
     "reclaimedSpace": "Freigegebener Speicherplatz",
+    "movedToRecycleBin": "In den Papierkorb verschoben",
     "filesCleaned": "Bereinigte Dateien",
     "failedTrash": "Fehlgeschlagene Papierkorb-Verschiebungen",
     "allCleanTitle": "Alles sauber!",

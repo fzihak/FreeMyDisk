@@ -24,6 +24,7 @@ import {
   Folder20Regular,
   Sparkle20Filled,
 } from "@fluentui/react-icons";
+import { describeDisposal } from "@/utils/disposal";
 
 interface StorageVolumeInfo {
   mount_point: string;
@@ -85,6 +86,7 @@ interface DisposalSummary {
   successful_items: number;
   failed_items: number;
   total_freed_bytes: number;
+  recycled_bytes?: number;
   failed_trash_paths: string[];
   results: { path: string; success: boolean; error: string | null }[];
 }
@@ -285,7 +287,7 @@ export const DuplicatesPage: React.FC = () => {
       }
       toast.success(
         "Duplicates Recycled",
-        `Safely moved ${summary.successful_items} duplicate file(s) to Recycle Bin (${formatBytes(summary.total_freed_bytes)} reclaimed).`
+        `${summary.successful_items} ${t.common.files} · ${describeDisposal(summary, t, formatBytes)}`
       );
     } catch (e) {
       console.error("Failed to trash duplicate files:", e);
@@ -561,7 +563,7 @@ export const DuplicatesPage: React.FC = () => {
                 {t.cleanup.cleanComplete}
               </div>
               <div className="text-[11px] text-emerald-400/80 font-ibm-mono tabular-nums">
-                {disposalSummary.successful_items} {t.common.files} • {t.cleanup.reclaimedSpace}: {formatBytes(disposalSummary.total_freed_bytes)}
+                {disposalSummary.successful_items} {t.common.files} • {describeDisposal(disposalSummary, t, formatBytes)}
               </div>
             </div>
           </div>

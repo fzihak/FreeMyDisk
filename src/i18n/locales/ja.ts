@@ -150,6 +150,7 @@ export const ja: TranslationSchema = {
     "cleaningProgress": "クリーンアップ処理中...",
     "cleanComplete": "クリーンアップ完了",
     "reclaimedSpace": "回収された空き容量",
+    "movedToRecycleBin": "ごみ箱へ移動",
     "filesCleaned": "クリーンアップされたファイル数",
     "failedTrash": "ごみ箱への移動に失敗した項目",
     "allCleanTitle": "すべて正常にクリーンアップされました",

@@ -27,6 +27,7 @@ import { WinUIButton } from "@/components/winui/WinUIButton";
 import { LiveScanProgressWidget } from "@/components/shared/LiveScanProgressWidget";
 import { ProjectArtifactsView } from "@/components/cleanup/ProjectArtifactsView";
 import { AiAndToolchainsView } from "@/components/cleanup/AiAndToolchainsView";
+import { describeDisposal } from "@/utils/disposal";
 
 interface RuleScanCandidate {
   path: string;
@@ -70,6 +71,7 @@ interface DisposalSummary {
   successful_items: number;
   failed_items: number;
   total_freed_bytes: number;
+  recycled_bytes?: number;
   results: DisposalItemResult[];
   failed_trash_paths: string[];
 }
@@ -213,7 +215,7 @@ export const CleanupPage: React.FC = () => {
       } else {
         toast.success(
           t.cleanup.cleanComplete,
-          `${formatBytes(result.total_freed_bytes)} ${t.dashboard.reclaimedNotice}`
+          describeDisposal(result, t, formatBytes)
         );
       }
     } catch (e) {
@@ -393,7 +395,7 @@ export const CleanupPage: React.FC = () => {
           <div className="flex items-center gap-2.5 text-emerald-400">
             <CheckmarkCircle24Filled className="w-5 h-5 text-emerald-400 shrink-0" />
             <span>
-              <strong>{t.cleanup.cleanComplete}:</strong> {formatBytes(lastDisposal.total_freed_bytes)} {t.dashboard.reclaimedNotice} ({lastDisposal.successful_items} {t.common.files} processed).
+              <strong>{t.cleanup.cleanComplete}:</strong> {describeDisposal(lastDisposal, t, formatBytes)} ({lastDisposal.successful_items} {t.common.files}).
             </span>
           </div>
           <button
@@ -479,11 +481,17 @@ export const CleanupPage: React.FC = () => {
               Session: {lastDisposal.session_id.substring(0, 8)}...
             </div>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 font-ibm-mono">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 font-ibm-mono">
             <div className="p-2.5 bg-black/20 rounded-[4px] border border-[var(--border-subtle)]">
               <div className="text-[11px] text-[var(--text-muted)] font-sans">{t.cleanup.reclaimedSpace}</div>
               <div className="text-lg font-bold text-emerald-400 mt-0.5 tabular-nums">
                 {formatBytes(lastDisposal.total_freed_bytes)}
+              </div>
+            </div>
+            <div className="p-2.5 bg-black/20 rounded-[4px] border border-[var(--border-subtle)]">
+              <div className="text-[11px] text-[var(--text-muted)] font-sans">{t.cleanup.movedToRecycleBin}</div>
+              <div className="text-lg font-bold text-[var(--text-primary)] mt-0.5 tabular-nums">
+                {formatBytes(lastDisposal.recycled_bytes ?? 0)}
               </div>
             </div>
             <div className="p-2.5 bg-black/20 rounded-[4px] border border-[var(--border-subtle)]">

@@ -150,6 +150,7 @@ export const en: TranslationSchema = {
     "cleaningProgress": "Cleaning selected caches...",
     "cleanComplete": "Cleanup Completed Successfully",
     "reclaimedSpace": "Total Reclaimed Space",
+    "movedToRecycleBin": "Moved to Recycle Bin",
     "filesCleaned": "Files Cleaned",
     "failedTrash": "Failed Trash Routes",
     "allCleanTitle": "Caches Completely Clean",

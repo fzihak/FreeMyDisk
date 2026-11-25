@@ -150,6 +150,7 @@ export const bn: TranslationSchema = {
     "cleaningProgress": "পরিষ্কার প্রক্রিয়া চলছে...",
     "cleanComplete": "ক্লিনআপ সম্পন্ন হয়েছে",
     "reclaimedSpace": "উদ্ধারকৃত ডিস্ক স্পেস",
+    "movedToRecycleBin": "রিসাইকেল বিনে সরানো হয়েছে",
     "filesCleaned": "পরিষ্কারকৃত ফাইলের সংখ্যা",
     "failedTrash": "রিসাইকেল বিনে পাঠাতে ব্যর্থ",
     "allCleanTitle": "সবকিছু পরিষ্কার ও নিরাপদ!",

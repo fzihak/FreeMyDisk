@@ -150,6 +150,7 @@ export const zhCN: TranslationSchema = {
     "cleaningProgress": "正在清理选中的缓存文件...",
     "cleanComplete": "清理操作圆满完成",
     "reclaimedSpace": "累计回收空间",
+    "movedToRecycleBin": "已移至回收站",
     "filesCleaned": "清理文件总数",
     "failedTrash": "未成功放入回收站",
     "allCleanTitle": "缓存非常干净",

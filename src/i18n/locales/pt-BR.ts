@@ -150,6 +150,7 @@ export const ptBR: TranslationSchema = {
     "cleaningProgress": "Limpando caches selecionadas...",
     "cleanComplete": "Limpeza Concluída com Sucesso",
     "reclaimedSpace": "Espaço Total Recuperado",
+    "movedToRecycleBin": "Movido para a Lixeira",
     "filesCleaned": "Arquivos Limpos",
     "failedTrash": "Falhas no Envio para a Lixeira",
     "allCleanTitle": "Caches Totalmente Limpas",

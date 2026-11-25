@@ -150,6 +150,7 @@ export const ko: TranslationSchema = {
     "cleaningProgress": "정리 진행 중...",
     "cleanComplete": "정리 완료",
     "reclaimedSpace": "확보된 공간",
+    "movedToRecycleBin": "휴지통으로 이동됨",
     "filesCleaned": "정리된 파일 수",
     "failedTrash": "휴지통 이동 실패 항목",
     "allCleanTitle": "모두 깨끗하게 정리되었습니다",

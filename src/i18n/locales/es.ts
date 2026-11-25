@@ -150,6 +150,7 @@ export const es: TranslationSchema = {
     "cleaningProgress": "Limpiando cachés seleccionadas...",
     "cleanComplete": "Limpieza completada con éxito",
     "reclaimedSpace": "Espacio total recuperado",
+    "movedToRecycleBin": "Movido a la Papelera",
     "filesCleaned": "Archivos eliminados",
     "failedTrash": "Fallos al enviar a la papelera",
     "allCleanTitle": "Cachés totalmente limpias",
