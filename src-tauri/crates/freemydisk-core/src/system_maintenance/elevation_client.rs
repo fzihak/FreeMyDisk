@@ -115,24 +115,25 @@ impl ElevatedClient {
             return Ok(resp);
         }
 
-        // Unelevated: Request elevation via PowerShell Start-Process -Verb RunAs with temporary token files
+        // Unelevated: request elevation with Start-Process -Verb RunAs. The request is
+        // passed on the helper's command line (hex encoded), which other processes
+        // cannot change once the elevated helper has started, unlike a file in %TEMP%.
         let token = session_token;
-        let temp_dir = std::env::temp_dir();
-        let req_file = temp_dir.join(format!("fmd_elev_req_{}.json", token));
-        let resp_file = temp_dir.join(format!("fmd_elev_resp_{}.json", token));
-
-        serde_json::to_writer(std::fs::File::create(&req_file)?, &req)?;
+        let resp_file = std::env::temp_dir().join(format!("fmd_elev_resp_{}.json", token));
+        let request_hex: String = serde_json::to_vec(&req)?
+            .iter()
+            .map(|b| format!("{:02x}", b))
+            .collect();
 
         #[cfg(target_os = "windows")]
         {
             use std::os::windows::process::CommandExt;
             let helper_str = helper_path.to_string_lossy().replace('\'', "''");
-            let req_str = req_file.to_string_lossy().replace('\'', "''");
             let resp_str = resp_file.to_string_lossy().replace('\'', "''");
 
             let ps_args = format!(
-                "Start-Process -FilePath '{}' -ArgumentList '--token \"{}\" --file \"{}\" \"{}\"' -Verb RunAs -WindowStyle Hidden -Wait",
-                helper_str, token, req_str, resp_str
+                "Start-Process -FilePath '{}' -ArgumentList '--token \"{}\" --request-hex {} --response \"{}\"' -Verb RunAs -WindowStyle Hidden -Wait",
+                helper_str, token, request_hex, resp_str
             );
 
             let mut cmd = Command::new("powershell");
@@ -140,7 +141,6 @@ impl ElevatedClient {
             cmd.args(["-NoProfile", "-NonInteractive", "-Command", &ps_args]);
 
             let status = cmd.status()?;
-            let _ = std::fs::remove_file(&req_file);
 
             if !status.success() {
                 let _ = std::fs::remove_file(&resp_file);
@@ -154,7 +154,7 @@ impl ElevatedClient {
 
         #[cfg(not(target_os = "windows"))]
         {
-            let _ = std::fs::remove_file(&req_file);
+            let _ = (&request_hex, &helper_path);
             let _ = std::fs::remove_file(&resp_file);
             return Err(CoreError::Platform(
                 freemydisk_platform::traits::PlatformError::Unsupported(
