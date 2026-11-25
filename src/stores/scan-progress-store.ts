@@ -42,7 +42,7 @@ const defaultProgress = (scanType: string): AppScanProgress => ({
   lastUpdated: Date.now(),
 });
 
-let unlistenInstance: UnlistenFn | null = null;
+let listenerPromise: Promise<void> | null = null;
 
 export const useScanProgressStore = create<ScanProgressStore>((set, get) => ({
   progressByScanType: {},
@@ -81,26 +81,24 @@ export const useScanProgressStore = create<ScanProgressStore>((set, get) => ({
   },
 
   initProgressListener: async () => {
-    if (get().isListening && unlistenInstance) {
-      return unlistenInstance;
-    }
-
-    try {
-      const unlisten = await listen<Omit<AppScanProgress, "lastUpdated">>(
-        "scan-progress",
-        (event) => {
-          if (event.payload && event.payload.scanType) {
-            get().updateProgress(event.payload);
-          }
+    // One app-wide subscription. Components share it and never tear it down, so a
+    // page unmounting cannot stop progress updates for the rest of the app.
+    if (!listenerPromise) {
+      listenerPromise = listen<Omit<AppScanProgress, "lastUpdated">>("scan-progress", (event) => {
+        if (event.payload && event.payload.scanType) {
+          get().updateProgress(event.payload);
         }
-      );
-      unlistenInstance = unlisten;
-      set({ isListening: true });
-      return unlisten;
-    } catch (err) {
-      console.warn("Failed to attach scan-progress listener (non-Tauri environment?):", err);
-      return () => {};
+      })
+        .then(() => {
+          set({ isListening: true });
+        })
+        .catch((err) => {
+          listenerPromise = null;
+          console.warn("Failed to attach scan-progress listener (non-Tauri environment?):", err);
+        });
     }
+    await listenerPromise;
+    return () => {};
   },
 }));
 
