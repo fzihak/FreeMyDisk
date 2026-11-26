@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useI18nStore } from "@/i18n";
 import { APP_VERSION } from "@/version";
+import { useUpdaterStore } from "@/stores/updater-store";
 import {
   Home20Regular,
   Home20Filled,
@@ -84,6 +85,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onToggleCollapse,
 }) => {
   const { t } = useI18nStore();
+  const updateStatus = useUpdaterStore((s) => s.status);
+  const updateVersion = useUpdaterStore((s) => s.version);
+  const openUpdateDialog = useUpdaterStore((s) => s.openDialog);
+  const hasUpdate = ["available", "downloading", "installing", "error"].includes(updateStatus) && !!updateVersion;
   const [vitals, setVitals] = useState<SystemVitals | null>(null);
 
   const navSections: NavSection[] = [
@@ -312,6 +317,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
           ))}
 
         {navButton("settings", t.nav.settings, Settings20Regular, Settings20Filled)}
+
+        {hasUpdate && (
+          <button
+            onClick={openUpdateDialog}
+            title={`${t.layout.updateAvailableShort}: v${updateVersion}`}
+            className={`w-full h-8 flex items-center rounded-md text-xs text-[var(--accent-text)] hover:bg-[var(--fill-subtle)] transition-colors ${focusRing} ${
+              collapsed ? "justify-center" : "gap-3 px-3"
+            }`}
+          >
+            <span className="relative flex w-4 h-4 items-center justify-center shrink-0">
+              <span className="absolute w-2 h-2 rounded-full bg-[var(--accent-text)] animate-ping opacity-60" />
+              <span className="w-2 h-2 rounded-full bg-[var(--accent-text)]" />
+            </span>
+            {!collapsed && (
+              <>
+                <span className="flex-1 text-left font-medium">{t.layout.updateAvailableShort}</span>
+                <span className="font-ibm-mono">v{updateVersion}</span>
+              </>
+            )}
+          </button>
+        )}
 
         <button
           onClick={openGitHub}

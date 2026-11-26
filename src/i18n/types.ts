@@ -64,6 +64,26 @@ export interface TranslationSchema {
     scanDefaultTitle: string;
     readyToScan: string;
     readyToScanDesc: string;
+    updateAvailableTitle: string;
+    updateAvailableDesc: string;
+    updateDetails: string;
+    updateLater: string;
+    updateSkip: string;
+    updateAndRestart: string;
+    updateDownloading: string;
+    updateDownloadedOf: string;
+    updateInstalling: string;
+    updateWhatsNew: string;
+    updateFailed: string;
+    updateRetry: string;
+    updateReleased: string;
+    updateVerifiedNote: string;
+    updateUpToDate: string;
+    updateCurrentVersion: string;
+    updateNewVersion: string;
+    updateClose: string;
+    updateBannerAction: string;
+    updateAvailableShort: string;
   };
   common: {
     scan: string;

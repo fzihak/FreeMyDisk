@@ -13,6 +13,7 @@ import {
   DocumentSearch20Regular,
   QuestionCircle20Regular,
   Sparkle20Filled,
+  ErrorCircle20Regular,
 } from "@fluentui/react-icons";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useSettingsStore } from "@/stores/settings-store";
@@ -97,11 +98,12 @@ export const SettingsPage: React.FC = () => {
 
   const handleCheckUpdates = async () => {
     setManualCheckMsg(null);
+    // A manual check opens the update dialog with the result (new version or up to date).
     await checkForUpdates(false);
-    // Read fresh store state: the `updateAvailable` captured by this closure is stale after the await.
-    if (!useUpdaterStore.getState().updateAvailable) {
-      setManualCheckMsg(t.settings.upToDate.replace("{version}", APP_VERSION));
-      setTimeout(() => setManualCheckMsg(null), 5000);
+    const after = useUpdaterStore.getState();
+    if (after.status === "error") {
+      setManualCheckMsg(after.errorMessage ?? t.common.error);
+      setTimeout(() => setManualCheckMsg(null), 6000);
     }
   };
 
@@ -226,7 +228,7 @@ export const SettingsPage: React.FC = () => {
               <div className="space-y-2">
                 {manualCheckMsg && (
                   <div className="flex items-center gap-2 text-sm text-[var(--text-primary)]">
-                    <CheckmarkCircle20Filled className="w-4 h-4 shrink-0 text-[var(--success)]" />
+                    <ErrorCircle20Regular className="w-4 h-4 shrink-0 text-[var(--danger)]" />
                     <span>{manualCheckMsg}</span>
                   </div>
                 )}
@@ -234,6 +236,9 @@ export const SettingsPage: React.FC = () => {
                   <div className="flex items-center gap-2 text-sm text-[var(--text-primary)]">
                     <Sparkle20Filled className="w-4 h-4 shrink-0 text-[var(--accent-text)]" />
                     <span>{t.settings.updateAvailableMsg.replace("{version}", version)}</span>
+                    <WinUIButton variant="subtle" size="sm" onClick={() => useUpdaterStore.getState().openDialog()}>
+                      {t.layout.updateDetails}
+                    </WinUIButton>
                   </div>
                 )}
               </div>
