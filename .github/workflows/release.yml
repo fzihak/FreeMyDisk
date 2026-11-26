@@ -6,47 +6,59 @@ name: Release
 # To ship a new version:
 #   1. Bump "version" in package.json, src-tauri/tauri.conf.json and Cargo.toml.
 #   2. Merge to main, then push a tag:  git tag v1.1.0 && git push origin v1.1.0
-#   3. Review the draft release on GitHub and publish it. Installed copies see
-#      the update as soon as it is published.
+#   3. Approve the "release" deployment on GitHub (Actions > the run > Review).
+#   4. Review the draft release and publish it. Installed copies see the update
+#      as soon as it is published.
 #
-# Needs the repository secrets TAURI_SIGNING_PRIVATE_KEY and
-# TAURI_SIGNING_PRIVATE_KEY_PASSWORD (empty if the key has no password). The
-# key must match the "pubkey" in src-tauri/tauri.conf.json.
+# Security:
+#   - The signing key lives only in the protected "release" environment. That
+#     environment needs the maintainer's approval for every run and only
+#     accepts `v*` tags, so pull requests and branches never see the key.
+#   - Every third-party action is pinned to a full commit SHA, so a moved or
+#     hijacked tag cannot run code next to the key.
+#   - The installer gets a GitHub build-provenance attestation. Anyone can check
+#     that it was built by this workflow from this repository with:
+#       gh attestation verify FreeMyDisk_<version>_x64-setup.exe --repo fzihak/FreeMyDisk
 
 on:
   push:
     tags: ["v*"]
-  workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   release:
-    name: Build & publish (Windows)
+    name: Build, sign & publish (Windows)
     runs-on: windows-latest
+    environment: release
+    permissions:
+      contents: write # create the draft release and upload its assets
+      id-token: write # sign the build-provenance attestation
+      attestations: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 20
 
-      - uses: pnpm/action-setup@v3
+      - uses: pnpm/action-setup@a3252b78c470c02df07e9d59298aecedc3ccdd6d # v3
         with:
           version: 9
 
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
 
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: ". -> target"
+      # No build cache on release builds: a cache written by another workflow
+      # cannot end up inside a signed installer.
 
       - name: Build, sign and publish
-        uses: tauri-apps/tauri-action@v0
+        uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
@@ -59,3 +71,8 @@ jobs:
           prerelease: false
           includeUpdaterJson: true
           args: --config src-tauri/tauri.bundle.conf.json
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        with:
+          subject-path: target/release/bundle/nsis/*-setup.exe
