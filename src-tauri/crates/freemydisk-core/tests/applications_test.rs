@@ -30,6 +30,8 @@ fn test_confidence_scorer() {
 }
 
 #[test]
+// Process and installed-app discovery are implemented on Windows only.
+#[cfg_attr(not(target_os = "windows"), ignore = "Windows-only backend")]
 fn test_process_controller_current_process() {
     let current_pid = std::process::id();
     assert!(ProcessController::is_process_alive(current_pid));
@@ -37,6 +39,8 @@ fn test_process_controller_current_process() {
 }
 
 #[test]
+// Process and installed-app discovery are implemented on Windows only.
+#[cfg_attr(not(target_os = "windows"), ignore = "Windows-only backend")]
 fn test_application_service_discovery() {
     let service = ApplicationService::new();
     let apps = service.list_applications().unwrap();
