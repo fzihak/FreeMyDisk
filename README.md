@@ -194,14 +194,7 @@ Drop a file into [`src-tauri/crates/freemydisk-core/rules/`](src-tauri/crates/fr
 
 ## 🏗️ How it's built
 
-```mermaid
-flowchart LR
-    UI["React 19 UI<br/>Windows 11 design"] -- "Tauri IPC" --> Host["Tauri 2 host<br/>commands · events · updater"]
-    Host --> Core["freemydisk-core<br/>rule engine · planner · disposal · journal<br/>duplicates (BLAKE3) · scanners"]
-    CLI["freemydisk-cli"] --> Core
-    Core --> Platform["freemydisk-platform<br/>Win32 · Recycle Bin · Restart Manager"]
-    Host -. "UAC, allow-listed actions" .-> Helper["freemydisk-elevated"]
-```
+<p align="center"><img src="docs/media/architecture.svg" alt="Architecture: React UI and Tauri host on top of the Rust core engine, CLI, platform layer and UAC helper" width="100%" /></p>
 
 | Layer | Tech |
 | :--- | :--- |
