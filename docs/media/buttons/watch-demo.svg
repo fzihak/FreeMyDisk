@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="196" height="52" viewBox="0 0 196 52" role="img" aria-label="Watch the demo">
+  <defs>
+    <linearGradient id="b" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1d2433"/>
+      <stop offset="1" stop-color="#141a26"/>
+    </linearGradient>
+  </defs>
+  <rect x="1" y="1" width="194" height="50" rx="14" fill="url(#b)"/>
+  <rect x="1.5" y="1.5" width="193" height="49" rx="13.5" fill="none" stroke="#60cdff" stroke-opacity="0.35"/>
+  <g transform="translate(18 14)"><path d="M8 5l12 7-12 7z" fill="#60cdff"/></g>
+  <text x="52" y="32" font-family="Segoe UI Variable Display, Segoe UI, -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="16" font-weight="600" fill="#e8f2ff">Watch the demo</text>
+</svg>

@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="470" viewBox="0 0 1000 470" role="img" aria-label="FreeMyDisk architecture" font-family="Segoe UI Variable Display, Segoe UI, -apple-system, Helvetica, Arial, sans-serif">
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5 0 10z" fill="#60cdff"/></marker></defs>
+<rect width="1000" height="470" rx="18" fill="#0d1117"/>
+<g><rect x="40" y="40" width="270" height="110" rx="14" fill="#161b22" stroke="#61dafb" stroke-opacity="0.6"/>
+<rect x="40" y="40" width="5" height="110" rx="2.5" fill="#61dafb"/>
+<text x="58" y="70" font-size="16" font-weight="700" fill="#e6edf3">React 19 UI</text><text x="58" y="92" font-size="13" fill="#9fb3c8">Windows 11 design system</text><text x="58" y="111" font-size="13" fill="#9fb3c8">9 languages · 3 themes</text></g>
+<g><rect x="390" y="40" width="290" height="110" rx="14" fill="#161b22" stroke="#24c8db" stroke-opacity="0.6"/>
+<rect x="390" y="40" width="5" height="110" rx="2.5" fill="#24c8db"/>
+<text x="408" y="70" font-size="16" font-weight="700" fill="#e6edf3">Tauri 2 host</text><text x="408" y="92" font-size="13" fill="#9fb3c8">IPC commands · progress events</text><text x="408" y="111" font-size="13" fill="#9fb3c8">signed in-app updater</text></g>
+<g><rect x="760" y="40" width="200" height="110" rx="14" fill="#161b22" stroke="#a371f7" stroke-opacity="0.6"/>
+<rect x="760" y="40" width="5" height="110" rx="2.5" fill="#a371f7"/>
+<text x="778" y="70" font-size="16" font-weight="700" fill="#e6edf3">freemydisk-cli</text><text x="778" y="92" font-size="13" fill="#9fb3c8">scriptable engine</text><text x="778" y="111" font-size="13" fill="#9fb3c8">text · json · csv</text></g>
+<g><rect x="300" y="230" width="480" height="120" rx="14" fill="#161b22" stroke="#f74c00" stroke-opacity="0.6"/>
+<rect x="300" y="230" width="5" height="120" rx="2.5" fill="#f74c00"/>
+<text x="318" y="260" font-size="16" font-weight="700" fill="#e6edf3">freemydisk-core (Rust)</text><text x="318" y="282" font-size="13" fill="#9fb3c8">rule engine (122 TOML rules) · planner · disposal</text><text x="318" y="301" font-size="13" fill="#9fb3c8">crash-safe journal (SQLite WAL) · duplicates (BLAKE3)</text><text x="318" y="320" font-size="13" fill="#9fb3c8">large-file &amp; storage scanners · rayon parallelism</text></g>
+<g><rect x="40" y="300" width="220" height="130" rx="14" fill="#161b22" stroke="#f7b500" stroke-opacity="0.6"/>
+<rect x="40" y="300" width="5" height="130" rx="2.5" fill="#f7b500"/>
+<text x="58" y="330" font-size="16" font-weight="700" fill="#e6edf3">freemydisk-elevated</text><text x="58" y="352" font-size="13" fill="#9fb3c8">UAC helper</text><text x="58" y="371" font-size="13" fill="#9fb3c8">allow-listed admin</text><text x="58" y="390" font-size="13" fill="#9fb3c8">actions only</text></g>
+<g><rect x="300" y="380" width="480" height="70" rx="14" fill="#161b22" stroke="#2ea043" stroke-opacity="0.6"/>
+<rect x="300" y="380" width="5" height="70" rx="2.5" fill="#2ea043"/>
+<text x="318" y="410" font-size="16" font-weight="700" fill="#e6edf3">freemydisk-platform</text><text x="318" y="432" font-size="13" fill="#9fb3c8">Win32 · Recycle Bin · Restart Manager · FindFirstFileEx</text></g>
+<line x1="310" y1="95" x2="388" y2="95" stroke="#60cdff" stroke-width="2" marker-end="url(#a)"/><rect x="330.2" y="83.0" width="37.6" height="22" rx="11" fill="#0d1117" stroke="#30363d"/><text x="349.0" y="99.0" font-size="12" fill="#c9d1d9" text-anchor="middle">IPC</text>
+<line x1="535" y1="150" x2="535" y2="228" stroke="#60cdff" stroke-width="2" marker-end="url(#a)"/>
+<line x1="860" y1="150" x2="700" y2="228" stroke="#60cdff" stroke-width="2" marker-end="url(#a)"/>
+<line x1="540" y1="350" x2="540" y2="378" stroke="#60cdff" stroke-width="2" marker-end="url(#a)"/>
+<line x1="395" y1="150" x2="190" y2="298" stroke="#60cdff" stroke-width="2" stroke-dasharray="6 5" marker-end="url(#a)"/><rect x="273.7" y="212.0" width="37.6" height="22" rx="11" fill="#0d1117" stroke="#30363d"/><text x="292.5" y="228.0" font-size="12" fill="#c9d1d9" text-anchor="middle">UAC</text>
+</svg>

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="176" height="52" viewBox="0 0 176 52" role="img" aria-label="Why it’s safe">
+  <defs>
+    <linearGradient id="b" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1d2433"/>
+      <stop offset="1" stop-color="#141a26"/>
+    </linearGradient>
+  </defs>
+  <rect x="1" y="1" width="174" height="50" rx="14" fill="url(#b)"/>
+  <rect x="1.5" y="1.5" width="173" height="49" rx="13.5" fill="none" stroke="#60cdff" stroke-opacity="0.35"/>
+  <g transform="translate(18 14)"><path d="M12 2l8 3v6c0 5-3.4 9.3-8 11-4.6-1.7-8-6-8-11V5z" fill="none" stroke="#60cdff" stroke-width="2"/><path d="M8.5 12l2.5 2.5 4.5-5" fill="none" stroke="#60cdff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></g>
+  <text x="52" y="32" font-family="Segoe UI Variable Display, Segoe UI, -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="16" font-weight="600" fill="#e8f2ff">Why it’s safe</text>
+</svg>
