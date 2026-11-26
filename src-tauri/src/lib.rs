@@ -746,6 +746,7 @@ async fn execute_cleanup_rules(
     res
 }
 
+#[cfg(target_os = "windows")]
 fn recycle_bin_path() -> PathBuf {
     let drive = std::env::var("SystemDrive").unwrap_or_else(|_| "C:".to_string());
     PathBuf::from(format!(r"{}\$Recycle.Bin", drive.trim_end_matches('\\')))
