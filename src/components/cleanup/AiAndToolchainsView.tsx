@@ -2,20 +2,21 @@ import React, { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { useI18nStore } from "@/i18n";
-import { WinUICard } from "@/components/winui/WinUICard";
 import { WinUIButton } from "@/components/winui/WinUIButton";
 import { toast } from "@/stores/toast-store";
 import {
-  Sparkle20Filled,
+  Sparkle20Regular,
   Code20Regular,
-  Box20Filled,
+  Box20Regular,
   ArrowClockwise20Regular,
   Delete20Regular,
   FolderOpen16Regular,
   CheckmarkCircle20Filled,
+  CheckmarkCircle16Filled,
   Warning20Filled,
-  DismissCircle20Regular,
+  Dismiss16Regular,
 } from "@fluentui/react-icons";
+import { Card, StatCard, Badge, ProgressBar, FilterTabs, EmptyState } from "@/components/ui";
 
 export interface AiModelInfo {
   id: string;
@@ -188,224 +189,168 @@ export const AiAndToolchainsView: React.FC = () => {
   const totalRustBytes = rustData?.total_size_bytes || 0;
   const totalCondaBytes = condaData?.total_size_bytes || 0;
 
-  const getProviderBadge = (provider: string) => {
+  const getProviderLabel = (provider: string) => {
     switch (provider) {
       case "ollama":
-        return { label: "Ollama", bg: "bg-purple-500/10 text-purple-400 border-purple-500/20" };
+        return "Ollama";
       case "lmstudio":
-        return { label: "LM Studio", bg: "bg-blue-500/10 text-blue-400 border-blue-500/20" };
+        return "LM Studio";
       case "huggingface":
-        return { label: "Hugging Face", bg: "bg-amber-500/10 text-amber-400 border-amber-500/20" };
+        return "Hugging Face";
       case "gpt4all":
-        return { label: "GPT4All", bg: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" };
+        return "GPT4All";
       case "jan":
-        return { label: "Jan AI", bg: "bg-cyan-500/10 text-cyan-400 border-cyan-500/20" };
+        return "Jan AI";
       case "claudecode":
-        return { label: "Claude Code", bg: "bg-rose-500/10 text-rose-400 border-rose-500/20" };
+        return "Claude Code";
       case "gemini":
-        return { label: "Gemini / Assistant", bg: "bg-indigo-500/10 text-indigo-400 border-indigo-500/20" };
+        return "Gemini / Assistant";
       default:
-        return { label: provider, bg: "bg-white/[0.04] text-[var(--text-secondary)] border-[var(--border-subtle)]" };
+        return provider;
     }
   };
 
-  return (
-    <div className="space-y-4">
-      {/* Sub-tab Navigation */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border-subtle)] pb-2">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setSubTab("ai")}
-            className={`px-3.5 py-1.5 text-xs font-semibold rounded-[4px] transition-all cursor-pointer flex items-center gap-1.5 ${
-              subTab === "ai"
-                ? "bg-[#0078d4] text-white shadow-xs"
-                : "bg-white/[0.04] text-[var(--text-secondary)] hover:text-white border border-[var(--border-subtle)]"
-            }`}
-          >
-            <Sparkle20Filled className="w-3.5 h-3.5" />
-            <span>
-              {t.aiAndToolchains.tabAiModels} ({models.length})
-            </span>
-          </button>
-          <button
-            onClick={() => setSubTab("rust")}
-            className={`px-3.5 py-1.5 text-xs font-semibold rounded-[4px] transition-all cursor-pointer flex items-center gap-1.5 ${
-              subTab === "rust"
-                ? "bg-[#0078d4] text-white shadow-xs"
-                : "bg-white/[0.04] text-[var(--text-secondary)] hover:text-white border border-[var(--border-subtle)]"
-            }`}
-          >
-            <Code20Regular className="w-3.5 h-3.5" />
-            <span>
-              {t.aiAndToolchains.tabRustToolchains} ({rustData?.toolchains.length || 0})
-            </span>
-          </button>
-          <button
-            onClick={() => setSubTab("conda")}
-            className={`px-3.5 py-1.5 text-xs font-semibold rounded-[4px] transition-all cursor-pointer flex items-center gap-1.5 ${
-              subTab === "conda"
-                ? "bg-[#0078d4] text-white shadow-xs"
-                : "bg-white/[0.04] text-[var(--text-secondary)] hover:text-white border border-[var(--border-subtle)]"
-            }`}
-          >
-            <Box20Filled className="w-3.5 h-3.5" />
-            <span>
-              {t.aiAndToolchains.tabConda} ({condaData?.package_count || 0})
-            </span>
-          </button>
-        </div>
+  const renderLoading = (hint: string) => (
+    <Card className="py-10 flex flex-col items-center text-center gap-3">
+      <div className="flex items-center gap-2 text-sm font-medium text-[var(--text-primary)]">
+        <ArrowClockwise20Regular className="w-4 h-4 animate-spin text-[var(--accent-text)]" />
+        <span>{t.aiAndToolchains.scanning}</span>
+      </div>
+      <ProgressBar value={75} className="max-w-xs animate-pulse" />
+      <p className="text-xs text-[var(--text-muted)]">{hint}</p>
+    </Card>
+  );
 
-        <div className="flex items-center gap-2">
-          <WinUIButton
-            variant="standard"
-            onClick={() => {
-              if (subTab === "ai") scanAiModels();
-              else if (subTab === "rust") scanRustToolchains();
-              else scanConda();
-            }}
-            disabled={loadingAi || loadingRust || loadingConda}
-            icon={
-              <ArrowClockwise20Regular
-                className={`w-3.5 h-3.5 ${
-                  loadingAi || loadingRust || loadingConda ? "animate-spin" : ""
-                }`}
-              />
-            }
-          >
-            {t.aiAndToolchains.rescan}
-          </WinUIButton>
-        </div>
+  const renderReveal = (path: string) => (
+    <button
+      onClick={() => revealItemInDir(path)}
+      title={t.common.showInFolder}
+      className="p-1.5 rounded-md text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--fill-subtle-hover)] cursor-pointer transition-colors"
+    >
+      <FolderOpen16Regular className="w-4 h-4" />
+    </button>
+  );
+
+  return (
+    <div className="space-y-5">
+      {/* Sub-tab navigation */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <FilterTabs
+          items={[
+            {
+              id: "ai",
+              label: (
+                <>
+                  <Sparkle20Regular className="w-4 h-4" />
+                  {t.aiAndToolchains.tabAiModels}
+                </>
+              ),
+              count: models.length,
+            },
+            {
+              id: "rust",
+              label: (
+                <>
+                  <Code20Regular className="w-4 h-4" />
+                  {t.aiAndToolchains.tabRustToolchains}
+                </>
+              ),
+              count: rustData?.toolchains.length || 0,
+            },
+            {
+              id: "conda",
+              label: (
+                <>
+                  <Box20Regular className="w-4 h-4" />
+                  {t.aiAndToolchains.tabConda}
+                </>
+              ),
+              count: condaData?.package_count || 0,
+            },
+          ]}
+          value={subTab}
+          onChange={setSubTab}
+          className="min-w-0"
+        />
+
+        <WinUIButton
+          variant="standard"
+          onClick={() => {
+            if (subTab === "ai") scanAiModels();
+            else if (subTab === "rust") scanRustToolchains();
+            else scanConda();
+          }}
+          disabled={loadingAi || loadingRust || loadingConda}
+          icon={
+            <ArrowClockwise20Regular
+              className={`w-4 h-4 ${loadingAi || loadingRust || loadingConda ? "animate-spin" : ""}`}
+            />
+          }
+        >
+          {t.aiAndToolchains.rescan}
+        </WinUIButton>
       </div>
 
-      {/* Overview Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <WinUICard className="p-3.5 bg-[var(--card-bg)] border border-[var(--border-subtle)]">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-[var(--text-secondary)]">
-              {t.aiAndToolchains.modelsFound}
-            </span>
-            <Sparkle20Filled className="w-4 h-4 text-purple-400" />
-          </div>
-          <div className="text-lg font-bold text-[var(--text-primary)] mt-1">
-            {formatBytes(totalAiBytes)}
-          </div>
-          <div className="text-xs text-[var(--text-muted)] mt-0.5">
-            {models.length} {t.common.items}
-          </div>
-        </WinUICard>
-
-        <WinUICard className="p-3.5 bg-[var(--card-bg)] border border-[var(--border-subtle)]">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-[var(--text-secondary)]">
-              {t.aiAndToolchains.toolchainsFound}
-            </span>
-            <Code20Regular className="w-4 h-4 text-amber-400" />
-          </div>
-          <div className="text-lg font-bold text-[var(--text-primary)] mt-1">
-            {formatBytes(totalRustBytes)}
-          </div>
-          <div className="text-xs text-[var(--text-muted)] mt-0.5">
-            {rustData?.toolchains.length || 0} toolchain(s)
-          </div>
-        </WinUICard>
-
-        <WinUICard className="p-3.5 bg-[var(--card-bg)] border border-[var(--border-subtle)]">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-[var(--text-secondary)]">
-              {t.aiAndToolchains.condaPackagesFound}
-            </span>
-            <Box20Filled className="w-4 h-4 text-emerald-400" />
-          </div>
-          <div className="text-lg font-bold text-[var(--text-primary)] mt-1">
-            {formatBytes(totalCondaBytes)}
-          </div>
-          <div className="text-xs text-[var(--text-muted)] mt-0.5">
-            {condaData?.package_count || 0} archives
-          </div>
-        </WinUICard>
+      {/* Overview stats */}
+      <div className="grid gap-3 sm:grid-cols-3">
+        <StatCard
+          label={t.aiAndToolchains.modelsFound}
+          value={formatBytes(totalAiBytes)}
+          hint={`${models.length} ${t.common.items}`}
+          icon={<Sparkle20Regular />}
+        />
+        <StatCard
+          label={t.aiAndToolchains.toolchainsFound}
+          value={formatBytes(totalRustBytes)}
+          hint={`${rustData?.toolchains.length || 0} toolchain(s)`}
+          icon={<Code20Regular />}
+        />
+        <StatCard
+          label={t.aiAndToolchains.condaPackagesFound}
+          value={formatBytes(totalCondaBytes)}
+          hint={`${condaData?.package_count || 0} archives`}
+          icon={<Box20Regular />}
+        />
       </div>
 
       {/* Subtab 1: AI Models & Sessions */}
-      {subTab === "ai" && (
-        <div className="space-y-3">
-          {loadingAi ? (
-            <WinUICard className="p-8 text-center space-y-3">
-              <div className="flex items-center justify-center gap-2 text-xs font-semibold text-[var(--text-primary)]">
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500" />
-                </span>
-                <span>{t.aiAndToolchains.scanning}</span>
-              </div>
-              <div className="max-w-xs mx-auto h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
-                <div className="h-full bg-blue-500 rounded-full animate-pulse w-3/4" />
-              </div>
-              <p className="text-xs text-[var(--text-muted)]">
-                Inspecting Ollama, HuggingFace, LM Studio, and GPT4All cache directories...
-              </p>
-            </WinUICard>
-          ) : models.length === 0 ? (
-            <WinUICard className="p-8 text-center text-[var(--text-secondary)]">
-              <CheckmarkCircle20Filled className="w-8 h-8 text-emerald-400 mx-auto mb-2" />
-              <div className="text-sm font-semibold text-[var(--text-primary)]">
-                {t.aiAndToolchains.noModelsFound}
-              </div>
-              <div className="text-xs text-[var(--text-muted)] mt-1">
-                {t.aiAndToolchains.noModelsDesc}
-              </div>
-            </WinUICard>
-          ) : (
-            models.map((model) => {
-              const badge = getProviderBadge(model.provider);
+      {subTab === "ai" &&
+        (loadingAi ? (
+          renderLoading("Inspecting Ollama, HuggingFace, LM Studio, and GPT4All cache directories...")
+        ) : models.length === 0 ? (
+          <EmptyState
+            icon={<CheckmarkCircle20Filled className="text-[var(--success)]" />}
+            title={t.aiAndToolchains.noModelsFound}
+            description={t.aiAndToolchains.noModelsDesc}
+          />
+        ) : (
+          <Card padded={false} className="overflow-hidden divide-y divide-[var(--border-divider)]">
+            {models.map((model) => {
               const isDeleting = deletingModelPath === model.path;
               return (
-                <WinUICard
+                <div
                   key={model.id}
-                  className="p-3.5 bg-[var(--card-bg)] border border-[var(--border-subtle)] flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-[var(--border-default)] transition-colors"
+                  className="px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-[var(--fill-subtle)] transition-colors"
                 >
-                  <div className="space-y-1 min-w-0 flex-1">
+                  <div className="min-w-0 flex-1 space-y-0.5">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-semibold text-xs text-[var(--text-primary)] truncate">
-                        {model.name}
-                      </span>
-                      <span
-                        className={`text-xs px-2 py-0.5 rounded-full border font-medium ${badge.bg}`}
-                      >
-                        {badge.label}
-                      </span>
-                      {model.is_directory && (
-                        <span className="text-xs px-1.5 py-0.2 bg-white/[0.04] text-[var(--text-muted)] rounded border border-[var(--border-subtle)]">
-                          Directory
-                        </span>
-                      )}
+                      <span className="text-sm font-medium text-[var(--text-primary)] truncate">{model.name}</span>
+                      <Badge tone="accent">{getProviderLabel(model.provider)}</Badge>
+                      {model.is_directory && <Badge>{t.cleanup.stateDirectory}</Badge>}
                     </div>
                     {model.description && (
-                      <p className="text-xs text-[var(--text-muted)] line-clamp-1">
-                        {model.description}
-                      </p>
+                      <p className="text-xs text-[var(--text-secondary)] line-clamp-1">{model.description}</p>
                     )}
-                    <p className="text-xs text-[var(--text-muted)] truncate font-mono">
-                      {model.path}
-                    </p>
+                    <p className="text-xs text-[var(--text-muted)] truncate font-code">{model.path}</p>
                   </div>
 
-                  <div className="flex items-center gap-3 shrink-0 self-end sm:self-center">
-                    <div className="text-right">
-                      <div className="text-xs font-bold text-[var(--text-primary)]">
-                        {formatBytes(model.size_bytes)}
-                      </div>
-                    </div>
-
-                    <button
-                      onClick={() => revealItemInDir(model.path)}
-                      title={t.common.showInFolder}
-                      className="p-1.5 text-[var(--text-secondary)] hover:text-white rounded hover:bg-white/[0.06] cursor-pointer transition-colors"
-                    >
-                      <FolderOpen16Regular className="w-4 h-4" />
-                    </button>
-
+                  <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                    <span className="text-sm font-semibold font-ibm-mono tabular-nums text-[var(--text-primary)] mr-1">
+                      {formatBytes(model.size_bytes)}
+                    </span>
+                    {renderReveal(model.path)}
                     <WinUIButton
-                      variant="danger"
+                      variant="standard"
                       size="sm"
                       disabled={isDeleting}
                       onClick={() =>
@@ -416,95 +361,57 @@ export const AiAndToolchainsView: React.FC = () => {
                           sizeBytes: model.size_bytes,
                         })
                       }
-                      icon={<Delete20Regular className="w-3.5 h-3.5" />}
+                      icon={<Delete20Regular className="w-4 h-4" />}
                     >
                       {isDeleting ? t.aiAndToolchains.cleaningModel : t.aiAndToolchains.cleanModel}
                     </WinUIButton>
                   </div>
-                </WinUICard>
+                </div>
               );
-            })
-          )}
-        </div>
-      )}
+            })}
+          </Card>
+        ))}
 
       {/* Subtab 2: Rust Toolchains */}
-      {subTab === "rust" && (
-        <div className="space-y-3">
-          {loadingRust ? (
-            <WinUICard className="p-8 text-center space-y-3">
-              <div className="flex items-center justify-center gap-2 text-xs font-semibold text-[var(--text-primary)]">
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
-                </span>
-                <span>{t.aiAndToolchains.scanning}</span>
-              </div>
-              <div className="max-w-xs mx-auto h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
-                <div className="h-full bg-amber-500 rounded-full animate-pulse w-3/4" />
-              </div>
-              <p className="text-xs text-[var(--text-muted)]">
-                Inspecting Rustup installed toolchains and multi-gigabyte build targets...
-              </p>
-            </WinUICard>
-          ) : !rustData || rustData.toolchains.length === 0 ? (
-            <WinUICard className="p-8 text-center text-[var(--text-secondary)]">
-              <CheckmarkCircle20Filled className="w-8 h-8 text-emerald-400 mx-auto mb-2" />
-              <div className="text-sm font-semibold text-[var(--text-primary)]">
-                {t.aiAndToolchains.noToolchainsFound}
-              </div>
-              <div className="text-xs text-[var(--text-muted)] mt-1">
-                {t.aiAndToolchains.noToolchainsDesc}
-              </div>
-            </WinUICard>
-          ) : (
-            rustData.toolchains.map((tc) => {
+      {subTab === "rust" &&
+        (loadingRust ? (
+          renderLoading("Inspecting Rustup installed toolchains and multi-gigabyte build targets...")
+        ) : !rustData || rustData.toolchains.length === 0 ? (
+          <EmptyState
+            icon={<CheckmarkCircle20Filled className="text-[var(--success)]" />}
+            title={t.aiAndToolchains.noToolchainsFound}
+            description={t.aiAndToolchains.noToolchainsDesc}
+          />
+        ) : (
+          <Card padded={false} className="overflow-hidden divide-y divide-[var(--border-divider)]">
+            {rustData.toolchains.map((tc) => {
               const isDeleting = deletingToolchainName === tc.name;
               return (
-                <WinUICard
+                <div
                   key={tc.name}
-                  className={`p-3.5 bg-[var(--card-bg)] border transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
-                    tc.is_active
-                      ? "border-emerald-500/30 bg-emerald-500/[0.02]"
-                      : "border-[var(--border-subtle)] hover:border-[var(--border-default)]"
-                  }`}
+                  className="px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-[var(--fill-subtle)] transition-colors"
                 >
-                  <div className="space-y-1 min-w-0 flex-1">
+                  <div className="min-w-0 flex-1 space-y-0.5">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-semibold text-xs text-[var(--text-primary)] truncate">
-                        {tc.name}
-                      </span>
+                      <span className="text-sm font-medium text-[var(--text-primary)] truncate">{tc.name}</span>
                       {tc.is_active && (
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-medium">
-                          ✓ {t.aiAndToolchains.activeDefault}
-                        </span>
+                        <Badge tone="success">
+                          <CheckmarkCircle16Filled className="w-3.5 h-3.5" />
+                          {t.aiAndToolchains.activeDefault}
+                        </Badge>
                       )}
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-white/[0.04] text-[var(--text-secondary)] border border-[var(--border-subtle)] font-medium capitalize">
-                        {tc.channel}
-                      </span>
+                      <Badge className="capitalize">{tc.channel}</Badge>
                     </div>
-                    <p className="text-xs text-[var(--text-muted)] truncate font-mono">
-                      {tc.path}
-                    </p>
+                    <p className="text-xs text-[var(--text-muted)] truncate font-code">{tc.path}</p>
                   </div>
 
-                  <div className="flex items-center gap-3 shrink-0 self-end sm:self-center">
-                    <div className="text-right">
-                      <div className="text-xs font-bold text-[var(--text-primary)]">
-                        {formatBytes(tc.size_bytes)}
-                      </div>
-                    </div>
-
-                    <button
-                      onClick={() => revealItemInDir(tc.path)}
-                      title={t.common.showInFolder}
-                      className="p-1.5 text-[var(--text-secondary)] hover:text-white rounded hover:bg-white/[0.06] cursor-pointer transition-colors"
-                    >
-                      <FolderOpen16Regular className="w-4 h-4" />
-                    </button>
-
+                  <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                    <span className="text-sm font-semibold font-ibm-mono tabular-nums text-[var(--text-primary)] mr-1">
+                      {formatBytes(tc.size_bytes)}
+                    </span>
+                    {renderReveal(tc.path)}
                     <WinUIButton
-                      variant={tc.is_active ? "standard" : "danger"}
+                      variant="standard"
                       size="sm"
                       disabled={isDeleting}
                       onClick={() =>
@@ -516,119 +423,89 @@ export const AiAndToolchainsView: React.FC = () => {
                           sizeBytes: tc.size_bytes,
                         })
                       }
-                      icon={<Delete20Regular className="w-3.5 h-3.5" />}
+                      icon={<Delete20Regular className="w-4 h-4" />}
                     >
-                      {isDeleting
-                        ? t.aiAndToolchains.cleaningToolchain
-                        : t.aiAndToolchains.cleanToolchain}
+                      {isDeleting ? t.aiAndToolchains.cleaningToolchain : t.aiAndToolchains.cleanToolchain}
                     </WinUIButton>
                   </div>
-                </WinUICard>
+                </div>
               );
-            })
-          )}
-        </div>
-      )}
+            })}
+          </Card>
+        ))}
 
       {/* Subtab 3: Conda Package Cache */}
-      {subTab === "conda" && (
-        <div className="space-y-3">
-          {loadingConda ? (
-            <WinUICard className="p-8 text-center space-y-3">
-              <div className="flex items-center justify-center gap-2 text-xs font-semibold text-[var(--text-primary)]">
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-                </span>
-                <span>{t.aiAndToolchains.scanning}</span>
-              </div>
-              <div className="max-w-xs mx-auto h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
-                <div className="h-full bg-emerald-500 rounded-full animate-pulse w-3/4" />
-              </div>
-              <p className="text-xs text-[var(--text-muted)]">
-                Inspecting Conda and Miniconda package tarball caches...
-              </p>
-            </WinUICard>
-          ) : !condaData || (!condaData.found && condaData.total_size_bytes === 0) ? (
-            <WinUICard className="p-8 text-center text-[var(--text-secondary)]">
-              <CheckmarkCircle20Filled className="w-8 h-8 text-emerald-400 mx-auto mb-2" />
-              <div className="text-sm font-semibold text-[var(--text-primary)]">
-                {t.aiAndToolchains.noCondaFound}
-              </div>
-              <div className="text-xs text-[var(--text-muted)] mt-1">
-                {t.aiAndToolchains.noCondaDesc}
-              </div>
-            </WinUICard>
-          ) : (
-            <WinUICard className="p-5 bg-[var(--card-bg)] border border-[var(--border-subtle)] space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div>
-                  <h3 className="font-semibold text-sm text-[var(--text-primary)] flex items-center gap-2">
-                    <Box20Filled className="w-4 h-4 text-emerald-400" />
+      {subTab === "conda" &&
+        (loadingConda ? (
+          renderLoading("Inspecting Conda and Miniconda package tarball caches...")
+        ) : !condaData || (!condaData.found && condaData.total_size_bytes === 0) ? (
+          <EmptyState
+            icon={<CheckmarkCircle20Filled className="text-[var(--success)]" />}
+            title={t.aiAndToolchains.noCondaFound}
+            description={t.aiAndToolchains.noCondaDesc}
+          />
+        ) : (
+          <Card padded={false} className="overflow-hidden">
+            <div className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-start gap-3 min-w-0">
+                <Box20Regular className="w-5 h-5 text-[var(--text-secondary)] shrink-0 mt-0.5" />
+                <div className="min-w-0">
+                  <h3 className="text-sm font-semibold text-[var(--text-primary)]">
                     Conda & Miniconda Downloaded Package Tarballs
                   </h3>
-                  <p className="text-xs text-[var(--text-muted)] mt-0.5">
+                  <p className="text-xs text-[var(--text-secondary)] mt-0.5">
                     {condaData.package_count} cached .conda and .tar.bz2 archives consuming{" "}
-                    <strong>{formatBytes(condaData.total_size_bytes)}</strong>.
+                    <strong className="font-ibm-mono text-[var(--text-primary)]">{formatBytes(condaData.total_size_bytes)}</strong>.
                   </p>
                 </div>
-
-                <WinUIButton
-                  variant="primary"
-                  disabled={cleaningConda || condaData.total_size_bytes === 0}
-                  onClick={() =>
-                    setConfirmTarget({
-                      type: "conda",
-                      name: "Conda Package Cache",
-                      path: condaData.cache_dirs[0] || "",
-                      sizeBytes: condaData.total_size_bytes,
-                    })
-                  }
-                  icon={<Delete20Regular className="w-3.5 h-3.5" />}
-                >
-                  {cleaningConda
-                    ? t.aiAndToolchains.cleaningConda
-                    : `${t.aiAndToolchains.cleanConda} (${formatBytes(
-                        condaData.total_size_bytes
-                      )})`}
-                </WinUIButton>
               </div>
 
-              {condaData.cache_dirs.length > 0 && (
-                <div className="bg-black/20 p-3 rounded border border-[var(--border-subtle)] space-y-1.5">
-                  <div className="text-xs font-semibold text-[var(--text-secondary)]">
-                    Scanned Package Repositories:
-                  </div>
+              <WinUIButton
+                variant="primary"
+                disabled={cleaningConda || condaData.total_size_bytes === 0}
+                onClick={() =>
+                  setConfirmTarget({
+                    type: "conda",
+                    name: "Conda Package Cache",
+                    path: condaData.cache_dirs[0] || "",
+                    sizeBytes: condaData.total_size_bytes,
+                  })
+                }
+                icon={<Delete20Regular className="w-4 h-4" />}
+              >
+                {cleaningConda
+                  ? t.aiAndToolchains.cleaningConda
+                  : `${t.aiAndToolchains.cleanConda} (${formatBytes(condaData.total_size_bytes)})`}
+              </WinUIButton>
+            </div>
+
+            {condaData.cache_dirs.length > 0 && (
+              <div className="border-t border-[var(--border-divider)]">
+                <div className="px-4 pt-3 pb-1 text-xs text-[var(--text-secondary)]">Scanned Package Repositories:</div>
+                <div className="divide-y divide-[var(--border-divider)]">
                   {condaData.cache_dirs.map((dir) => (
                     <div
                       key={dir}
-                      className="text-xs text-[var(--text-muted)] font-mono flex items-center justify-between"
+                      className="px-4 py-2 flex items-center justify-between gap-3 hover:bg-[var(--fill-subtle)] transition-colors"
                     >
-                      <span>{dir}</span>
-                      <button
-                        onClick={() => revealItemInDir(dir)}
-                        className="text-[var(--text-secondary)] hover:text-white cursor-pointer"
-                        title={t.common.showInFolder}
-                      >
-                        <FolderOpen16Regular className="w-3.5 h-3.5" />
-                      </button>
+                      <span className="text-xs text-[var(--text-secondary)] font-code truncate">{dir}</span>
+                      {renderReveal(dir)}
                     </div>
                   ))}
                 </div>
-              )}
-            </WinUICard>
-          )}
-        </div>
-      )}
+              </div>
+            )}
+          </Card>
+        ))}
 
-      {/* Confirmation Modal */}
+      {/* Confirmation modal */}
       {confirmTarget && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <WinUICard className="max-w-md w-full p-5 bg-[var(--card-bg)] border border-[var(--border-subtle)] shadow-2xl space-y-4">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <Card className="max-w-md w-full p-5 shadow-xl space-y-4">
             <div className="flex items-start justify-between gap-3">
-              <div className="flex items-center gap-2.5 text-amber-400">
-                <Warning20Filled className="w-5 h-5 shrink-0" />
-                <h3 className="font-semibold text-sm text-[var(--text-primary)]">
+              <div className="flex items-center gap-2.5">
+                <Warning20Filled className="w-5 h-5 shrink-0 text-[var(--brand-amber)]" />
+                <h3 className="font-semibold text-base text-[var(--text-primary)]">
                   {confirmTarget.type === "ai"
                     ? t.aiAndToolchains.confirmDeleteModel
                     : confirmTarget.type === "rust"
@@ -638,13 +515,14 @@ export const AiAndToolchainsView: React.FC = () => {
               </div>
               <button
                 onClick={() => setConfirmTarget(null)}
-                className="text-[var(--text-muted)] hover:text-[var(--text-primary)] cursor-pointer"
+                className="p-1 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--fill-subtle)] cursor-pointer"
+                title={t.common.cancel}
               >
-                <DismissCircle20Regular className="w-4 h-4" />
+                <Dismiss16Regular className="w-4 h-4" />
               </button>
             </div>
 
-            <p className="text-xs text-[var(--text-secondary)]">
+            <p className="text-sm text-[var(--text-secondary)]">
               {confirmTarget.type === "ai"
                 ? t.aiAndToolchains.confirmDeleteModelDesc
                 : confirmTarget.type === "rust"
@@ -653,32 +531,25 @@ export const AiAndToolchainsView: React.FC = () => {
             </p>
 
             {confirmTarget.isActive && (
-              <div className="bg-rose-500/10 border border-rose-500/30 p-2.5 rounded text-xs text-rose-300 flex items-center gap-2">
-                <Warning20Filled className="w-4 h-4 text-rose-400 shrink-0" />
+              <div className="px-3 py-2 rounded-md border border-[color-mix(in_srgb,var(--danger)_40%,transparent)] bg-[color-mix(in_srgb,var(--danger)_10%,transparent)] text-sm text-[var(--danger)] flex items-center gap-2">
+                <Warning20Filled className="w-4 h-4 shrink-0" />
                 <span>{t.aiAndToolchains.activeToolchainWarning}</span>
               </div>
             )}
 
-            <div className="bg-white/[0.04] p-3 rounded border border-[var(--border-subtle)] space-y-1 text-xs">
-              <div className="flex justify-between">
-                <span className="text-[var(--text-muted)]">{t.common.name}:</span>
-                <span className="font-medium text-[var(--text-primary)]">
-                  {confirmTarget.name}
-                </span>
+            <div className="rounded-md bg-[var(--fill-subtle)] border border-[var(--border-card)] text-sm divide-y divide-[var(--border-divider)]">
+              <div className="flex justify-between gap-3 px-3 py-2">
+                <span className="text-[var(--text-secondary)]">{t.common.name}</span>
+                <span className="font-medium text-[var(--text-primary)] truncate">{confirmTarget.name}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-[var(--text-muted)]">{t.common.size}:</span>
-                <span className="font-semibold text-emerald-400">
-                  {formatBytes(confirmTarget.sizeBytes)}
-                </span>
+              <div className="flex justify-between gap-3 px-3 py-2">
+                <span className="text-[var(--text-secondary)]">{t.common.size}</span>
+                <span className="font-semibold font-ibm-mono text-[var(--text-primary)]">{formatBytes(confirmTarget.sizeBytes)}</span>
               </div>
             </div>
 
             <div className="flex items-center justify-end gap-2 pt-2">
-              <WinUIButton
-                variant="standard"
-                onClick={() => setConfirmTarget(null)}
-              >
+              <WinUIButton variant="standard" onClick={() => setConfirmTarget(null)}>
                 {t.common.cancel}
               </WinUIButton>
               <WinUIButton
@@ -696,7 +567,7 @@ export const AiAndToolchainsView: React.FC = () => {
                 {t.common.confirm}
               </WinUIButton>
             </div>
-          </WinUICard>
+          </Card>
         </div>
       )}
     </div>

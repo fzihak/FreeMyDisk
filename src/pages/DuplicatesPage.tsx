@@ -4,17 +4,15 @@ import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { useI18nStore } from "@/i18n";
 import { useSettingsStore } from "@/stores/settings-store";
 import { toast } from "@/stores/toast-store";
-import { WinUICard } from "@/components/winui/WinUICard";
+import { useScanProgress, useScanProgressStore } from "@/stores/scan-progress-store";
 import { WinUIButton } from "@/components/winui/WinUIButton";
-import { LiveScanProgressWidget } from "@/components/shared/LiveScanProgressWidget";
+import { Page, PageHeader, Card, StatCard, Badge, ProgressBar, FilterTabs, EmptyState, ActionBar } from "@/components/ui";
 import {
-  DocumentCopy24Filled,
+  DocumentCopy20Regular,
   Delete20Regular,
   ArrowClockwise20Regular,
   Link20Regular,
-  Document20Regular,
   CheckmarkCircle20Filled,
-  Checkmark16Filled,
   Search20Regular,
   Layer20Regular,
   HardDrive20Regular,
@@ -23,6 +21,7 @@ import {
   FolderOpen20Regular,
   Folder20Regular,
   Sparkle20Filled,
+  Dismiss16Regular,
 } from "@fluentui/react-icons";
 import { describeDisposal } from "@/utils/disposal";
 
@@ -103,6 +102,90 @@ const PROTECTED_SYSTEM_FILES = new Set([
 
 const isProtectedSystemFile = (path: string): boolean =>
   PROTECTED_SYSTEM_FILES.has((path.split(/[\\/]/).pop() || "").toLowerCase());
+
+/** Short size for drive chips: "21 GB", "1.8 TB". */
+const compactBytes = (bytes: number): string => {
+  if (!bytes || bytes <= 0) return "0 GB";
+  const gb = bytes / (1024 * 1024 * 1024);
+  if (gb >= 1024) return `${(gb / 1024).toFixed(1)} TB`;
+  return gb >= 10 ? `${Math.round(gb)} GB` : `${gb.toFixed(1)} GB`;
+};
+
+/** Drive picker chip. The selected chip gets the accent border. */
+const DriveChip: React.FC<{
+  selected: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+  title?: string;
+  children: React.ReactNode;
+}> = ({ selected, disabled, onClick, title, children }) => (
+  <button
+    onClick={onClick}
+    disabled={disabled}
+    title={title}
+    className={`h-9 px-3 rounded-md border text-sm inline-flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+      selected
+        ? "border-[var(--accent)] bg-[var(--fill-subtle)] text-[var(--text-primary)]"
+        : "border-[var(--border-card)] text-[var(--text-secondary)] hover:bg-[var(--fill-subtle)] hover:text-[var(--text-primary)] cursor-pointer"
+    }`}
+  >
+    {children}
+  </button>
+);
+
+/** Live progress of a running scan or disposal, fed by the backend progress events. */
+const ScanProgressCard: React.FC<{
+  scanType: string;
+  title: string;
+  subtitle?: string;
+  cancelLabel?: string;
+  onCancel?: () => void;
+}> = ({ scanType, title, subtitle, cancelLabel, onCancel }) => {
+  const { initProgressListener } = useScanProgressStore();
+  const progress = useScanProgress(scanType);
+
+  useEffect(() => {
+    let unlisten: (() => void) | null = null;
+    initProgressListener().then((u) => {
+      unlisten = u;
+    });
+    return () => {
+      if (unlisten) unlisten();
+    };
+  }, [initProgressListener]);
+
+  const percent = Math.max(1, Math.min(100, progress.percent || 1));
+
+  return (
+    <Card className="space-y-3">
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <div className="text-sm font-semibold text-[var(--text-primary)]">{progress.stage || title}</div>
+          <div className="text-xs text-[var(--text-secondary)] mt-0.5 truncate">{subtitle ? `${title} · ${subtitle}` : title}</div>
+        </div>
+        <div className="flex items-center gap-3 shrink-0">
+          <span className="text-sm font-ibm-mono text-[var(--text-secondary)]">{percent}%</span>
+          {onCancel && (
+            <WinUIButton size="sm" onClick={onCancel} icon={<Dismiss16Regular className="w-4 h-4" />}>
+              {cancelLabel}
+            </WinUIButton>
+          )}
+        </div>
+      </div>
+      <ProgressBar value={percent} />
+      <div className="flex items-center justify-between gap-4">
+        <div className="font-code text-xs text-[var(--text-muted)] truncate min-w-0" title={progress.currentPath}>
+          {progress.currentPath || "…"}
+        </div>
+        {progress.itemsScanned > 0 && (
+          <span className="text-xs font-ibm-mono text-[var(--text-muted)] shrink-0">
+            {progress.itemsScanned.toLocaleString()}
+          </span>
+        )}
+      </div>
+    </Card>
+  );
+};
 
 export const DuplicatesPage: React.FC = () => {
   const { t } = useI18nStore();
@@ -407,149 +490,110 @@ export const DuplicatesPage: React.FC = () => {
         : t.common.allDrives
       : selectedDrive;
 
+  const folderSelectedCount = scanResult?.folder_groups
+    ? scanResult.folder_groups.reduce((acc, g) => acc + g.directories.filter((d) => d.selected).length, 0)
+    : 0;
+
+  const requestTrashSelected = () => {
+    if (confirmBeforeDelete) {
+      setShowConfirmModal(true);
+    } else {
+      handleTrashSelected();
+    }
+  };
+
+  const busy = scanning || trashing;
+
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-4 select-none font-sans text-[var(--text-primary)] pb-24">
-      {/* WinUI 3 Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-[4px] bg-white/[0.04] border border-[var(--border-subtle)] flex items-center justify-center text-[#0078d4] shrink-0">
-            <DocumentCopy24Filled className="w-6 h-6" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl font-semibold tracking-tight text-[var(--text-primary)]">
-                {t.duplicates.title}
-              </h1>
-              <span className="px-2 py-0.5 rounded-[4px] text-xs font-ibm-mono uppercase tracking-wider bg-[#0078d4]/10 text-[#0078d4] border border-[#0078d4]/20">
-                {t.duplicates.exactMatchBadge}
-              </span>
-            </div>
-            <p className="text-xs text-[var(--text-secondary)]">
-              {t.duplicates.subtitle}
-            </p>
-          </div>
-        </div>
-
-        {/* Quick scan controls */}
-        <div className="flex flex-wrap items-center gap-2.5">
-          <div className="flex items-center gap-2 bg-black/20 px-2.5 py-1 rounded-[4px] border border-[var(--border-card)]">
-            <span className="text-xs text-[var(--text-secondary)] font-medium">{t.duplicates.minSize}</span>
-            <select
-              value={minSizeKb}
-              disabled={scanning || trashing}
-              onChange={(e) => {
-                const val = Number(e.target.value);
-                setMinSizeKb(val);
-                handleScan(selectedDrive, val);
-              }}
-              className="bg-transparent text-[var(--text-primary)] text-xs font-ibm-mono font-semibold focus:outline-none cursor-pointer disabled:opacity-50"
-            >
-              <option value={1} className="bg-[#202020] text-[var(--text-primary)]">≥ 1 KB</option>
-              <option value={10} className="bg-[#202020] text-[var(--text-primary)]">≥ 10 KB</option>
-              <option value={1024} className="bg-[#202020] text-[var(--text-primary)]">≥ 1 MB</option>
-              <option value={10240} className="bg-[#202020] text-[var(--text-primary)]">≥ 10 MB</option>
-              <option value={102400} className="bg-[#202020] text-[var(--text-primary)]">≥ 100 MB</option>
-            </select>
-          </div>
-
-          <WinUIButton
-            variant="primary"
-            onClick={() => handleScan()}
-            disabled={scanning || trashing}
-            className="flex items-center gap-1.5"
-          >
-            <ArrowClockwise20Regular className={`w-3.5 h-3.5 ${scanning ? "animate-spin" : ""}`} />
-            <span>{scanning ? t.common.scanning : t.common.rescan}</span>
-          </WinUIButton>
-
-          {totalSelectedCount > 0 && (
+    <Page className="select-none">
+      <PageHeader
+        icon={<DocumentCopy20Regular />}
+        title={
+          <span className="inline-flex items-center gap-3">
+            {t.duplicates.title}
+            <Badge tone="accent">{t.duplicates.exactMatchBadge}</Badge>
+          </span>
+        }
+        description={t.duplicates.subtitle}
+        actions={
+          <>
+            <label className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+              <span className="whitespace-nowrap">{t.duplicates.minSize}</span>
+              <select
+                value={minSizeKb}
+                disabled={busy}
+                onChange={(e) => {
+                  const val = Number(e.target.value);
+                  setMinSizeKb(val);
+                  handleScan(selectedDrive, val);
+                }}
+                className="h-8 px-2 rounded-md bg-[var(--bg-input)] border border-[var(--border-card)] text-sm text-[var(--text-primary)] font-ibm-mono focus:outline-none focus:border-[var(--accent)] cursor-pointer disabled:opacity-50"
+              >
+                <option value={1} className="bg-[var(--bg-card)] text-[var(--text-primary)]">≥ 1 KB</option>
+                <option value={10} className="bg-[var(--bg-card)] text-[var(--text-primary)]">≥ 10 KB</option>
+                <option value={1024} className="bg-[var(--bg-card)] text-[var(--text-primary)]">≥ 1 MB</option>
+                <option value={10240} className="bg-[var(--bg-card)] text-[var(--text-primary)]">≥ 10 MB</option>
+                <option value={102400} className="bg-[var(--bg-card)] text-[var(--text-primary)]">≥ 100 MB</option>
+              </select>
+            </label>
             <WinUIButton
-              variant="danger"
-              onClick={() => {
-                if (confirmBeforeDelete) {
-                  setShowConfirmModal(true);
-                } else {
-                  handleTrashSelected();
-                }
-              }}
-              disabled={trashing || scanning}
-              className="flex items-center gap-1.5"
+              variant="primary"
+              onClick={() => handleScan()}
+              disabled={busy}
+              icon={<ArrowClockwise20Regular className={`w-4 h-4 ${scanning ? "animate-spin" : ""}`} />}
             >
-              <Delete20Regular className="w-3.5 h-3.5" />
-              <span>{trashing ? t.duplicates.trashingProgress : `${t.duplicates.trashSelected} (${totalSelectedCount}) • ${formatBytes(totalSelectedBytes)}`}</span>
+              {scanning ? t.common.scanning : scanResult ? t.common.rescan : t.duplicates.scan}
             </WinUIButton>
-          )}
-        </div>
-      </div>
+          </>
+        }
+      />
 
-      {/* Drive Selection Pills */}
+      {/* Drive picker */}
       {volumes.length > 0 && (
-        <WinUICard className="p-3 space-y-2">
-          <div className="flex items-center gap-2 text-xs font-medium text-[var(--text-secondary)]">
-            <HardDrive20Regular className="w-4 h-4 text-[#0078d4]" />
+        <Card className="space-y-3">
+          <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]">
+            <HardDrive20Regular className="w-4 h-4 text-[var(--text-secondary)]" />
             <span>{t.duplicates.selectDrive}</span>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <button
+            <DriveChip
+              selected={selectedDrive === "ALL"}
+              disabled={busy}
               onClick={() => {
                 setSelectedDrive("ALL");
                 handleScan("ALL", minSizeKb);
               }}
-              disabled={scanning || trashing}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-[4px] text-xs transition-all ${
-                scanning || trashing ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
-              } ${
-                selectedDrive === "ALL"
-                  ? "bg-[#0078d4] text-white shadow-xs"
-                  : "bg-black/20 hover:bg-white/[0.05] text-[var(--text-primary)] border border-[var(--border-card)]"
-              }`}
             >
-              <HardDrive20Regular className="w-3.5 h-3.5" />
-              <span className="font-semibold">{t.common.allDrives}</span>
-              <span
-                className={`text-xs px-1.5 py-0.5 rounded-[3px] font-ibm-mono tabular-nums ${
-                  selectedDrive === "ALL" ? "bg-white/20 text-white" : "bg-black/30 text-[var(--text-secondary)]"
-                }`}
-              >
-                {volumes.length}
-              </span>
-            </button>
+              <HardDrive20Regular className="w-4 h-4" />
+              <span className="font-medium">{t.common.allDrives}</span>
+              <span className="text-xs text-[var(--text-muted)] font-ibm-mono">{volumes.length}</span>
+            </DriveChip>
 
             {volumes.map((vol) => {
-              const isSelected = selectedDrive === vol.mount_point;
-              const freeGb = (vol.available_bytes / (1024 * 1024 * 1024)).toFixed(1);
-              const totalGb = (vol.total_bytes / (1024 * 1024 * 1024)).toFixed(1);
-
               return (
-                <button
+                <DriveChip
                   key={vol.mount_point}
+                  selected={selectedDrive === vol.mount_point}
+                  disabled={busy}
+                  title={vol.volume_name || t.common.drive}
                   onClick={() => {
                     setSelectedDrive(vol.mount_point);
                     handleScan(vol.mount_point, minSizeKb);
                   }}
-                  disabled={scanning || trashing}
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded-[4px] text-xs transition-all ${
-                    scanning || trashing ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
-                  } ${
-                    isSelected
-                      ? "bg-[#0078d4] text-white shadow-xs"
-                      : "bg-black/20 hover:bg-white/[0.05] text-[var(--text-primary)] border border-[var(--border-card)]"
-                  }`}
                 >
-                  <span className="font-ibm-mono font-bold">{vol.mount_point}</span>
-                  <span className="text-xs opacity-80">{vol.volume_name || t.common.drive}</span>
-                  <span
-                    className={`text-xs px-1.5 py-0.5 rounded-[3px] font-ibm-mono tabular-nums ${
-                      isSelected ? "bg-white/20 text-white" : "bg-black/30 text-[var(--text-secondary)]"
-                    }`}
-                  >
-                    {freeGb} GB {t.common.freeOf} {totalGb} GB
+                  <span className="font-medium font-ibm-mono text-[var(--text-primary)]">
+                    {vol.mount_point.replace(/[\\/]+$/, "")}
                   </span>
-                </button>
+                  <span className="text-xs text-[var(--text-muted)] font-ibm-mono">
+                    {compactBytes(vol.available_bytes)} {t.common.freeOf} {compactBytes(vol.total_bytes)}
+                  </span>
+                </DriveChip>
               );
             })}
 
-            <button
+            <DriveChip
+              selected={selectedDrive !== "ALL" && !volumes.some((v) => v.mount_point === selectedDrive)}
+              disabled={busy}
               onClick={() => {
                 const custom = prompt(t.duplicates.customPathPrompt, selectedDrive === "ALL" ? "C:\\" : selectedDrive);
                 if (custom && custom.trim()) {
@@ -557,505 +601,415 @@ export const DuplicatesPage: React.FC = () => {
                   handleScan(custom.trim(), minSizeKb);
                 }
               }}
-              disabled={scanning || trashing}
-              className={`px-3 py-1.5 rounded-[4px] text-xs font-medium bg-black/20 hover:bg-white/[0.05] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border-card)] transition-all flex items-center gap-1.5 ${
-                scanning || trashing ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
-              }`}
             >
-              <Folder20Regular className="w-3.5 h-3.5" />
-              <span>{t.common.showInFolder}...</span>
-            </button>
+              <Folder20Regular className="w-4 h-4" />
+              <span className="max-w-[220px] truncate">
+                {selectedDrive !== "ALL" && !volumes.some((v) => v.mount_point === selectedDrive)
+                  ? selectedDrive
+                  : `${t.common.showInFolder}…`}
+              </span>
+            </DriveChip>
           </div>
-        </WinUICard>
+        </Card>
       )}
 
-      {/* Disposal Summary Notification */}
+      {/* Disposal summary */}
       {disposalSummary && (
-        <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-[4px] flex items-center justify-between shadow-xs">
-          <div className="flex items-center gap-2.5">
-            <CheckmarkCircle20Filled className="w-4 h-4 text-emerald-400 shrink-0" />
-            <div>
-              <div className="text-xs font-semibold text-emerald-400">
-                {t.cleanup.cleanComplete}
-              </div>
-              <div className="text-xs text-emerald-400/80 font-ibm-mono tabular-nums">
-                {disposalSummary.successful_items} {t.common.files} • {describeDisposal(disposalSummary, t, formatBytes)}
+        <Card className="flex items-center justify-between gap-3 py-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <CheckmarkCircle20Filled className="w-5 h-5 text-[var(--success)] shrink-0" />
+            <div className="min-w-0">
+              <div className="text-sm font-semibold text-[var(--text-primary)]">{t.cleanup.cleanComplete}</div>
+              <div className="text-xs text-[var(--text-secondary)] font-ibm-mono truncate">
+                {disposalSummary.successful_items} {t.common.files} · {describeDisposal(disposalSummary, t, formatBytes)}
               </div>
             </div>
           </div>
-          <button
-            onClick={() => setDisposalSummary(null)}
-            className="text-xs text-emerald-400 hover:text-white px-2 py-0.5 rounded-[3px] bg-emerald-500/20 font-medium cursor-pointer"
-          >
+          <WinUIButton variant="subtle" size="sm" onClick={() => setDisposalSummary(null)}>
             {t.common.dismiss}
-          </button>
-        </div>
+          </WinUIButton>
+        </Card>
       )}
 
-      {/* 4-Tile Stat Strip */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <WinUICard className="p-3.5">
-          <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] mb-1">
-            <span className="font-medium text-xs">{t.duplicates.statSets}</span>
-            <Layer20Regular className="w-3.5 h-3.5 text-[#0078d4]" />
-          </div>
-          <div className="text-xl font-bold text-[var(--text-primary)] font-ibm-mono tabular-nums">
-            {scanResult ? scanResult.total_groups.toLocaleString() : "—"}
-          </div>
-          <div className="text-xs text-[var(--text-muted)] font-ibm-mono tabular-nums mt-1">
-            {scanResult ? `${filteredGroups.length} ${t.duplicates.setsShown}` : t.common.notScannedYet}
-          </div>
-        </WinUICard>
-
-        <WinUICard className="p-3.5">
-          <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] mb-1">
-            <span className="font-medium text-xs">{t.duplicates.statFiles}</span>
-            <DocumentCopy24Filled className="w-3.5 h-3.5 text-indigo-400" />
-          </div>
-          <div className="text-xl font-bold text-indigo-400 font-ibm-mono tabular-nums">
-            {scanResult ? scanResult.total_duplicate_files.toLocaleString() : "—"}
-          </div>
-          <div className="text-xs text-[var(--text-muted)] font-ibm-mono tabular-nums mt-1">
-            {scanResult ? `${totalSelectedCount} ${t.duplicates.filesSelected}` : t.common.notScannedYet}
-          </div>
-        </WinUICard>
-
-        <WinUICard className="p-3.5">
-          <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] mb-1">
-            <span className="font-medium text-xs">{t.duplicates.potentialSavings}</span>
-            <HardDrive20Regular className="w-3.5 h-3.5 text-emerald-400" />
-          </div>
-          <div className="text-xl font-bold text-emerald-400 font-ibm-mono tabular-nums">
-            {scanResult ? formatBytes(scanResult.total_potential_savings) : "—"}
-          </div>
-          <div className="text-xs text-[var(--text-muted)] font-ibm-mono truncate mt-1" title={scanTargetLabel}>
-            {scanTargetLabel}
-          </div>
-        </WinUICard>
-
-        <WinUICard className="p-3.5">
-          <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] mb-1">
-            <span className="font-medium text-xs">{t.duplicates.hideHardlinks}</span>
-            <Link20Regular className="w-3.5 h-3.5 text-amber-400" />
-          </div>
-          <div className="text-xl font-bold text-amber-400 font-ibm-mono tabular-nums">
-            {totalHardlinkGroups}
-          </div>
-          <div className="text-xs text-amber-400/80 font-ibm-mono mt-1">
-            0 B (NTFS)
-          </div>
-        </WinUICard>
-      </div>
-
-      {/* Instant Hash Cache Acceleration Banner */}
-      {scanResult && scanResult.cache_hits !== undefined && scanResult.cache_hits > 0 && (
-        <div className="p-3 bg-[#0078d4]/10 border border-[#0078d4]/30 rounded-[4px] flex items-center justify-between text-xs text-blue-300">
-          <div className="flex items-center gap-2">
-            <Sparkle20Filled className="w-4 h-4 text-[#0078d4]" />
-            <span>
-              <strong>⚡ {t.duplicateFolders.instantCacheActive}:</strong> {scanResult.cache_hits.toLocaleString()} {t.common.files} {t.duplicateFolders.cacheHitDesc} ({scanResult.scan_duration_ms || 0}ms).
-            </span>
-          </div>
-        </div>
-      )}
-
-      {/* Files vs Folders Tab Switcher */}
-      <div className="flex items-center gap-2 pt-1">
-        <button
-          onClick={() => setActiveTab("files")}
-          className={`px-3.5 py-1.5 text-xs font-semibold rounded-[4px] transition-all cursor-pointer flex items-center gap-1.5 ${
-            activeTab === "files"
-              ? "bg-[#0078d4] text-white shadow-xs"
-              : "bg-black/20 text-[var(--text-secondary)] hover:text-white border border-[var(--border-card)]"
-          }`}
-        >
-          <Document20Regular className="w-3.5 h-3.5" />
-          <span>{t.duplicateFolders.tabFiles} ({scanResult?.groups.length || 0})</span>
-        </button>
-        <button
-          onClick={() => setActiveTab("folders")}
-          className={`px-3.5 py-1.5 text-xs font-semibold rounded-[4px] transition-all cursor-pointer flex items-center gap-1.5 ${
-            activeTab === "folders"
-              ? "bg-[#0078d4] text-white shadow-xs"
-              : "bg-black/20 text-[var(--text-secondary)] hover:text-white border border-[var(--border-card)]"
-          }`}
-        >
-          <Folder20Regular className="w-3.5 h-3.5" />
-          <span>{t.duplicateFolders.tabFolders} ({scanResult?.folder_groups?.length || 0})</span>
-        </button>
-      </div>
-
-      {/* Controls & Quick Select Bar (for Files tab) */}
-      {activeTab === "files" && (
-        <WinUICard className="p-3 flex flex-col lg:flex-row items-center justify-between gap-3">
-        {/* Search */}
-        <div className="relative w-full lg:w-72">
-          <Search20Regular className="w-3.5 h-3.5 absolute left-2.5 top-2 text-[var(--text-muted)]" />
-          <input
-            type="text"
-            placeholder={t.duplicates.searchPlaceholder}
-            value={searchFilter}
-            onChange={(e) => setSearchFilter(e.target.value)}
-            className="w-full pl-8 pr-3 py-1 bg-black/20 border border-[var(--border-card)] rounded-[4px] text-xs font-ibm-mono text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-[#0078d4]"
-          />
-        </div>
-
-        {/* Heuristic Presets */}
-        <div className="flex flex-wrap items-center gap-1.5 w-full lg:w-auto">
-          <span className="text-xs font-medium text-[var(--text-secondary)]">{t.duplicates.autoSelectRules}</span>
-          <button
-            onClick={() => applyHeuristic("oldest")}
-            className="px-2.5 py-1 bg-black/20 hover:bg-white/[0.05] text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-[4px] text-xs font-medium transition-all cursor-pointer border border-[var(--border-card)]"
-          >
-            {t.duplicates.keepOldest}
-          </button>
-          <button
-            onClick={() => applyHeuristic("newest")}
-            className="px-2.5 py-1 bg-black/20 hover:bg-white/[0.05] text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-[4px] text-xs font-medium transition-all cursor-pointer border border-[var(--border-card)]"
-          >
-            {t.duplicates.keepNewest}
-          </button>
-          <button
-            onClick={() => applyHeuristic("shortest")}
-            className="px-2.5 py-1 bg-black/20 hover:bg-white/[0.05] text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-[4px] text-xs font-medium transition-all cursor-pointer border border-[var(--border-card)]"
-          >
-            {t.duplicates.keepShortestPath}
-          </button>
-          <button
-            onClick={() => applyHeuristic("all-except-first")}
-            className="px-2.5 py-1 bg-[#0078d4] text-white rounded-[4px] text-xs font-medium transition-all cursor-pointer"
-          >
-            {t.duplicates.selectAllDuplicates}
-          </button>
-          <button
-            onClick={() => applyHeuristic("none")}
-            className="px-2.5 py-1 bg-black/20 hover:bg-white/[0.05] text-[var(--text-muted)] hover:text-[var(--text-secondary)] rounded-[4px] text-xs font-medium transition-all cursor-pointer border border-[var(--border-card)]"
-          >
-            {t.common.clear}
-          </button>
-
-          <div className="h-4 w-px bg-[var(--border-divider)] mx-1" />
-
-          <button
-            onClick={() => setHideHardlinks(!hideHardlinks)}
-            className={`px-2.5 py-1 rounded-[4px] text-xs font-medium transition-all flex items-center gap-1 cursor-pointer ${
-              hideHardlinks
-                ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
-                : "bg-black/20 text-[var(--text-muted)] hover:text-[var(--text-secondary)] border border-[var(--border-card)]"
-            }`}
-          >
-            <Link20Regular className="w-3 h-3" />
-            {hideHardlinks ? t.duplicates.hideHardlinks : t.common.all}
-          </button>
-        </div>
-      </WinUICard>
-      )}
-
-      {/* Folders Action Bar (for Folders tab) */}
-      {activeTab === "folders" && (
-        <WinUICard className="p-3 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
-            <Folder20Regular className="w-4 h-4 text-[#0078d4]" />
-            <span>
-              {scanResult?.folder_groups?.length || 0} {t.duplicateFolders.foldersFound}
-            </span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <WinUIButton
-              variant="danger"
-              onClick={() => handleTrashFolders()}
-              disabled={trashing || scanning || !(scanResult?.folder_groups?.some((g) => g.directories.some((d) => d.selected)))}
-              className="flex items-center gap-1.5"
-            >
-              <Delete20Regular className="w-3.5 h-3.5" />
-              <span>{trashing ? t.duplicateFolders.recyclingFolders : t.duplicateFolders.recycleSelectedFolders}</span>
-            </WinUIButton>
-          </div>
-        </WinUICard>
-      )}
-
-      {/* Duplicate Groups List */}
       {scanning ? (
-        <LiveScanProgressWidget
+        <ScanProgressCard
           scanType="duplicates"
           title={t.duplicates.scanning}
-          subtitle={`Target: ${scanTargetLabel} • ${t.duplicates.minSize} ≥ ${formatBytes(minSizeKb * 1024)}`}
+          subtitle={`${scanTargetLabel} · ${t.duplicates.minSize} ≥ ${formatBytes(minSizeKb * 1024)}`}
+          cancelLabel={t.duplicates.cancelScan}
           onCancel={handleCancelScan}
         />
       ) : trashing ? (
-        <LiveScanProgressWidget
-          scanType="disposal"
-          title="Recycling duplicate items to Recycle Bin..."
-          subtitle="Moving duplicate files safely to Windows Recycle Bin"
-          showCancel={false}
-        />
+        <ScanProgressCard scanType="disposal" title={t.duplicates.recyclingTitle} />
       ) : !scanResult ? (
-        <WinUICard className="p-12 text-center space-y-3">
-          <div className="w-12 h-12 rounded-[4px] bg-white/[0.04] border border-[var(--border-subtle)] flex items-center justify-center mx-auto text-[#0078d4]">
-            <DocumentCopy24Filled className="w-6 h-6" />
-          </div>
-          <div className="space-y-1">
-            <h3 className="text-sm font-semibold text-[var(--text-primary)]">{t.duplicates.readyTitle} ({scanTargetLabel})</h3>
-            <p className="text-xs text-[var(--text-secondary)] max-w-md mx-auto">
-              {t.duplicates.readyDesc}
-            </p>
-          </div>
-          <div className="pt-2">
-            <WinUIButton
-              variant="primary"
-              onClick={() => handleScan()}
-              className="inline-flex items-center gap-1.5"
-            >
-              <Search20Regular className="w-3.5 h-3.5" />
-              <span>{t.duplicates.startScan}</span>
+        <EmptyState
+          icon={<DocumentCopy20Regular />}
+          title={`${t.duplicates.readyTitle} (${scanTargetLabel})`}
+          description={t.duplicates.readyDesc}
+          action={
+            <WinUIButton variant="primary" onClick={() => handleScan()} icon={<Search20Regular className="w-4 h-4" />}>
+              {t.duplicates.startScan}
             </WinUIButton>
+          }
+        />
+      ) : (
+        <>
+          {/* Stats */}
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <StatCard
+              label={t.duplicates.statSets}
+              icon={<Layer20Regular />}
+              value={scanResult.total_groups.toLocaleString()}
+              hint={`${filteredGroups.length} ${t.duplicates.setsShown}`}
+            />
+            <StatCard
+              label={t.duplicates.statFiles}
+              icon={<DocumentCopy20Regular />}
+              value={scanResult.total_duplicate_files.toLocaleString()}
+              hint={`${totalSelectedCount} ${t.duplicates.filesSelected}`}
+            />
+            <StatCard
+              label={t.duplicates.statReclaimable}
+              icon={<HardDrive20Regular />}
+              tone="success"
+              value={formatBytes(scanResult.total_potential_savings)}
+              hint={<span title={scanTargetLabel}>{scanTargetLabel}</span>}
+            />
+            <StatCard
+              label={t.duplicates.statHardlinks}
+              icon={<Link20Regular />}
+              value={totalHardlinkGroups}
+              hint={hideHardlinks ? t.duplicates.hardlinksHiddenHint : t.duplicates.hardlinksShownHint}
+            />
           </div>
-        </WinUICard>
-      ) : activeTab === "folders" ? (
-        scanResult?.folder_groups && scanResult.folder_groups.length > 0 ? (
-          <div className="space-y-3">
-            {scanResult.folder_groups.map((fGroup) => (
-              <WinUICard key={fGroup.group_id} className="overflow-hidden">
-                <div className="px-4 py-2.5 bg-black/20 border-b border-[var(--border-divider)] flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <Folder20Regular className="w-4 h-4 text-[#0078d4] shrink-0" />
-                    <div className="font-ibm-mono text-xs font-semibold text-[var(--text-primary)] truncate">
-                      {fGroup.directories.length} {t.duplicateFolders.tabFolders} • {fGroup.total_files} {t.duplicateFolders.identicalFiles}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className="text-xs font-ibm-mono font-semibold text-emerald-400">
-                      {t.duplicateFolders.potentialSavings}: {formatBytes(fGroup.potential_savings_bytes)}
-                    </span>
-                  </div>
-                </div>
 
-                <div className="p-2 space-y-1.5 bg-black/10">
-                  {fGroup.directories.map((dir, dIdx) => (
-                    <div
-                      key={dir.path}
-                      className="flex items-center justify-between p-2 rounded-[4px] hover:bg-white/[0.03] text-xs transition-colors"
-                    >
-                      <div className="flex items-center gap-2.5 min-w-0">
+          {/* Hash cache info */}
+          {scanResult.cache_hits !== undefined && scanResult.cache_hits > 0 && (
+            <div className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
+              <Sparkle20Filled className="w-4 h-4 text-[var(--accent-text)] shrink-0" />
+              <span>
+                <span className="font-medium text-[var(--text-primary)]">{t.duplicateFolders.instantCacheActive}:</span>{" "}
+                {scanResult.cache_hits.toLocaleString()} {t.common.files} {t.duplicateFolders.cacheHitDesc} ({scanResult.scan_duration_ms || 0} ms)
+              </span>
+            </div>
+          )}
+
+          <FilterTabs
+            items={[
+              { id: "files" as const, label: t.duplicates.filesTab, count: scanResult.groups.length },
+              { id: "folders" as const, label: t.duplicates.foldersTab, count: scanResult.folder_groups?.length || 0 },
+            ]}
+            value={activeTab}
+            onChange={setActiveTab}
+          />
+
+          {activeTab === "files" ? (
+            <>
+              {/* Toolbar */}
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="relative w-full sm:w-56">
+                  <Search20Regular className="w-4 h-4 absolute left-2.5 top-2 text-[var(--text-muted)]" />
+                  <input
+                    type="text"
+                    placeholder={t.duplicates.searchPlaceholder}
+                    value={searchFilter}
+                    onChange={(e) => setSearchFilter(e.target.value)}
+                    className="w-full h-8 pl-8 pr-3 bg-[var(--bg-input)] border border-[var(--border-card)] rounded-md text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-[var(--accent)]"
+                  />
+                </div>
+                <span className="text-sm text-[var(--text-secondary)] ml-1">{t.duplicates.autoSelectRules}</span>
+                <WinUIButton size="sm" onClick={() => applyHeuristic("oldest")} title={t.duplicates.keepOldest}>{t.duplicates.ruleOldest}</WinUIButton>
+                <WinUIButton size="sm" onClick={() => applyHeuristic("newest")} title={t.duplicates.keepNewest}>{t.duplicates.ruleNewest}</WinUIButton>
+                <WinUIButton size="sm" onClick={() => applyHeuristic("shortest")} title={t.duplicates.keepShortestPath}>{t.duplicates.ruleShortest}</WinUIButton>
+                <div className="h-5 w-px bg-[var(--border-divider)] mx-1" />
+                <WinUIButton size="sm" onClick={() => applyHeuristic("all-except-first")} title={t.duplicates.selectAllDuplicates}>
+                  {t.duplicates.selectAll}
+                </WinUIButton>
+                <WinUIButton size="sm" variant="subtle" onClick={() => applyHeuristic("none")}>{t.common.clear}</WinUIButton>
+                <label className="ml-auto inline-flex items-center gap-2 text-sm text-[var(--text-secondary)] cursor-pointer" title={t.duplicates.hideHardlinks}>
+                  <input
+                    type="checkbox"
+                    checked={hideHardlinks}
+                    onChange={() => setHideHardlinks(!hideHardlinks)}
+                    className="accent-[var(--accent)] w-4 h-4 cursor-pointer"
+                  />
+                  <span>{t.duplicates.hideHardlinksShort}</span>
+                </label>
+              </div>
+
+              {filteredGroups.length > 0 ? (
+                <div className="space-y-3">
+                  {filteredGroups.map((group) => {
+                    const isExpanded = expandedGroups.has(group.group_id);
+                    const isHardlink = group.potential_savings_bytes === 0;
+                    const selectedCount = group.files.filter((f) => f.selected).length;
+                    const fileName = group.files[0]?.path.split(/[\\/]/).pop() || group.hash;
+
+                    return (
+                      <Card key={group.group_id} padded={false} className="overflow-hidden">
+                        {/* Set header */}
+                        <div
+                          onClick={() => toggleGroupExpand(group.group_id)}
+                          className="px-4 py-3 flex items-center gap-3 cursor-pointer hover:bg-[var(--fill-subtle)] transition-colors"
+                        >
+                          <span className="text-[var(--text-secondary)] shrink-0">
+                            {isExpanded ? <ChevronUp16Regular className="w-4 h-4" /> : <ChevronDown16Regular className="w-4 h-4" />}
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="text-sm font-semibold text-[var(--text-primary)] truncate" title={fileName}>
+                                {fileName}
+                              </span>
+                              <span className="text-xs text-[var(--text-secondary)] font-ibm-mono whitespace-nowrap">
+                                {formatBytes(group.file_size)} {t.duplicates.perCopy} · {group.files.length} {t.duplicates.copies}
+                              </span>
+                            </div>
+                            <div className="text-xs font-code text-[var(--text-muted)] truncate" title={group.hash}>
+                              {t.duplicates.hashLabel} {group.hash.substring(0, 16)}…
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            {selectedCount > 0 && (
+                              <Badge tone="danger">
+                                {selectedCount} {t.duplicates.selected}
+                              </Badge>
+                            )}
+                            {isHardlink ? (
+                              <Badge tone="warning">
+                                <span title={t.duplicates.hardlinkNotice} className="inline-flex items-center gap-1">
+                                  <Link20Regular className="w-3 h-3" />
+                                  {t.duplicates.hardlinkShort}
+                                </span>
+                              </Badge>
+                            ) : (
+                              <Badge tone="success">
+                                {formatBytes(group.potential_savings_bytes)} {t.duplicates.reclaimable}
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Copies */}
+                        {isExpanded && (
+                          <div className="divide-y divide-[var(--border-divider)] border-t border-[var(--border-divider)]">
+                            {group.files.map((file) => {
+                              const isProtected = isProtectedSystemFile(file.path);
+                              return (
+                                <div
+                                  key={file.path}
+                                  onClick={() => toggleSelectFile(group.group_id, file.path)}
+                                  className="px-4 py-3 flex items-center gap-3 cursor-pointer hover:bg-[var(--fill-subtle)] transition-colors"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={file.selected}
+                                    disabled={!file.selected && isProtected}
+                                    onClick={(e) => e.stopPropagation()}
+                                    onChange={() => toggleSelectFile(group.group_id, file.path)}
+                                    className="accent-[var(--accent)] w-4 h-4 shrink-0 cursor-pointer disabled:cursor-not-allowed"
+                                  />
+                                  <div className="min-w-0 flex-1">
+                                    <div className="font-code text-xs text-[var(--text-primary)] truncate select-all" title={file.path}>
+                                      {file.path}
+                                    </div>
+                                    <div className="flex items-center gap-2 mt-0.5 text-xs text-[var(--text-muted)]">
+                                      <span>{t.common.date}: {new Date(file.modified_at * 1000).toLocaleString()}</span>
+                                      {file.is_hardlink_or_clone && (
+                                        <Badge tone="warning">
+                                          <span title={t.duplicates.hardlinkNotice}>{t.duplicates.hardlinkShort}</span>
+                                        </Badge>
+                                      )}
+                                      {isProtected && <Badge tone="warning">{t.duplicates.protectedFile}</Badge>}
+                                    </div>
+                                  </div>
+                                  <WinUIButton
+                                    variant="subtle"
+                                    size="sm"
+                                    title={t.common.openInExplorer}
+                                    aria-label={t.common.openInExplorer}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleRevealInExplorer(file.path);
+                                    }}
+                                    icon={<FolderOpen20Regular className="w-4 h-4 text-[var(--text-secondary)]" />}
+                                  />
+                                  <div className="w-16 flex justify-end shrink-0">
+                                    {file.selected ? (
+                                      <Badge tone="danger">{t.duplicates.deleteBadge}</Badge>
+                                    ) : (
+                                      <Badge tone="neutral">{t.duplicates.keepBadge}</Badge>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </Card>
+                    );
+                  })}
+                </div>
+              ) : (
+                <EmptyState
+                  icon={<DocumentCopy20Regular />}
+                  title={t.duplicates.noDuplicatesFound}
+                  description={t.duplicates.noDuplicatesDesc}
+                />
+              )}
+            </>
+          ) : scanResult.folder_groups && scanResult.folder_groups.length > 0 ? (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+                <Folder20Regular className="w-4 h-4 text-[var(--text-muted)]" />
+                <span>
+                  {scanResult.folder_groups.length} {t.duplicateFolders.foldersFound}
+                </span>
+              </div>
+              {scanResult.folder_groups.map((fGroup) => (
+                <Card key={fGroup.group_id} padded={false} className="overflow-hidden">
+                  <div className="px-4 py-3 flex items-center gap-3">
+                    <Folder20Regular className="w-4 h-4 text-[var(--text-secondary)] shrink-0" />
+                    <div className="text-sm font-semibold text-[var(--text-primary)] truncate flex-1 min-w-0">
+                      {fGroup.directories.length} {t.duplicateFolders.tabFolders} · {fGroup.total_files} {t.duplicateFolders.identicalFiles}
+                    </div>
+                    <Badge tone="success">
+                      {formatBytes(fGroup.potential_savings_bytes)} {t.duplicates.reclaimable}
+                    </Badge>
+                  </div>
+                  <div className="divide-y divide-[var(--border-divider)] border-t border-[var(--border-divider)]">
+                    {fGroup.directories.map((dir, dIdx) => (
+                      <div
+                        key={dir.path}
+                        className="px-4 py-3 flex items-center gap-3 hover:bg-[var(--fill-subtle)] transition-colors"
+                      >
                         <input
                           type="checkbox"
                           checked={dir.selected}
                           onChange={() => toggleSelectFolder(fGroup.group_id, dir.path)}
-                          className="rounded-[3px] accent-[#0078d4] cursor-pointer"
+                          className="accent-[var(--accent)] w-4 h-4 shrink-0 cursor-pointer"
                         />
-                        <div className="min-w-0">
-                          <div className="font-ibm-mono text-xs text-[var(--text-primary)] truncate font-semibold">
+                        <div className="min-w-0 flex-1">
+                          <div className="font-code text-xs text-[var(--text-primary)] truncate" title={dir.path}>
                             {dir.path}
                           </div>
-                          <div className="text-xs text-[var(--text-muted)] font-ibm-mono">
-                            {dir.file_count} {t.common.files} • {formatBytes(dir.total_size_bytes)} {dIdx === 0 ? "• (Original)" : "• (Duplicate)"}
+                          <div className="text-xs text-[var(--text-muted)] mt-0.5">
+                            {dir.file_count} {t.common.files} · {formatBytes(dir.total_size_bytes)}
                           </div>
                         </div>
-                      </div>
-
-                      <div className="flex items-center gap-2 shrink-0">
-                        <button
-                          onClick={() => handleRevealInExplorer(dir.path)}
-                          className="p-1 text-[var(--text-secondary)] hover:text-white rounded-[3px] hover:bg-white/[0.06] transition-colors cursor-pointer"
+                        <Badge tone="neutral">{dIdx === 0 ? t.duplicates.original : t.duplicates.duplicate}</Badge>
+                        <WinUIButton
+                          variant="subtle"
+                          size="sm"
                           title={t.duplicateFolders.revealInExplorer}
-                        >
-                          <FolderOpen20Regular className="w-4 h-4" />
-                        </button>
-                        <button
+                          aria-label={t.duplicateFolders.revealInExplorer}
+                          onClick={() => handleRevealInExplorer(dir.path)}
+                          icon={<FolderOpen20Regular className="w-4 h-4 text-[var(--text-secondary)]" />}
+                        />
+                        <WinUIButton
+                          variant="standard"
+                          size="sm"
+                          disabled={busy}
                           onClick={() => handleTrashFolders([dir.path])}
-                          className="px-2 py-0.5 rounded-[3px] bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 text-xs font-medium transition-colors cursor-pointer"
+                          className="text-[var(--danger)]"
                         >
                           {t.duplicateFolders.recycleFolder}
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </WinUICard>
-            ))}
-          </div>
-        ) : (
-          <WinUICard className="p-12 text-center space-y-2">
-            <Folder20Regular className="w-10 h-10 text-[var(--text-muted)] mx-auto opacity-40" />
-            <h3 className="text-sm font-semibold text-[var(--text-primary)]">{t.duplicateFolders.noFoldersFound}</h3>
-            <p className="text-xs text-[var(--text-secondary)] max-w-md mx-auto">
-              {t.duplicateFolders.noFoldersDesc}
-            </p>
-          </WinUICard>
-        )
-      ) : filteredGroups.length > 0 ? (
-        <div className="space-y-3">
-          {filteredGroups.map((group) => {
-            const isExpanded = expandedGroups.has(group.group_id);
-            const isHardlink = group.potential_savings_bytes === 0;
-            const selectedCount = group.files.filter((f) => f.selected).length;
-
-            return (
-              <WinUICard
-                key={group.group_id}
-                className="overflow-hidden"
-              >
-                {/* Group Header */}
-                <div
-                  onClick={() => toggleGroupExpand(group.group_id)}
-                  className="px-4 py-2.5 bg-black/20 border-b border-[var(--border-divider)] flex items-center justify-between gap-4 cursor-pointer hover:bg-white/[0.02] select-none"
-                >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <button className="text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
-                      {isExpanded ? <ChevronUp16Regular className="w-4 h-4" /> : <ChevronDown16Regular className="w-4 h-4" />}
-                    </button>
-                    <div className="font-ibm-mono text-xs text-[var(--text-primary)] flex items-center gap-1.5 truncate">
-                      <span className="text-[var(--text-muted)] uppercase text-xs">Hash:</span>
-                      <span className="text-[#0078d4] font-bold tracking-wider">{group.hash.substring(0, 16)}…</span>
-                    </div>
-                    <span className="text-xs px-1.5 py-0.2 rounded-[3px] bg-black/30 border border-[var(--border-card)] text-[var(--text-primary)] font-ibm-mono font-medium tabular-nums">
-                      {formatBytes(group.file_size)} / copy
-                    </span>
-                    <span className="text-xs px-1.5 py-0.2 rounded-[3px] bg-black/20 text-[var(--text-secondary)] font-ibm-mono">
-                      {group.files.length} copies
-                    </span>
-                  </div>
-
-                  <div className="flex items-center gap-2 shrink-0 text-xs">
-                    {isHardlink ? (
-                      <span className="flex items-center gap-1 px-2 py-0.5 rounded-[3px] bg-amber-500/10 text-amber-300 border border-amber-500/20 text-xs font-ibm-mono font-medium">
-                        <Link20Regular className="w-3 h-3 text-amber-400" />
-                        {t.duplicates.hardlinkNotice}
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-1 px-2 py-0.5 rounded-[3px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-ibm-mono font-semibold tabular-nums">
-                        {t.duplicates.potentialSavings}: {formatBytes(group.potential_savings_bytes)}
-                      </span>
-                    )}
-
-                    {selectedCount > 0 && (
-                      <span className="px-2 py-0.5 rounded-[3px] bg-rose-500/10 text-rose-400 border border-rose-500/20 text-xs font-ibm-mono font-bold">
-                        {selectedCount} {t.cleanup.itemsSelected}
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Group Files */}
-                {isExpanded && (
-                  <div className="divide-y divide-[var(--border-divider)]">
-                    {group.files.map((file) => (
-                      <div
-                        key={file.path}
-                        onClick={() => toggleSelectFile(group.group_id, file.path)}
-                        className={`px-4 py-2.5 flex items-center justify-between gap-4 cursor-pointer transition-colors ${
-                          file.selected
-                            ? "bg-rose-500/5 hover:bg-rose-500/10"
-                            : "hover:bg-white/[0.02]"
-                        }`}
-                      >
-                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                          <div className={`w-4 h-4 rounded-[3px] border flex items-center justify-center shrink-0 transition-colors ${
-                            file.selected
-                              ? "bg-rose-600 border-rose-600 text-white"
-                              : "border-[var(--border-subtle)] bg-black/20"
-                          }`}>
-                            {file.selected && <Checkmark16Filled className="w-3 h-3 text-white" />}
-                          </div>
-                          <Document20Regular className="w-4 h-4 text-[var(--text-muted)] shrink-0" />
-                          <div className="min-w-0 flex-1">
-                            <div className="font-ibm-mono text-xs text-[var(--text-primary)] truncate select-all">
-                              {file.path}
-                            </div>
-                            <div className="flex items-center gap-2.5 text-xs font-ibm-mono text-[var(--text-secondary)] mt-0.5 tabular-nums">
-                              <span>{t.common.date}: {new Date(file.modified_at * 1000).toLocaleString()}</span>
-                              {file.is_hardlink_or_clone && (
-                                <span className="text-amber-400 font-semibold">
-                                  [{t.duplicates.hardlinkNotice}]
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-2.5 shrink-0">
-                          {/* Reveal in Explorer */}
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleRevealInExplorer(file.path);
-                            }}
-                            title={t.common.openInExplorer}
-                            className="p-1 bg-black/20 hover:bg-[#0078d4] hover:text-white text-[var(--text-secondary)] rounded-[4px] transition-all border border-[var(--border-card)] cursor-pointer"
-                          >
-                            <FolderOpen20Regular className="w-3.5 h-3.5" />
-                          </button>
-
-                          <div className="font-ibm-mono text-xs text-right w-16">
-                            <span className={file.selected ? "text-rose-400 font-bold" : "text-[var(--text-muted)] font-medium"}>
-                              {file.selected ? t.common.delete.toUpperCase() : t.common.keepFile.toUpperCase()}
-                            </span>
-                          </div>
-                        </div>
+                        </WinUIButton>
                       </div>
                     ))}
                   </div>
-                )}
-              </WinUICard>
-            );
-          })}
-        </div>
-      ) : (
-        <WinUICard className="p-12 text-center space-y-2">
-          <DocumentCopy24Filled className="w-10 h-10 text-[var(--text-muted)] mx-auto" />
-          <h3 className="text-sm font-semibold text-[var(--text-primary)]">{t.duplicates.noDuplicatesFound}</h3>
-          <p className="text-xs text-[var(--text-secondary)] max-w-md mx-auto">
-            {t.duplicates.noDuplicatesDesc}
-          </p>
-        </WinUICard>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <EmptyState
+              icon={<Folder20Regular />}
+              title={t.duplicateFolders.noFoldersFound}
+              description={t.duplicateFolders.noFoldersDesc}
+            />
+          )}
+        </>
       )}
 
-      {/* Safety Confirmation Modal */}
+      {/* Selection actions */}
+      {scanResult && !scanning && activeTab === "files" && totalSelectedCount > 0 && (
+        <ActionBar
+          summary={
+            <>
+              <span className="font-semibold text-[var(--text-primary)]">
+                {totalSelectedCount} {t.duplicates.selected}
+              </span>{" "}
+              · <span className="font-ibm-mono">{formatBytes(totalSelectedBytes)}</span>
+            </>
+          }
+        >
+          <WinUIButton variant="subtle" onClick={() => applyHeuristic("none")} disabled={busy}>
+            {t.common.clear}
+          </WinUIButton>
+          <WinUIButton
+            variant="danger"
+            onClick={requestTrashSelected}
+            disabled={busy}
+            icon={<Delete20Regular className="w-4 h-4" />}
+          >
+            {trashing ? t.duplicates.trashingProgress : t.duplicates.moveToRecycleBin}
+          </WinUIButton>
+        </ActionBar>
+      )}
+      {scanResult && !scanning && activeTab === "folders" && folderSelectedCount > 0 && (
+        <ActionBar
+          summary={
+            <span className="font-semibold text-[var(--text-primary)]">
+              {folderSelectedCount} {t.duplicates.selected}
+            </span>
+          }
+        >
+          <WinUIButton
+            variant="danger"
+            onClick={() => handleTrashFolders()}
+            disabled={busy}
+            icon={<Delete20Regular className="w-4 h-4" />}
+          >
+            {trashing ? t.duplicateFolders.recyclingFolders : t.duplicateFolders.recycleSelectedFolders}
+          </WinUIButton>
+        </ActionBar>
+      )}
+
+      {/* Safety confirmation */}
       {showConfirmModal && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
-          <div className="max-w-lg w-full p-6 shadow-2xl space-y-4 border border-[var(--border-card)] bg-[var(--bg-card)] rounded-lg">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-[4px] bg-rose-500/15 border border-rose-500/30 flex items-center justify-center text-rose-400 shrink-0">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
+          <Card className="max-w-lg w-full p-6 space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-lg bg-[var(--fill-subtle)] border border-[var(--border-card)] flex items-center justify-center text-[var(--danger)] shrink-0">
                 <Delete20Regular className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="font-semibold text-[var(--text-primary)] text-sm">
+                <h3 className="text-sm font-semibold text-[var(--text-primary)]">
                   {t.duplicates.trashConfirm || "Confirm Duplicate File Disposal"}
                 </h3>
-                <p className="text-xs text-[var(--text-secondary)] mt-0.5">
-                  Move <span className="font-bold text-rose-400 font-ibm-mono">{totalSelectedCount}</span> duplicate file(s) to Recycle Bin, freeing approx{" "}
-                  <span className="font-bold text-emerald-400 font-ibm-mono">
-                    {formatBytes(totalSelectedBytes)}
-                  </span>
-                  .
+                <p className="text-sm text-[var(--text-secondary)] mt-1">
+                  Move <span className="font-semibold text-[var(--text-primary)] font-ibm-mono">{totalSelectedCount}</span> duplicate file(s) to Recycle Bin, freeing approx{" "}
+                  <span className="font-semibold text-[var(--success)] font-ibm-mono">{formatBytes(totalSelectedBytes)}</span>.
                 </p>
               </div>
             </div>
 
-            <div className="p-3 bg-black/20 rounded-[4px] border border-[var(--border-subtle)] text-xs space-y-2 font-sans">
+            <div className="rounded-md border border-[var(--border-card)] bg-[var(--fill-subtle)] p-3 text-sm space-y-2">
               <div className="flex justify-between text-[var(--text-secondary)]">
                 <span>Selected duplicate copies:</span>
-                <span className="font-ibm-mono text-[var(--text-primary)] font-bold">{totalSelectedCount}</span>
+                <span className="font-ibm-mono text-[var(--text-primary)] font-semibold">{totalSelectedCount}</span>
               </div>
               <div className="flex justify-between text-[var(--text-secondary)]">
                 <span>Space to reclaim:</span>
-                <span className="font-ibm-mono text-emerald-400 font-bold">{formatBytes(totalSelectedBytes)}</span>
+                <span className="font-ibm-mono text-[var(--success)] font-semibold">{formatBytes(totalSelectedBytes)}</span>
               </div>
               <div className="flex justify-between text-[var(--text-secondary)]">
                 <span>Disposal method:</span>
-                <span className="font-ibm-mono text-emerald-400 font-semibold">
-                  Windows Recycle Bin (Restorable)
-                </span>
+                <span className="text-[var(--success)] font-medium">Windows Recycle Bin (Restorable)</span>
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--border-divider)]">
-              <WinUIButton
-                variant="standard"
-                onClick={() => setShowConfirmModal(false)}
-                disabled={trashing}
-              >
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-[var(--border-divider)]">
+              <WinUIButton variant="standard" onClick={() => setShowConfirmModal(false)} disabled={trashing}>
                 {t.common.cancel}
               </WinUIButton>
               <WinUIButton
@@ -1066,13 +1020,13 @@ export const DuplicatesPage: React.FC = () => {
                 }}
                 disabled={trashing}
               >
-                {t.duplicates.trashSelected}
+                {t.duplicates.moveToRecycleBin}
               </WinUIButton>
             </div>
-          </div>
+          </Card>
         </div>
       )}
-    </div>
+    </Page>
   );
 };
 
