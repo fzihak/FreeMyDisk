@@ -1,0 +1,61 @@
+name: Release
+
+# Builds the signed Windows installer and publishes it with `latest.json`, the
+# file installed copies of FreeMyDisk read to find updates.
+#
+# To ship a new version:
+#   1. Bump "version" in package.json, src-tauri/tauri.conf.json and Cargo.toml.
+#   2. Merge to main, then push a tag:  git tag v1.1.0 && git push origin v1.1.0
+#   3. Review the draft release on GitHub and publish it. Installed copies see
+#      the update as soon as it is published.
+#
+# Needs the repository secrets TAURI_SIGNING_PRIVATE_KEY and
+# TAURI_SIGNING_PRIVATE_KEY_PASSWORD (empty if the key has no password). The
+# key must match the "pubkey" in src-tauri/tauri.conf.json.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build & publish (Windows)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ". -> target"
+
+      - name: Build, sign and publish
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: "FreeMyDisk ${{ github.ref_name }}"
+          releaseBody: "See the changes below. Installed copies of FreeMyDisk will offer this update automatically."
+          releaseDraft: true
+          prerelease: false
+          includeUpdaterJson: true
+          args: --config src-tauri/tauri.bundle.conf.json

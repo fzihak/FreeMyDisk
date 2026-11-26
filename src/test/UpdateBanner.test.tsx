@@ -1,107 +1,141 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, act } from "@testing-library/react";
 import { UpdateBanner } from "@/components/shared/UpdateBanner";
+import { UpdateDialog } from "@/components/shared/UpdateDialog";
 import { useUpdaterStore } from "@/stores/updater-store";
 import * as updaterPlugin from "@tauri-apps/plugin-updater";
+import * as processPlugin from "@tauri-apps/plugin-process";
 
-describe("UpdateBanner (Addendum A & Section 14.1 Test Matrix)", () => {
+const fakeUpdate = (version = "1.2.0") => {
+  const update = {
+    version,
+    body: "## Improvements\n- Faster scans\n- **New** look",
+    date: "2026-12-01T10:00:00Z",
+    download: vi.fn(async (onEvent: (e: any) => void) => {
+      onEvent({ event: "Started", data: { contentLength: 1000 } });
+      onEvent({ event: "Progress", data: { chunkLength: 400 } });
+      onEvent({ event: "Progress", data: { chunkLength: 600 } });
+      onEvent({ event: "Finished" });
+    }),
+    install: vi.fn(async () => {}),
+  };
+  return update;
+};
+
+const reset = () =>
+  useUpdaterStore.setState({
+    status: "idle",
+    version: "",
+    releaseNotes: "",
+    releaseDate: null,
+    dismissedThisSession: false,
+    dialogOpen: false,
+    downloadedBytes: 0,
+    totalBytes: 0,
+    downloadProgress: 0,
+    errorMessage: null,
+    updateAvailable: false,
+    isChecking: false,
+    isDownloading: false,
+    updateReady: false,
+  });
+
+describe("In-app updates", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    useUpdaterStore.setState({
-      updateAvailable: false,
-      version: "",
-      releaseNotes: "",
-      dismissedThisSession: false,
-      isDownloading: false,
-      downloadProgress: 0,
-      updateReady: false,
-      errorMessage: null,
-    });
+    localStorage.clear();
+    reset();
   });
 
-  it("(a) shows banner when update is available", async () => {
-    useUpdaterStore.setState({
-      updateAvailable: true,
-      version: "1.2.0",
-      releaseNotes: "Performance upgrades",
-    });
+  it("shows the banner after an automatic check finds a newer version", async () => {
+    vi.mocked(updaterPlugin.check).mockResolvedValueOnce(fakeUpdate() as any);
+    await useUpdaterStore.getState().checkForUpdates(true);
 
     render(<UpdateBanner />);
-    expect(
-      screen.getByText(/A new version of FreeMyDisk is available/i)
-    ).toBeInTheDocument();
-    expect(screen.getByText(/\(v1.2.0\)/i)).toBeInTheDocument();
-    expect(screen.getByText(/\[See what's new\]/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Update Now/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Not now/i })).toBeInTheDocument();
+    expect(screen.getByText(/FreeMyDisk 1\.2\.0 is available/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Update now/i })).toBeInTheDocument();
+    // An automatic check never opens the dialog by itself.
+    expect(useUpdaterStore.getState().dialogOpen).toBe(false);
   });
 
-  it("(b) does not show banner when up to date", async () => {
-    vi.mocked(updaterPlugin.check).mockResolvedValueOnce({
-      available: false,
-      version: "1.0.0",
-    } as any);
-
-    await useUpdaterStore.getState().checkForUpdates();
+  it("stays silent when up to date or offline", async () => {
+    vi.mocked(updaterPlugin.check).mockResolvedValueOnce(null);
+    await useUpdaterStore.getState().checkForUpdates(true);
+    vi.mocked(updaterPlugin.check).mockRejectedValueOnce(new Error("offline"));
+    await expect(useUpdaterStore.getState().checkForUpdates(true)).resolves.toBeUndefined();
 
     render(<UpdateBanner />);
-    expect(
-      screen.queryByText(/A new version of FreeMyDisk is available/i)
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/is available/i)).not.toBeInTheDocument();
+    expect(useUpdaterStore.getState().errorMessage).toBeNull();
   });
 
-  it("(c) hides banner for current session when dismissed", () => {
-    useUpdaterStore.setState({
-      updateAvailable: true,
-      version: "1.2.0",
-      dismissedThisSession: false,
-    });
+  it("a manual check reports errors and up-to-date in the dialog", async () => {
+    vi.mocked(updaterPlugin.check).mockRejectedValueOnce(new Error("GitHub unreachable"));
+    await useUpdaterStore.getState().checkForUpdates(false);
+    expect(useUpdaterStore.getState().status).toBe("error");
+    expect(useUpdaterStore.getState().errorMessage).toMatch(/GitHub unreachable/);
 
-    render(<UpdateBanner />);
-    const notNowBtn = screen.getByRole("button", { name: /Not now/i });
-    fireEvent.click(notNowBtn);
-
-    expect(
-      screen.queryByText(/A new version of FreeMyDisk is available/i)
-    ).not.toBeInTheDocument();
-    expect(useUpdaterStore.getState().dismissedThisSession).toBe(true);
+    vi.mocked(updaterPlugin.check).mockResolvedValueOnce(null);
+    await useUpdaterStore.getState().checkForUpdates(false);
+    expect(useUpdaterStore.getState().status).toBe("upToDate");
+    expect(useUpdaterStore.getState().dialogOpen).toBe(true);
   });
 
-  it("(d) banner reappears on next simulated launch while still outdated", () => {
-    // Session 1: dismiss
-    useUpdaterStore.setState({
-      updateAvailable: true,
-      version: "1.2.0",
-      dismissedThisSession: false,
-    });
-    useUpdaterStore.getState().dismissBanner();
-    expect(useUpdaterStore.getState().dismissedThisSession).toBe(true);
-
-    // Simulated launch 2 (new session state resets in-memory dismissedThisSession)
-    useUpdaterStore.setState({
-      updateAvailable: true,
-      version: "1.2.0",
-      dismissedThisSession: false, // strictly in-memory reset
-    });
-
+  it("'Later' hides the banner for this session only", async () => {
+    vi.mocked(updaterPlugin.check).mockResolvedValueOnce(fakeUpdate() as any);
+    await useUpdaterStore.getState().checkForUpdates(true);
     render(<UpdateBanner />);
-    expect(
-      screen.getByText(/A new version of FreeMyDisk is available/i)
-    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /^Later$/i }));
+    expect(screen.queryByText(/is available/i)).not.toBeInTheDocument();
+    expect(localStorage.getItem("fmd.update.skippedVersion")).toBeNull();
   });
 
-  it("(e) offline / failed check fails 100% silently with zero UI side effects", async () => {
-    vi.mocked(updaterPlugin.check).mockRejectedValueOnce(
-      new Error("Network timeout / offline")
-    );
+  it("'Skip this version' silences automatic checks for that version only", async () => {
+    vi.mocked(updaterPlugin.check).mockResolvedValueOnce(fakeUpdate("1.2.0") as any);
+    await useUpdaterStore.getState().checkForUpdates(true);
+    useUpdaterStore.getState().skipThisVersion();
+    reset();
 
-    // Should not throw, should not set error state visible to user
-    await expect(useUpdaterStore.getState().checkForUpdates()).resolves.toBeUndefined();
+    vi.mocked(updaterPlugin.check).mockResolvedValueOnce(fakeUpdate("1.2.0") as any);
+    await useUpdaterStore.getState().checkForUpdates(true);
+    expect(useUpdaterStore.getState().status).toBe("idle");
 
-    render(<UpdateBanner />);
-    expect(
-      screen.queryByText(/A new version of FreeMyDisk is available/i)
-    ).not.toBeInTheDocument();
-    expect(screen.queryByText(/error/i)).not.toBeInTheDocument();
+    vi.mocked(updaterPlugin.check).mockResolvedValueOnce(fakeUpdate("1.3.0") as any);
+    await useUpdaterStore.getState().checkForUpdates(true);
+    expect(useUpdaterStore.getState().status).toBe("available");
+  });
+
+  it("downloads only after the user confirms, then installs and restarts", async () => {
+    const update = fakeUpdate();
+    vi.mocked(updaterPlugin.check).mockResolvedValueOnce(update as any);
+    await useUpdaterStore.getState().checkForUpdates(true);
+    expect(update.download).not.toHaveBeenCalled();
+
+    act(() => useUpdaterStore.getState().openDialog());
+    render(<UpdateDialog />);
+    expect(screen.getByText(/Faster scans/)).toBeInTheDocument();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Update and restart/i }));
+    });
+    expect(update.download).toHaveBeenCalledTimes(1);
+    expect(update.install).toHaveBeenCalledTimes(1);
+    expect(processPlugin.relaunch).toHaveBeenCalled();
+    expect(useUpdaterStore.getState().downloadProgress).toBe(100);
+  });
+
+  it("shows a retry when the download fails", async () => {
+    const update = fakeUpdate();
+    update.download.mockRejectedValueOnce(new Error("signature mismatch"));
+    vi.mocked(updaterPlugin.check).mockResolvedValueOnce(update as any);
+    await useUpdaterStore.getState().checkForUpdates(false);
+
+    render(<UpdateDialog />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Update and restart/i }));
+    });
+    expect(update.install).not.toHaveBeenCalled();
+    expect(screen.getByText(/signature mismatch/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Try again/i })).toBeInTheDocument();
   });
 });

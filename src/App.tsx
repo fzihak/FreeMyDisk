@@ -2,6 +2,7 @@ import React, { useEffect, useState, Suspense } from "react";
 import { Sidebar, NavTab } from "@/components/layout/Sidebar";
 import { TitleBar } from "@/components/layout/TitleBar";
 import { UpdateBanner } from "@/components/shared/UpdateBanner";
+import { UpdateDialog } from "@/components/shared/UpdateDialog";
 import { RecoveryAlert } from "@/components/shared/RecoveryAlert";
 import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
 import { ToastContainer } from "@/components/shared/ToastContainer";
@@ -52,14 +53,14 @@ export const App: React.FC = () => {
       return !prev;
     });
 
-  const { checkForUpdates } = useUpdaterStore();
+  const startAutomaticChecks = useUpdaterStore((s) => s.startAutomaticChecks);
   const { autoCheckUpdates } = useSettingsStore();
 
+  // Checks shortly after start and every few hours while the app is open.
   useEffect(() => {
-    if (autoCheckUpdates) {
-      checkForUpdates(true);
-    }
-  }, [autoCheckUpdates, checkForUpdates]);
+    if (!autoCheckUpdates) return;
+    return startAutomaticChecks();
+  }, [autoCheckUpdates, startAutomaticChecks]);
 
   const renderContent = () => {
     switch (currentTab) {
@@ -121,6 +122,7 @@ export const App: React.FC = () => {
           </div>
           </div>
         </div>
+        <UpdateDialog />
         <ToastContainer />
       </div>
     </ErrorBoundary>
