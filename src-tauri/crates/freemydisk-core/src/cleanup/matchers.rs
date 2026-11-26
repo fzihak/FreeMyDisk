@@ -59,6 +59,73 @@ pub fn glob_match(pattern: &str, text: &str) -> bool {
     match_segments(&segments(pattern), &segments(text))
 }
 
+/// True when some path strictly below `text` could still match `pattern`, so a
+/// walker must descend into `text` to find every match.
+fn could_match_below(pattern: &[String], text: &[String]) -> bool {
+    match pattern.split_first() {
+        None => false,
+        Some((head, _)) if head == "**" => true,
+        Some(_) if text.is_empty() => true,
+        Some((head, rest)) => segment_match(head, &text[0]) && could_match_below(rest, &text[1..]),
+    }
+}
+
+/// A glob split into segments once, for matching many paths against it.
+#[derive(Debug, Clone)]
+pub struct CompiledGlob {
+    segs: Vec<String>,
+}
+
+impl CompiledGlob {
+    pub fn new(pattern: &str) -> Self {
+        Self {
+            segs: segments(pattern),
+        }
+    }
+
+    /// Same result as [`glob_match`] with this pattern.
+    pub fn matches(&self, path: &Path) -> bool {
+        match_segments(&self.segs, &segments(&path.to_string_lossy()))
+    }
+
+    /// False when nothing below `dir` can match, so a walker can skip the folder.
+    pub fn could_match_below(&self, dir: &Path) -> bool {
+        could_match_below(&self.segs, &segments(&dir.to_string_lossy()))
+    }
+}
+
+/// A rule's `protect_subpaths` list, compiled once for walking a matched folder.
+#[derive(Debug, Clone)]
+pub struct CompiledProtect {
+    patterns: Vec<Vec<String>>,
+}
+
+impl CompiledProtect {
+    pub fn new(protect_patterns: &[String]) -> Self {
+        Self {
+            patterns: protect_patterns
+                .iter()
+                .map(|p| protect_pattern(p))
+                .collect(),
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.patterns.is_empty()
+    }
+
+    /// True when the full path matches a pattern. Unlike [`is_subpath_protected`]
+    /// the parent folders are not checked: a walker that skips protected folders
+    /// has already checked them.
+    pub fn matches_leaf(&self, path: &Path) -> bool {
+        if self.patterns.is_empty() {
+            return false;
+        }
+        let text = segments(&path.to_string_lossy());
+        self.patterns.iter().any(|pat| match_segments(pat, &text))
+    }
+}
+
 /// Normalises a `protect_subpaths` pattern into an unanchored glob.
 /// `*/name` means "a segment called name anywhere"; a pattern without a
 /// separator (such as `*.msi`) is matched against single segments.
@@ -151,6 +218,37 @@ mod tests {
     fn double_star_spans_segments() {
         assert!(glob_match("C:/a/**/x.log", r"C:\a\b\c\x.log"));
         assert!(glob_match("C:/a/**/x.log", r"C:\a\x.log"));
+    }
+
+    #[test]
+    fn walker_pruning_only_skips_dead_branches() {
+        let g = CompiledGlob::new("C:/u/Local/*/GPUCache/*");
+        assert!(g.could_match_below(Path::new(r"C:\u\Local\App")));
+        assert!(g.could_match_below(Path::new(r"C:\u\Local\App\GPUCache")));
+        assert!(!g.could_match_below(Path::new(r"C:\u\Local\App\Other")));
+        assert!(!g.could_match_below(Path::new(r"C:\u\Local\App\GPUCache\f")));
+        assert!(g.matches(Path::new(r"C:\u\Local\App\GPUCache\f")));
+
+        let deep = CompiledGlob::new("C:/a/**/x.log");
+        assert!(deep.could_match_below(Path::new(r"C:\a\b\c\d")));
+        assert!(!deep.could_match_below(Path::new(r"C:\z")));
+    }
+
+    #[test]
+    fn compiled_protect_matches_like_subpath_check_for_leaves() {
+        let patterns = vec!["*/Sessions/*".to_string(), "*/cookies*".to_string()];
+        let compiled = CompiledProtect::new(&patterns);
+        for p in [
+            r"C:\p\Default\Sessions",
+            r"C:\p\Default\Cookies-journal",
+            r"C:\p\Default\Cache\f",
+        ] {
+            assert_eq!(
+                compiled.matches_leaf(Path::new(p)),
+                is_subpath_protected(Path::new(p), &patterns),
+                "{p}"
+            );
+        }
     }
 
     #[test]

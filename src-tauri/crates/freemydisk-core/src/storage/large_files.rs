@@ -1,12 +1,16 @@
 use crate::cleanup::disposal::{DisposalEngine, DisposalItemResult, DisposalSummary};
 use crate::cleanup::plan::CleanupPlanItem;
-use crate::cleanup::protected_paths::ProtectedPathRegistry;
 use crate::filesystem::journal::CrashRecoveryJournal;
 use crate::shared::errors::CoreError;
 use crate::shared::progress::CancellationToken;
+use crate::storage::discovery::{
+    discover_files, run_with_ticks, DiscoveryProgress, ScanExclusions,
+};
 use freemydisk_platform::traits::PlatformFilesystem;
+use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::Ordering;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum FileCategory {
@@ -75,145 +79,70 @@ impl LargeFilesScanner {
     where
         F: FnMut(&Path, u64, u64),
     {
-        let mut files = Vec::new();
-        let mut total_bytes = 0u64;
-        let mut items_scanned = 0u64;
-        let mut last_emit = std::time::Instant::now();
+        let exclusions = ScanExclusions::new();
+        let progress = DiscoveryProgress::default();
+        let found = Mutex::new(Vec::new());
+        let roots: Vec<PathBuf> = roots.iter().filter(|r| r.exists()).cloned().collect();
 
-        for root in roots {
-            if cancel.is_cancelled() {
-                return Err(CoreError::Cancelled);
-            }
+        // All drives and folders are listed in parallel. Folders such as Windows,
+        // Program Files, System Volume Information and $Recycle.Bin are not entered,
+        // and OS files (pagefile.sys, hiberfil.sys, ...) are never listed: they
+        // cannot be deleted and must not be offered with a delete button.
+        let result = run_with_ticks(
+            || {
+                discover_files(
+                    &roots,
+                    min_size_bytes,
+                    &exclusions,
+                    cancel,
+                    &progress,
+                    |f| found.lock().push(f),
+                )
+            },
+            || {
+                let current = progress.current_path.lock().clone();
+                on_progress(
+                    &current,
+                    progress.items_scanned.load(Ordering::Relaxed),
+                    progress.bytes_found.load(Ordering::Relaxed),
+                );
+            },
+        );
+        result?;
 
-            if !root.exists() {
-                continue;
-            }
-
-            #[cfg(target_os = "windows")]
-            {
-                let cancel_fn = || cancel.is_cancelled();
-                let mut callback =
-                    |entry_path: &Path, name: &str, size: u64, is_dir: bool| -> bool {
-                        items_scanned += 1;
-                        if last_emit.elapsed().as_millis() >= 33 {
-                            on_progress(entry_path, items_scanned, total_bytes);
-                            last_emit = std::time::Instant::now();
-                        }
-
-                        if ProtectedPathRegistry::is_protected_lexical(entry_path) {
-                            return false;
-                        }
-                        if !is_dir && size >= min_size_bytes {
-                            let extension = entry_path
-                                .extension()
-                                .and_then(|s| s.to_str())
-                                .unwrap_or("")
-                                .to_string();
-                            let category = Self::classify_extension(&extension);
-                            let modified_at = entry_path
-                                .metadata()
-                                .ok()
-                                .and_then(|m| m.modified().ok())
-                                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-                                .map(|d| d.as_secs())
-                                .unwrap_or(0);
-
-                            total_bytes += size;
-                            files.push(LargeFileEntry {
-                                path: entry_path.to_path_buf(),
-                                name: name.to_string(),
-                                size_bytes: size,
-                                modified_at,
-                                category,
-                                extension,
-                            });
-                        }
-                        true
-                    };
-
-                if let Err(e) = freemydisk_platform::windows::win32_fast_scan::win32_traverse_tree(
-                    root,
-                    &cancel_fn,
-                    &mut callback,
-                ) {
-                    if e.kind() == std::io::ErrorKind::Interrupted {
-                        return Err(CoreError::Cancelled);
-                    }
+        let mut files: Vec<LargeFileEntry> = found
+            .into_inner()
+            .into_iter()
+            .map(|f| {
+                let extension = f
+                    .path
+                    .extension()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("")
+                    .to_string();
+                LargeFileEntry {
+                    name: f
+                        .path
+                        .file_name()
+                        .map(|n| n.to_string_lossy().to_string())
+                        .unwrap_or_default(),
+                    category: Self::classify_extension(&extension),
+                    extension,
+                    size_bytes: f.size,
+                    modified_at: f.modified_nanos / 1_000_000_000,
+                    path: f.path,
                 }
-            }
-
-            #[cfg(not(target_os = "windows"))]
-            {
-                let mut it = walkdir::WalkDir::new(root)
-                    .min_depth(1)
-                    .follow_links(false)
-                    .into_iter();
-
-                while let Some(entry_res) = it.next() {
-                    if cancel.is_cancelled() {
-                        return Err(CoreError::Cancelled);
-                    }
-
-                    let entry = match entry_res {
-                        Ok(e) => e,
-                        Err(_) => continue,
-                    };
-
-                    let path = entry.path();
-                    items_scanned += 1;
-                    if last_emit.elapsed().as_millis() >= 33 {
-                        on_progress(path, items_scanned, total_bytes);
-                        last_emit = std::time::Instant::now();
-                    }
-
-                    if entry.file_type().is_dir() {
-                        if ProtectedPathRegistry::is_protected_lexical(path) {
-                            it.skip_current_dir();
-                        }
-                        continue;
-                    }
-
-                    if entry.file_type().is_file() {
-                        if ProtectedPathRegistry::is_protected_lexical(path) {
-                            continue;
-                        }
-
-                        let len = entry.metadata().map(|m| m.len()).unwrap_or(0);
-                        if len >= min_size_bytes {
-                            let name = entry.file_name().to_string_lossy().to_string();
-                            let extension = path
-                                .extension()
-                                .and_then(|s| s.to_str())
-                                .unwrap_or("")
-                                .to_string();
-                            let category = Self::classify_extension(&extension);
-
-                            let modified_at = entry
-                                .metadata()
-                                .ok()
-                                .and_then(|m| m.modified().ok())
-                                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-                                .map(|d| d.as_secs())
-                                .unwrap_or(0);
-
-                            total_bytes += len;
-                            files.push(LargeFileEntry {
-                                path: path.to_path_buf(),
-                                name,
-                                size_bytes: len,
-                                modified_at,
-                                category,
-                                extension,
-                            });
-                        }
-                    }
-                }
-            }
-        }
+            })
+            .collect();
+        let total_bytes: u64 = files.iter().map(|f| f.size_bytes).sum();
 
         // Final progress emit
         if let Some(first_root) = roots.first() {
-            on_progress(first_root, items_scanned, total_bytes);
+            on_progress(
+                first_root,
+                progress.items_scanned.load(Ordering::Relaxed),
+                total_bytes,
+            );
         }
 
         // Sort descending by size by default

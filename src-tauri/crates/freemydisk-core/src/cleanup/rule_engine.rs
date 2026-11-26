@@ -1,12 +1,14 @@
-use crate::cleanup::matchers::{glob_match, is_subpath_protected};
+use crate::cleanup::matchers::{is_subpath_protected, CompiledGlob, CompiledProtect};
 use crate::cleanup::protected_paths::ProtectedPathRegistry;
 use crate::cleanup::rule_schema::CleanupRuleDefinition;
 use crate::shared::errors::CoreError;
 use crate::shared::paths::expand_path_variables;
 use crate::shared::progress::CancellationToken;
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, SystemTime};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -310,36 +312,53 @@ impl RuleEngine {
             .min_age_hours
             .map(|h| SystemTime::now() - Duration::from_secs(h * 3600));
 
-        for target in &rule.targets.paths {
-            if cancel.is_cancelled() {
-                return Err(CoreError::Cancelled);
-            }
-            for (path, is_dir) in Self::matching_paths(rule, &target.path, cancel)? {
-                let measured = measure(&path, is_dir, &rule.disposal.protect_subpaths);
-                if cutoff.is_some_and(|c| measured.newest > c) {
-                    continue;
-                }
+        // Targets are expanded in parallel and every matched item is measured in
+        // parallel; `collect` keeps the original order, so results are unchanged.
+        let matched: Vec<Vec<(PathBuf, bool)>> = rule
+            .targets
+            .paths
+            .par_iter()
+            .map(|target| Self::matching_paths(rule, &target.path, cancel))
+            .collect::<Result<_, _>>()?;
+        let protect = CompiledProtect::new(&rule.disposal.protect_subpaths);
+        let measured_items: Vec<(PathBuf, bool, Measured)> = matched
+            .into_iter()
+            .flatten()
+            .collect::<Vec<_>>()
+            .into_par_iter()
+            .map(|(path, is_dir)| {
+                let measured = measure(&path, is_dir, &protect, cancel);
+                (path, is_dir, measured)
+            })
+            .collect();
+        if cancel.is_cancelled() {
+            return Err(CoreError::Cancelled);
+        }
 
-                total_bytes += measured.size;
-                total_items += measured.count.max(1);
-
-                let candidate = RuleScanCandidate {
-                    path,
-                    size_bytes: measured.size,
-                    is_dir,
-                    rule_id: rule.rule.id.clone(),
-                    rule_name: rule.rule.name.clone(),
-                    category: rule.rule.category.clone(),
-                    risk: rule.rule.risk.clone(),
-                    verified_rebuildable: rule.rule.verified_rebuildable,
-                    default_action: rule.disposal.default_action.clone(),
-                    protect_subpaths: rule.disposal.protect_subpaths.clone(),
-                };
-                if candidates.len() < MAX_PREVIEW_CANDIDATES {
-                    candidates.push(candidate.clone());
-                }
-                all_candidates.push(candidate);
+        for (path, is_dir, measured) in measured_items {
+            if cutoff.is_some_and(|c| measured.newest > c) {
+                continue;
             }
+
+            total_bytes += measured.size;
+            total_items += measured.count.max(1);
+
+            let candidate = RuleScanCandidate {
+                path,
+                size_bytes: measured.size,
+                is_dir,
+                rule_id: rule.rule.id.clone(),
+                rule_name: rule.rule.name.clone(),
+                category: rule.rule.category.clone(),
+                risk: rule.rule.risk.clone(),
+                verified_rebuildable: rule.rule.verified_rebuildable,
+                default_action: rule.disposal.default_action.clone(),
+                protect_subpaths: rule.disposal.protect_subpaths.clone(),
+            };
+            if candidates.len() < MAX_PREVIEW_CANDIDATES {
+                candidates.push(candidate.clone());
+            }
+            all_candidates.push(candidate);
         }
 
         Ok(RuleScanSummary {
@@ -403,38 +422,41 @@ impl RuleEngine {
             .strip_suffix("/*")
             .or_else(|| target_str.strip_suffix(r"\*"));
 
-        let mut matched_dirs: Vec<PathBuf> = Vec::new();
-        for entry in walkdir::WalkDir::new(&base_dir)
+        let full_glob = CompiledGlob::new(&target_str);
+        let dir_glob = dir_pattern.map(CompiledGlob::new);
+
+        // Matched folders are cleanup units: their contents are never listed, so the
+        // walk does not enter them. Folders that cannot lead to a match are skipped
+        // too; without this a pattern like `${app_data}/*/GPUCache/*` walked the whole
+        // of AppData several levels deep.
+        let mut it = walkdir::WalkDir::new(&base_dir)
             .min_depth(1)
             .max_depth(max_depth)
-            .into_iter()
-            .flatten()
-        {
+            .into_iter();
+        while let Some(entry) = it.next() {
             if cancel.is_cancelled() {
                 return Err(CoreError::Cancelled);
             }
+            let Ok(entry) = entry else { continue };
             let path = entry.path();
-            if matched_dirs.iter().any(|d| path.starts_with(d)) {
-                continue;
-            }
-
             let is_dir = entry.file_type().is_dir();
-            let path_str = path.to_string_lossy();
-            let is_match = glob_match(&target_str, &path_str)
+            let is_match = full_glob.matches(path)
                 || (is_dir
                     && path != base_dir
-                    && dir_pattern.is_some_and(|p| glob_match(p, &path_str)));
-            if !is_match
-                || is_subpath_protected(path, protect)
-                || ProtectedPathRegistry::is_protected_lexical(path)
+                    && dir_glob.as_ref().is_some_and(|g| g.matches(path)));
+            if is_match
+                && !is_subpath_protected(path, protect)
+                && !ProtectedPathRegistry::is_protected_lexical(path)
             {
+                if is_dir {
+                    it.skip_current_dir();
+                }
+                found.push((path.to_path_buf(), is_dir));
                 continue;
             }
-
-            if is_dir {
-                matched_dirs.push(path.to_path_buf());
+            if is_dir && !full_glob.could_match_below(path) {
+                it.skip_current_dir();
             }
-            found.push((path.to_path_buf(), is_dir));
         }
         Ok(found)
     }
@@ -448,19 +470,53 @@ impl RuleEngine {
         F: FnMut(&str, usize, usize, u64),
     {
         let total = self.rules.len();
-        let mut summaries = Vec::with_capacity(total);
+        let rules = &self.rules;
+        let stop = AtomicBool::new(false);
+        let (tx, rx) = std::sync::mpsc::channel();
+        let mut slots: Vec<Option<Result<RuleScanSummary, CoreError>>> =
+            (0..total).map(|_| None).collect();
+        let mut next = 0usize;
         let mut cumulative_bytes = 0u64;
 
-        for (idx, rule) in self.rules.iter().enumerate() {
-            if cancel.is_cancelled() {
-                return Err(CoreError::Cancelled);
-            }
-            let summary = Self::scan_rule(rule, cancel)?;
-            cumulative_bytes += summary.total_bytes;
-            on_progress(&rule.rule.name, idx + 1, total, cumulative_bytes);
-            summaries.push(summary);
-        }
+        // Rules are scanned in parallel; results are reported strictly in rule order
+        // on the calling thread, so progress still reads "Rule N/total" in sequence.
+        std::thread::scope(|scope| {
+            let stop = &stop;
+            scope.spawn(move || {
+                rules
+                    .par_iter()
+                    .enumerate()
+                    .for_each_with(tx, |tx, (idx, rule)| {
+                        let result = if cancel.is_cancelled() || stop.load(Ordering::Relaxed) {
+                            Err(CoreError::Cancelled)
+                        } else {
+                            Self::scan_rule(rule, cancel)
+                        };
+                        if result.is_err() {
+                            stop.store(true, Ordering::Relaxed);
+                        }
+                        let _ = tx.send((idx, result));
+                    });
+            });
 
+            for (idx, result) in rx {
+                slots[idx] = Some(result);
+                while let Some(Some(Ok(summary))) = slots.get(next) {
+                    cumulative_bytes += summary.total_bytes;
+                    on_progress(&rules[next].rule.name, next + 1, total, cumulative_bytes);
+                    next += 1;
+                }
+            }
+        });
+
+        let mut summaries = Vec::with_capacity(total);
+        for slot in slots {
+            match slot {
+                Some(Ok(summary)) => summaries.push(summary),
+                Some(Err(e)) => return Err(e),
+                None => return Err(CoreError::Cancelled),
+            }
+        }
         Ok(summaries)
     }
 
@@ -492,7 +548,12 @@ struct Measured {
     newest: SystemTime,
 }
 
-fn measure(path: &Path, is_dir: bool, protect_patterns: &[String]) -> Measured {
+fn measure(
+    path: &Path,
+    is_dir: bool,
+    protect: &CompiledProtect,
+    cancel: &CancellationToken,
+) -> Measured {
     let modified = |m: &std::fs::Metadata| m.modified().unwrap_or(SystemTime::UNIX_EPOCH);
     if !is_dir {
         let meta = path.metadata().ok();
@@ -515,16 +576,22 @@ fn measure(path: &Path, is_dir: bool, protect_patterns: &[String]) -> Measured {
             .unwrap_or(SystemTime::UNIX_EPOCH),
     };
     // The folder itself was already checked against the protected-path list, so its
-    // contents only need the rule's own protect_subpaths.
-    for entry in walkdir::WalkDir::new(path)
-        .min_depth(1)
-        .into_iter()
-        .flatten()
-    {
-        let p = entry.path();
-        if is_subpath_protected(p, protect_patterns) {
+    // contents only need the rule's own protect_subpaths. A protected folder is not
+    // entered, which also covers everything inside it.
+    let mut it = walkdir::WalkDir::new(path).min_depth(1).into_iter();
+    while let Some(entry) = it.next() {
+        if cancel.is_cancelled() {
+            break;
+        }
+        let Ok(entry) = entry else { continue };
+        if protect.matches_leaf(entry.path()) {
+            if entry.file_type().is_dir() {
+                it.skip_current_dir();
+            }
             continue;
         }
+        // On Windows walkdir keeps the directory listing's metadata, so this does
+        // not open the file.
         if let Ok(meta) = entry.metadata() {
             out.newest = out.newest.max(modified(&meta));
             if entry.file_type().is_file() {

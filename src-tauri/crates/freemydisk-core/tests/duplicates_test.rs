@@ -386,3 +386,146 @@ fn test_unknown_file_identity_never_merges_distinct_files() {
     assert_eq!(group.potential_savings_bytes, 4096);
     assert!(group.files.iter().all(|f| !f.is_hardlink_or_clone));
 }
+
+/// Files of one size whose start and end match but whose middle differs are not
+/// duplicates; the middle sample (or the full hash) must tell them apart.
+#[test]
+fn test_sampled_hash_groups_only_true_duplicates() {
+    let dir = tempdir().unwrap();
+    let size = 512 * 1024;
+    let base = vec![3u8; size];
+    let mut middle_changed = base.clone();
+    middle_changed[size / 2] = 9;
+    // Differs outside every sample, so only the full hash can separate it.
+    let mut quarter_changed = base.clone();
+    quarter_changed[size / 4] = 9;
+
+    let a = dir.path().join("a.bin");
+    let b = dir.path().join("b.bin");
+    let mid = dir.path().join("mid.bin");
+    let quarter = dir.path().join("quarter.bin");
+    let unique_size = dir.path().join("unique.bin");
+    fs::write(&a, &base).unwrap();
+    fs::write(&b, &base).unwrap();
+    fs::write(&mid, &middle_changed).unwrap();
+    fs::write(&quarter, &quarter_changed).unwrap();
+    fs::write(&unique_size, vec![3u8; size + 1]).unwrap();
+
+    let platform = MockHardlinkPlatform::new();
+    for (i, p) in [&a, &b, &mid, &quarter].into_iter().enumerate() {
+        platform.register_identity(
+            p.clone(),
+            FileIdentity {
+                device_id: 1,
+                file_index: 500 + i as u64,
+                link_count: 1,
+                is_reparse_or_symlink: false,
+            },
+        );
+    }
+
+    let result = DuplicateDetector::scan_duplicates(
+        &[dir.path().to_path_buf()],
+        1024,
+        &platform,
+        &CancellationToken::new(),
+    )
+    .unwrap();
+
+    assert_eq!(result.total_groups, 1);
+    let mut paths: Vec<_> = result.groups[0]
+        .files
+        .iter()
+        .map(|f| f.path.clone())
+        .collect();
+    paths.sort();
+    assert_eq!(paths, vec![a.clone(), b.clone()]);
+    assert_eq!(result.groups[0].potential_savings_bytes, size as u64);
+    // Group order is stable: the first path is the copy kept by default.
+    assert!(!result.groups[0].files[0].selected);
+    assert!(result.groups[0].files[1].selected);
+    assert_eq!(result.groups[0].files[0].path, a);
+}
+
+/// OS files such as a page file are never reported, even when identical.
+#[test]
+fn test_os_files_are_never_duplicate_candidates() {
+    let dir = tempdir().unwrap();
+    let d1 = dir.path().join("d1");
+    let d2 = dir.path().join("d2");
+    fs::create_dir_all(&d1).unwrap();
+    fs::create_dir_all(&d2).unwrap();
+    for d in [&d1, &d2] {
+        fs::write(d.join("pagefile.sys"), vec![1u8; 4096]).unwrap();
+        fs::write(d.join("hiberfil.sys"), vec![2u8; 4096]).unwrap();
+        let svi = d.join("System Volume Information");
+        fs::create_dir_all(&svi).unwrap();
+        fs::write(svi.join("snapshot.bin"), vec![4u8; 4096]).unwrap();
+    }
+
+    let result = DuplicateDetector::scan_duplicates(
+        &[dir.path().to_path_buf()],
+        1,
+        &MockHardlinkPlatform::new(),
+        &CancellationToken::new(),
+    )
+    .unwrap();
+    assert_eq!(result.total_groups, 0);
+}
+
+/// A hash-cache entry from the older sampling scheme is not trusted: the file is
+/// sampled again and still grouped with an uncached copy.
+#[test]
+fn test_old_format_cache_entries_are_resampled() {
+    use freemydisk_core::storage::duplicates::HashCache;
+
+    let dir = tempdir().unwrap();
+    let a = dir.path().join("a.bin");
+    let b = dir.path().join("b.bin");
+    fs::write(&a, vec![5u8; 300_000]).unwrap();
+    fs::write(&b, vec![5u8; 300_000]).unwrap();
+
+    let cache = HashCache::in_memory().unwrap();
+    let stamp = fs::metadata(&a)
+        .unwrap()
+        .modified()
+        .unwrap()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos() as u64;
+    cache.store(&a, 300_000, stamp, "legacy-sample", "legacy-full");
+
+    let platform = MockHardlinkPlatform::new();
+    platform.register_identity(
+        a.clone(),
+        FileIdentity {
+            device_id: 1,
+            file_index: 1,
+            link_count: 1,
+            is_reparse_or_symlink: false,
+        },
+    );
+    let result = DuplicateDetector::scan_duplicates_with_cache(
+        &[dir.path().to_path_buf()],
+        1,
+        &platform,
+        Some(&cache),
+        &CancellationToken::new(),
+    )
+    .unwrap();
+    assert_eq!(result.total_groups, 1);
+    assert_eq!(result.groups[0].files.len(), 2);
+    assert_ne!(result.groups[0].hash, "legacy-full");
+
+    // The second scan is served from the refreshed cache.
+    let again = DuplicateDetector::scan_duplicates_with_cache(
+        &[dir.path().to_path_buf()],
+        1,
+        &platform,
+        Some(&cache),
+        &CancellationToken::new(),
+    )
+    .unwrap();
+    assert_eq!(again.total_groups, 1);
+    assert_eq!(again.cache_hits, 2);
+}

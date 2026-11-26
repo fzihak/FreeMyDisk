@@ -25,6 +25,7 @@ pub mod shared {
 
 pub mod storage {
     pub mod analyzer;
+    pub mod discovery;
     pub mod duplicates;
     pub mod folder_agg;
     pub mod hash_cache;

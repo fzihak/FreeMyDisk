@@ -275,3 +275,133 @@ fn test_builtin_rules_declare_locking_processes_by_exact_rule() {
     assert_eq!(find("windows_app_obs_cache"), vec!["obs64.exe"]);
     assert!(find("windows_system_search_index_temp").is_empty());
 }
+
+fn temp_rule(id: &str, patterns: &[String], protect: &[&str]) -> String {
+    let paths: Vec<String> = patterns
+        .iter()
+        .map(|p| format!("{{ path = \"{}\", matcher = \"glob\" }}", p))
+        .collect();
+    let protect: Vec<String> = protect.iter().map(|p| format!("\"{}\"", p)).collect();
+    format!(
+        r#"
+[rule]
+id = "{id}"
+name = "Rule {id}"
+category = "system"
+risk = "safe"
+verified_rebuildable = false
+verified_at = "2026-11-26"
+author = "test"
+description = "test"
+platform = "any"
+
+[targets]
+paths = [{}]
+
+[disposal]
+default_action = "permanent"
+protect_subpaths = [{}]
+"#,
+        paths.join(", "),
+        protect.join(", ")
+    )
+}
+
+#[test]
+fn test_pruned_walk_finds_cache_units_and_skips_unrelated_trees() {
+    use freemydisk_core::shared::progress::CancellationToken;
+
+    let dir = tempdir().unwrap();
+    let root = dir.path();
+    // Two apps with a GPU cache, one deep unrelated tree, one protected app.
+    for app in ["AppA", "AppB", "Microsoft"] {
+        let cache = root.join(app).join("GPUCache");
+        fs::create_dir_all(&cache).unwrap();
+        fs::write(cache.join("data_0"), vec![0u8; 100]).unwrap();
+        fs::write(cache.join("data_1"), vec![0u8; 50]).unwrap();
+    }
+    let deep = root.join("AppC").join("a").join("b").join("GPUCache");
+    fs::create_dir_all(&deep).unwrap();
+    fs::write(deep.join("x"), b"nested too deep for the pattern").unwrap();
+    let sessions = root.join("AppB").join("GPUCache").join("Sessions");
+    fs::create_dir_all(&sessions).unwrap();
+    fs::write(sessions.join("keep"), vec![0u8; 999]).unwrap();
+
+    let base = root
+        .to_string_lossy()
+        .replace(std::path::MAIN_SEPARATOR, "/");
+    let toml = temp_rule(
+        "gpu",
+        &[format!("{base}/*/GPUCache/*")],
+        &["*/Microsoft/*", "*/Sessions/*"],
+    );
+    let rule = RuleEngine::parse_rule_toml(&toml).unwrap();
+    let summary = RuleEngine::scan_rule(&rule, &CancellationToken::new()).unwrap();
+
+    let mut paths: Vec<_> = summary
+        .all_candidates
+        .iter()
+        .map(|c| c.path.clone())
+        .collect();
+    paths.sort();
+    assert_eq!(
+        paths,
+        vec![
+            root.join("AppA").join("GPUCache"),
+            root.join("AppB").join("GPUCache"),
+        ]
+    );
+    assert!(summary.all_candidates.iter().all(|c| c.is_dir));
+    // Protected Sessions contents are excluded from the size.
+    assert_eq!(summary.total_bytes, 300);
+    assert_eq!(summary.total_items, 4);
+    for c in &summary.all_candidates {
+        assert!(
+            !c.path.to_string_lossy().contains('/') || !cfg!(windows),
+            "mixed separators in {}",
+            c.path.display()
+        );
+    }
+}
+
+#[test]
+fn test_parallel_rule_scan_reports_progress_in_rule_order() {
+    use freemydisk_core::shared::progress::CancellationToken;
+
+    let dir = tempdir().unwrap();
+    let mut rules = Vec::new();
+    for i in 0..24 {
+        let sub = dir.path().join(format!("r{i}"));
+        fs::create_dir_all(&sub).unwrap();
+        // Uneven work so rules finish out of order.
+        for f in 0..((24 - i) * 5) {
+            fs::write(sub.join(format!("f{f}.tmp")), vec![1u8; i + 1]).unwrap();
+        }
+        let base = sub
+            .to_string_lossy()
+            .replace(std::path::MAIN_SEPARATOR, "/");
+        let toml = temp_rule(&format!("r{i}"), &[format!("{base}/*")], &[]);
+        rules.push(RuleEngine::parse_rule_toml(&toml).unwrap());
+    }
+    let engine = RuleEngine::with_rules(rules);
+
+    let mut events = Vec::new();
+    let summaries = engine
+        .scan_all_with_progress(&CancellationToken::new(), |name, done, total, bytes| {
+            events.push((name.to_string(), done, total, bytes));
+        })
+        .unwrap();
+
+    assert_eq!(summaries.len(), 24);
+    assert_eq!(events.len(), 24);
+    let mut cumulative = 0;
+    for (i, (name, done, total, bytes)) in events.iter().enumerate() {
+        assert_eq!(*done, i + 1);
+        assert_eq!(*total, 24);
+        assert_eq!(name, &format!("Rule r{i}"));
+        assert_eq!(summaries[i].rule_id, format!("r{i}"));
+        cumulative += summaries[i].total_bytes;
+        assert_eq!(*bytes, cumulative);
+        assert_eq!(summaries[i].total_bytes, ((24 - i) * 5 * (i + 1)) as u64);
+    }
+}

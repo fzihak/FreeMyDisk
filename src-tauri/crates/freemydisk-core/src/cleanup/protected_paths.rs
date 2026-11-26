@@ -528,6 +528,16 @@ impl ProtectedPathRegistry {
     /// It makes no file-system calls, so it is cheap enough to run for every file a
     /// scan visits. Disposal always re-checks with the full version, which also
     /// resolves links, short names and the final path of an open handle.
+    /// System folders and files (plus runtime-registered paths) that must never be
+    /// cleaned. Unlike [`Self::is_protected_lexical`] this list holds no user
+    /// containers such as `C:\Users`, so a file scan can use it to decide which
+    /// folders to skip while still entering the user's own folders.
+    pub fn system_critical_paths() -> Vec<PathBuf> {
+        let mut out: Vec<PathBuf> = DYNAMIC_SYSTEM_CRITICAL_PATHS.clone();
+        out.extend(DYNAMIC_PROTECTED_PATHS.read().iter().cloned());
+        out
+    }
+
     pub fn is_protected_lexical(path: &Path) -> bool {
         let lexical = Self::normalize_lexical(path);
         let candidates = [
