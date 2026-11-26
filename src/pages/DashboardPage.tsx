@@ -9,24 +9,26 @@ import { useCleanupScanStore } from "@/stores/cleanup-scan-store";
 import type { RuleScanSummary } from "@/types/cleanup";
 import { describeDisposal } from "@/utils/disposal";
 import {
-  Storage24Filled,
-  Delete20Filled,
   Sparkle20Filled,
-  Flash20Filled,
   ArrowClockwise20Regular,
-  ChevronRight16Regular,
   CheckmarkCircle24Filled,
-  Apps20Filled,
-  DocumentFolder20Filled,
-  DocumentCopy20Filled,
-  Shield20Filled,
   Checkmark16Filled,
-  Wrench20Filled,
   Dismiss16Filled,
   Warning16Filled,
   ErrorCircle24Filled,
+  Shield20Filled,
+  Delete20Regular,
+  Storage20Regular,
+  DocumentFolder20Regular,
+  DocumentCopy20Regular,
+  ShieldCheckmark20Regular,
+  Apps20Regular,
+  Flash20Regular,
+  Wrench20Regular,
+  Gauge20Regular,
+  Flash20Filled,
 } from "@fluentui/react-icons";
-import { WinUICard, WinUISettingRow } from "@/components/winui/WinUICard";
+import { Page, PageHeader, Card, Badge, ProgressBar, FilterTabs, SectionTitle } from "@/components/ui";
 import { WinUIButton } from "@/components/winui/WinUIButton";
 
 interface StorageVolumeInfo {
@@ -132,6 +134,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
   const [vitals, setVitals] = useState<SystemVitals | null>(null);
   const [recycleBin, setRecycleBin] = useState<RecycleBinStatus | null>(null);
   const [emptyingBin, setEmptyingBin] = useState(false);
+  const [confirmEmptyBin, setConfirmEmptyBin] = useState(false);
 
   const [emergencyModalOpen, setEmergencyModalOpen] = useState(false);
   const [rescuing, setRescuing] = useState(false);
@@ -457,234 +460,195 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
     });
   }, [volumes]);
 
+  const drivePercentFree = volumeTotalBytes > 0 ? 100 - volumePercentUsed : 100;
+  const driveLow = drivePercentFree < 15;
+
+  const tools: Array<{
+    id: NavTab;
+    title: string;
+    desc: string;
+    icon: React.ReactNode;
+    badge?: React.ReactNode;
+  }> = [
+    {
+      id: "cleanup",
+      title: t.nav.cleanup,
+      desc: t.dashboard.deepCleanupDesc,
+      icon: <Delete20Regular />,
+      badge: totalCleanableBytes > 0 ? <Badge tone="accent">{formatBytes(totalCleanableBytes)}</Badge> : undefined,
+    },
+    { id: "storage", title: t.nav.storage, desc: t.dashboard.treemapDesc, icon: <Storage20Regular /> },
+    { id: "large_files", title: t.nav.largeFiles, desc: t.dashboard.largeFilesDesc, icon: <DocumentFolder20Regular /> },
+    { id: "duplicates", title: t.nav.duplicates, desc: t.dashboard.duplicatesDesc, icon: <DocumentCopy20Regular /> },
+    { id: "privacy", title: t.nav.privacy, desc: t.dashboard.privacyDesc, icon: <ShieldCheckmark20Regular /> },
+    { id: "applications", title: t.nav.applications, desc: t.dashboard.appsDesc, icon: <Apps20Regular /> },
+    {
+      id: "startup",
+      title: t.nav.startup,
+      desc: t.dashboard.startupDesc,
+      icon: <Flash20Regular />,
+      badge:
+        highImpactStartups > 0 ? (
+          <Badge tone="warning">{fill(t.dashboard.highImpactCount, { count: highImpactStartups })}</Badge>
+        ) : undefined,
+    },
+    { id: "maintenance", title: t.nav.maintenance, desc: t.dashboard.maintenanceDesc, icon: <Wrench20Regular /> },
+    { id: "optimization", title: t.nav.optimization, desc: t.dashboard.optimizerDesc, icon: <Gauge20Regular /> },
+  ];
+
+  const binEmpty = !recycleBin || recycleBin.total_bytes === 0;
+
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-4 select-none font-sans text-[var(--text-primary)]">
-      {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-[var(--text-primary)] tracking-tight">
-            {t.dashboard.title}
-          </h1>
-          <p className="text-xs text-[var(--text-secondary)] mt-0.5">
-            {t.dashboard.subtitle}
-          </p>
-        </div>
+    <Page>
+      <PageHeader
+        title={t.dashboard.title}
+        description={
+          vitals
+            ? `${vitals.os_name} · ${vitals.cpu_cores} ${t.dashboard.cpuCores}`
+            : t.dashboard.subtitle
+        }
+      />
 
-        {vitals && (
-          <div className="flex items-center gap-2 text-xs bg-white/[0.04] border border-[var(--border-subtle)] px-3 py-1.5 rounded-[4px] shrink-0 text-[var(--text-secondary)]">
-            <span className="w-2 h-2 rounded-full bg-emerald-400" />
-            <span className="font-medium text-[var(--text-primary)]">{vitals.os_name}</span>
-            <span className="text-[var(--text-muted)]">|</span>
-            <span className="font-ibm-mono">{vitals.cpu_cores} cores</span>
-            <span className="text-[var(--text-muted)]">|</span>
-            <span>RAM: <strong className="font-ibm-mono text-[var(--text-primary)]">{vitals.memory_load_percent}%</strong></span>
-          </div>
-        )}
-      </div>
-
-      {/* Microsoft PC Manager Signature Health / Quick Boost Hero Card */}
-      <WinUICard className="p-5">
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-          {/* Left metrics */}
-          <div className="flex flex-wrap items-center gap-8 flex-1">
-            {/* Cleanable temporary files metric */}
-            <div className="space-y-1">
-              <span className="text-xs text-[var(--text-secondary)] font-normal">
-                {t.dashboard.quickScanTitle}
-              </span>
-              <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-bold font-ibm-mono text-[var(--text-primary)] tabular-nums">
-                  {scanning
-                    ? t.dashboard.scanningHeadline
-                    : scanCompleted
-                    ? formatBytes(totalCleanableBytes)
-                    : "—"}
-                </span>
-                {scanning ? (
-                  <span className="text-xs font-medium text-[#4cc2ff] font-ibm-mono tabular-nums">
-                    {scanProgress}%
-                  </span>
-                ) : (
-                  scanCompleted &&
-                  totalCleanableBytes > 0 && (
-                    <span className="text-xs font-medium text-emerald-400 font-ibm-mono">
-                      {t.dashboard.reclaimable}
-                    </span>
-                  )
-                )}
-              </div>
-              <p className="text-xs text-[var(--text-muted)]">
-                {scanCompleted && !scanning
-                  ? fill(t.dashboard.categoriesInspected, { count: inspectedCount })
-                  : t.dashboard.categoriesHint}
-                {refreshing && (
-                  <span className="ml-2 inline-flex items-center gap-1 text-[#4cc2ff]">
-                    <ArrowClockwise20Regular className="w-3 h-3 animate-spin" />
-                    {t.dashboard.refreshingResults}
-                  </span>
-                )}
-              </p>
-              {scanCompleted && !scanning && quickClean.adminBytes > 0 && (
-                <p className="text-xs text-amber-400/90">
-                  {fill(t.dashboard.moreNeedsAdmin, { size: formatBytes(quickClean.adminBytes) })}
-                </p>
-              )}
-              {scanCompleted && !scanning && quickClean.lockedBytes > 0 && (
-                <p className="text-xs text-amber-400/90">
-                  {fill(t.dashboard.moreNeedsAppsClosed, {
-                    size: formatBytes(quickClean.lockedBytes),
-                    apps: quickClean.lockedApps.join(", ") || "apps",
-                  })}
-                </p>
-              )}
-            </div>
-
-            <div className="hidden sm:block h-10 w-px bg-[var(--border-divider)]" />
-
-            {/* RAM Load metric */}
-            {vitals && (
-              <div className="space-y-1">
-                <span className="text-xs text-[var(--text-secondary)] font-normal">
-                  RAM Memory Usage
-                </span>
-                <div className="flex items-baseline gap-2">
-                  <span className="text-3xl font-bold font-ibm-mono text-[var(--text-primary)] tabular-nums">
-                    {vitals.memory_load_percent}%
-                  </span>
-                  <button
-                    onClick={handleBoostRam}
-                    disabled={boostingRam}
-                    className="text-xs font-semibold text-[#0078d4] hover:text-[#4cc2ff] underline cursor-pointer disabled:opacity-50 transition-colors"
-                  >
-                    {boostingRam ? "Boosting..." : "Boost"}
-                  </button>
-                  <span className="text-xs font-medium text-[var(--text-muted)] font-ibm-mono">
-                    {((vitals.used_ram_bytes || 0) / (1024 * 1024 * 1024)).toFixed(1)} GB /{" "}
-                    {((vitals.total_ram_bytes || 0) / (1024 * 1024 * 1024)).toFixed(0)} GB
-                  </span>
+      {/* Hero: selected drive on the left, the one-click cleaner on the right */}
+      <Card className="p-6">
+        <div className="grid gap-6 md:grid-cols-[minmax(0,320px)_1fr]">
+          <div className="flex flex-col items-center md:items-start gap-4">
+            <div className="flex items-center gap-4">
+              <DriveRing percent={volumePercentUsed} danger={driveLow} />
+              <div className="min-w-0">
+                <div className="text-base font-semibold truncate">
+                  {currentVolume ? volumeLabel(currentVolume) : t.dashboard.driveSpaceTitle}
                 </div>
-                <div className="w-32 bg-black/20 h-1 rounded-full overflow-hidden">
-                  <div
-                    style={{ width: `${vitals.memory_load_percent}%` }}
-                    className="h-full bg-[#0078d4] rounded-full transition-all duration-500"
-                  />
-                </div>
-              </div>
-            )}
-
-            {recycleBin && recycleBin.total_bytes > 0 && (
-              <>
-                <div className="hidden sm:block h-10 w-px bg-[var(--border-divider)]" />
-                <div className="space-y-1">
-                  <span className="text-xs text-[var(--text-secondary)] font-normal">
-                    Recycle Bin
-                  </span>
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-3xl font-bold font-ibm-mono text-[var(--text-primary)] tabular-nums">
-                      {formatBytes(recycleBin.total_bytes)}
-                    </span>
-                    <button
-                      onClick={handleEmptyRecycleBin}
-                      disabled={emptyingBin}
-                      className="text-xs font-semibold text-rose-400 hover:text-rose-300 underline cursor-pointer disabled:opacity-50 transition-colors"
+                {currentVolume ? (
+                  <>
+                    <div className="text-sm text-[var(--text-secondary)] font-ibm-mono">
+                      {fill(t.dashboard.usedOfTotal, {
+                        used: formatBytes(volumeUsedBytes),
+                        total: formatBytes(volumeTotalBytes),
+                      })}
+                    </div>
+                    <div
+                      className={`text-sm font-ibm-mono ${driveLow ? "text-[var(--danger)]" : "text-[var(--success)]"}`}
                     >
-                      {emptyingBin ? "Emptying..." : "Empty"}
-                    </button>
-                  </div>
-                  <p className="text-xs text-[var(--text-muted)]">
-                    {recycleBin.item_count} items across drives
-                  </p>
-                </div>
-              </>
+                      {fill(t.dashboard.freeSpaceValue, { size: formatBytes(currentVolume.available_bytes) })}
+                    </div>
+                  </>
+                ) : (
+                  <div className="w-32 h-3 mt-1 rounded bg-[var(--fill-subtle)] animate-pulse" />
+                )}
+              </div>
+            </div>
+            {volumes.length > 1 && (
+              <FilterTabs
+                items={volumes.map((v, idx) => ({ id: String(idx), label: v.mount_point.replace(/\\$/, "") }))}
+                value={String(selectedVolumeIdx)}
+                onChange={(id) => setSelectedVolumeIdx(Number(id))}
+                className="max-w-full"
+              />
             )}
           </div>
 
-          {/* Right Action buttons */}
-          <div className="shrink-0 flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full md:w-auto">
-            {scanCompleted && !scanning && (totalCleanableBytes > 0 || cleaning) ? (
-              <WinUIButton
-                variant="primary"
-                size="lg"
-                onClick={handleInstantClean}
-                disabled={cleaning || refreshing}
-                icon={<Sparkle20Filled className="w-4 h-4" />}
-              >
-                {cleaning ? t.common.cleaning : t.dashboard.cleanNow}
-              </WinUIButton>
-            ) : scanCompleted && !scanning ? (
-              <WinUIButton variant="primary" size="lg" disabled icon={<CheckmarkCircle24Filled className="w-4 h-4" />}>
-                {refreshing ? t.dashboard.refreshingResults : t.dashboard.nothingToClean}
-              </WinUIButton>
+          <div className="md:border-l md:border-[var(--border-divider)] md:pl-6 flex flex-col justify-center gap-3 min-w-0">
+            <div className="text-sm text-[var(--text-secondary)]">{t.dashboard.quickScanTitle}</div>
+            <div className="flex items-baseline gap-2 flex-wrap">
+              <span className="text-[40px] leading-none font-semibold font-ibm-mono">
+                {scanning ? `${scanProgress}%` : scanCompleted ? formatBytes(totalCleanableBytes) : "—"}
+              </span>
+              <span className="text-sm text-[var(--text-secondary)]">
+                {scanning ? t.dashboard.scanningHeadline : scanCompleted ? t.dashboard.readyToClean : ""}
+              </span>
+              {refreshing && (
+                <span className="inline-flex items-center gap-1 text-xs text-[var(--accent-text)]">
+                  <ArrowClockwise20Regular className="w-3.5 h-3.5 animate-spin" />
+                  {t.dashboard.refreshingResults}
+                </span>
+              )}
+            </div>
+
+            {scanning ? (
+              <div className="space-y-1.5">
+                <ProgressBar value={Math.max(1, scanProgress)} />
+                <div className="text-xs text-[var(--text-muted)] truncate">
+                  {cleanupProgress.currentPath || scanStage}
+                </div>
+              </div>
             ) : (
-              <WinUIButton
-                variant="primary"
-                size="lg"
-                onClick={() => handleStartScan()}
-                disabled={scanning}
-                icon={<ArrowClockwise20Regular className={`w-4 h-4 ${scanning ? "animate-spin" : ""}`} />}
-              >
-                {scanning ? t.dashboard.scanningHeadline : t.dashboard.startQuickScan}
-              </WinUIButton>
+              <div className="space-y-1">
+                <div className="text-xs text-[var(--text-muted)]">
+                  {scanCompleted
+                    ? fill(t.dashboard.categoriesInspected, { count: inspectedCount })
+                    : t.dashboard.categoriesHint}
+                </div>
+                {scanCompleted && quickClean.adminBytes > 0 && (
+                  <Note>{fill(t.dashboard.moreNeedsAdmin, { size: formatBytes(quickClean.adminBytes) })}</Note>
+                )}
+                {scanCompleted && quickClean.lockedBytes > 0 && (
+                  <Note>
+                    {fill(t.dashboard.moreNeedsAppsClosed, {
+                      size: formatBytes(quickClean.lockedBytes),
+                      apps: quickClean.lockedApps.join(", ") || "apps",
+                    })}
+                  </Note>
+                )}
+              </div>
             )}
 
-            {scanCompleted && (
-              <WinUIButton
-                variant="standard"
-                size="lg"
-                onClick={() => handleStartScan()}
-                disabled={scanning || refreshing || cleaning}
-              >
-                {t.cleanup.rescan}
-              </WinUIButton>
-            )}
+            <div className="flex flex-wrap gap-2 pt-1">
+              {scanCompleted && !scanning && (totalCleanableBytes > 0 || cleaning) ? (
+                <WinUIButton
+                  variant="primary"
+                  size="lg"
+                  onClick={handleInstantClean}
+                  disabled={cleaning || refreshing}
+                  icon={<Sparkle20Filled className="w-4 h-4" />}
+                >
+                  {cleaning ? t.common.cleaning : t.dashboard.cleanNow}
+                </WinUIButton>
+              ) : scanCompleted && !scanning ? (
+                <WinUIButton variant="primary" size="lg" disabled icon={<CheckmarkCircle24Filled className="w-4 h-4" />}>
+                  {refreshing ? t.dashboard.refreshingResults : t.dashboard.nothingToClean}
+                </WinUIButton>
+              ) : (
+                <WinUIButton
+                  variant="primary"
+                  size="lg"
+                  onClick={() => handleStartScan()}
+                  disabled={scanning}
+                  icon={<ArrowClockwise20Regular className={`w-4 h-4 ${scanning ? "animate-spin" : ""}`} />}
+                >
+                  {scanning ? t.dashboard.scanningHeadline : t.dashboard.startQuickScan}
+                </WinUIButton>
+              )}
+              {scanCompleted && (
+                <WinUIButton
+                  variant="standard"
+                  size="lg"
+                  onClick={() => handleStartScan()}
+                  disabled={scanning || refreshing || cleaning}
+                >
+                  {t.cleanup.rescan}
+                </WinUIButton>
+              )}
+            </div>
           </div>
         </div>
-
-        {/* Live scanning progress bar with engine heartbeat */}
-        {scanning && (
-          <div className="mt-4 pt-3 border-t border-[var(--border-divider)] space-y-2">
-            <div className="flex items-center justify-between text-xs text-[var(--text-secondary)]">
-              <div className="flex items-center gap-2 truncate mr-3">
-                <span className="relative flex h-2 w-2 shrink-0">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500 shadow-[0_0_6px_rgba(52,211,153,0.8)]" />
-                </span>
-                <span className="truncate">{scanStage}</span>
-              </div>
-              <span className="font-ibm-mono font-bold text-[#0078d4] tabular-nums shrink-0">
-                {scanProgress}%
-              </span>
-            </div>
-            <div className="w-full bg-black/40 h-1.5 rounded-full overflow-hidden p-[1px] border border-white/[0.04]">
-              <div
-                style={{ width: `${Math.max(1, scanProgress)}%` }}
-                className="h-full bg-gradient-to-r from-[#005a9e] via-[#0078d4] to-[#2b88d8] rounded-full transition-all duration-200"
-              />
-            </div>
-            {cleanupProgress.currentPath && (
-              <div className="text-xs text-[var(--text-muted)] font-ibm-mono truncate">
-                Active rule: {cleanupProgress.currentPath}
-              </div>
-            )}
-          </div>
-        )}
 
         {/* Outcome of the last one-click clean */}
         {lastClean && !scanning && (
-          <div className="mt-4 pt-3 border-t border-[var(--border-divider)] space-y-1.5 text-xs">
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-              <span className="flex items-center gap-1.5 font-semibold text-emerald-400">
+          <div className="mt-5 pt-4 border-t border-[var(--border-divider)] space-y-2 text-sm">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+              <span className="flex items-center gap-1.5 font-semibold text-[var(--success)]">
                 <CheckmarkCircle24Filled className="w-4 h-4" />
                 {t.dashboard.lastCleanTitle}
               </span>
-              <span className="font-ibm-mono text-[var(--text-primary)]">
-                {fill(t.dashboard.lastCleanFreed, { size: formatBytes(lastClean.total_freed_bytes) })}
-              </span>
+              {lastClean.total_freed_bytes > 0 && (
+                <span className="font-ibm-mono">
+                  {fill(t.dashboard.lastCleanFreed, { size: formatBytes(lastClean.total_freed_bytes) })}
+                </span>
+              )}
               {(lastClean.recycled_bytes ?? 0) > 0 && (
-                <span className="font-ibm-mono text-[var(--text-secondary)]">
-                  {fill(t.dashboard.lastCleanRecycled, {
-                    size: formatBytes(lastClean.recycled_bytes ?? 0),
-                  })}
+                <span className="font-ibm-mono">
+                  {fill(t.dashboard.lastCleanRecycled, { size: formatBytes(lastClean.recycled_bytes ?? 0) })}
                 </span>
               )}
               <span className="text-[var(--text-secondary)]">
@@ -696,7 +660,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
                 </span>
               )}
               {(lastClean.failed_items ?? 0) > 0 && (
-                <span className="text-amber-400">
+                <span className="text-[var(--brand-amber)]">
                   {fill(t.dashboard.lastCleanFailed, { count: lastClean.failed_items ?? 0 })}
                 </span>
               )}
@@ -704,226 +668,139 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
             {cleanIssues.length > 0 && (
               <div className="flex flex-wrap gap-1.5">
                 {cleanIssues.map(([reason, count]) => (
-                  <span
-                    key={reason}
-                    className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-[4px] bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs"
-                  >
+                  <Badge key={reason} tone="warning">
                     <Warning16Filled className="w-3 h-3" />
                     {reason} · {count}
-                  </span>
+                  </Badge>
                 ))}
               </div>
             )}
           </div>
         )}
-      </WinUICard>
+      </Card>
 
-      {/* Windows 11 Storage Sense Bar Card */}
-      <WinUICard className="p-5 space-y-3.5">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-[4px] bg-white/[0.04] border border-[var(--border-subtle)] flex items-center justify-center text-[#0078d4] shrink-0">
-              <Storage24Filled className="w-5 h-5" />
+      {/* Status row */}
+      <div className="grid gap-3 sm:grid-cols-3">
+        <Card className="flex flex-col gap-3">
+          <div className="flex items-center justify-between text-sm text-[var(--text-secondary)]">
+            <span>{t.dashboard.recycleBinTitle}</span>
+            <Delete20Regular className="w-4 h-4 text-[var(--text-muted)]" />
+          </div>
+          <div>
+            <div className="text-2xl font-semibold font-ibm-mono">
+              {formatBytes(recycleBin?.total_bytes ?? 0)}
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-sm font-semibold text-[var(--text-primary)]">
-                  {currentVolume
-                    ? volumeLabel(currentVolume)
-                    : t.dashboard.driveSpaceTitle}
-                </h2>
-                {currentVolume && (
-                  <span className="text-xs font-ibm-mono px-1.5 py-0.5 rounded-[4px] bg-white/[0.06] text-[var(--text-secondary)]">
-                    {currentVolume.file_system}
-                  </span>
-                )}
-              </div>
-              <p className="text-xs text-[var(--text-secondary)] font-ibm-mono mt-0.5">
-                {currentVolume ? (
-                  <>
-                    <span>{formatBytes(volumeUsedBytes)}</span> / <span>{formatBytes(volumeTotalBytes)}</span> ({volumePercentUsed}%) ·{" "}
-                    <strong className="text-emerald-400 font-semibold">
-                      {formatBytes(currentVolume.available_bytes)} {t.dashboard.freeSpaceCategory}
-                    </strong>
-                  </>
-                ) : (
-                  <span className="inline-block w-48 h-3 rounded bg-white/[0.06] animate-pulse" />
-                )}
-              </p>
+            <div className="text-xs text-[var(--text-muted)]">
+              {binEmpty
+                ? t.dashboard.binIsEmpty
+                : fill(t.dashboard.recycleItems, { count: recycleBin?.item_count ?? 0 })}
             </div>
           </div>
-
-          {/* Drive selector tabs */}
-          {volumes.length > 1 && (
-            <div className="flex items-center gap-1 bg-black/20 p-0.5 rounded-[4px] border border-[var(--border-subtle)] self-start sm:self-auto">
-              {volumes.map((vol, idx) => (
-                <button
-                  key={vol.mount_point}
-                  onClick={() => setSelectedVolumeIdx(idx)}
-                  className={`px-2.5 py-1 text-xs rounded-[3px] font-ibm-mono transition-all cursor-pointer ${
-                    selectedVolumeIdx === idx
-                      ? "bg-[var(--bg-card)] text-[var(--text-primary)] font-semibold shadow-sm"
-                      : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-                  }`}
-                >
-                  {vol.mount_point}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Capacity bar: real used space, the part a scan found cleanable, and free space */}
-        <div className="w-full h-3 bg-black/20 rounded-[4px] overflow-hidden flex border border-[var(--border-subtle)]">
-          {volumeTotalBytes > 0 && (
-            <>
-              <div
-                style={{ width: `${((volumeUsedBytes - Math.min(totalCleanableBytes, volumeUsedBytes)) / volumeTotalBytes) * 100}%` }}
-                title={t.dashboard.usedSpaceCategory}
-                className="h-full bg-[#0078d4] transition-all duration-500"
-              />
-              <div
-                style={{ width: `${(Math.min(totalCleanableBytes, volumeUsedBytes) / volumeTotalBytes) * 100}%` }}
-                title={t.dashboard.tempFilesCategory}
-                className="h-full bg-[#f7630c] transition-all duration-500"
-              />
-            </>
-          )}
-        </div>
-
-        {/* Legend Row */}
-        <div className="flex flex-wrap items-center gap-5 text-xs text-[var(--text-secondary)] pt-1">
-          <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-[2px] bg-[#0078d4]" />
-            <span>{t.dashboard.usedSpaceCategory}</span>
+          <div className="mt-auto">
+            <WinUIButton
+              variant={confirmEmptyBin ? "danger" : "standard"}
+              size="sm"
+              disabled={binEmpty || emptyingBin}
+              onClick={() => {
+                if (confirmEmptyBin) {
+                  setConfirmEmptyBin(false);
+                  handleEmptyRecycleBin();
+                } else {
+                  setConfirmEmptyBin(true);
+                  window.setTimeout(() => setConfirmEmptyBin(false), 4000);
+                }
+              }}
+            >
+              {emptyingBin
+                ? t.dashboard.emptyingBin
+                : confirmEmptyBin
+                ? t.dashboard.confirmEmptyBin
+                : t.dashboard.emptyBin}
+            </WinUIButton>
           </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-[2px] bg-[#f7630c]" />
-            <span>{t.dashboard.tempFilesCategory}</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-[2px] bg-white/[0.15]" />
-            <span>{t.dashboard.freeSpaceCategory}</span>
-          </div>
-        </div>
-      </WinUICard>
+        </Card>
 
-      {/* WinUI 3 Group 1: Storage Cleaners & Intelligence */}
-      <div className="space-y-1.5">
-        <h3 className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider px-1">
-          Storage Intelligence
-        </h3>
-        <WinUICard>
-          <WinUISettingRow
-            icon={<Delete20Filled className="w-4 h-4 text-[#0078d4]" />}
-            title={t.nav.cleanup}
-            subtitle="Clean temporary system caches, crash dumps, and Windows logs"
-            onClick={() => onNavigate("cleanup")}
-            action={
-              <div className="flex items-center gap-2">
-                {totalCleanableBytes > 0 && (
-                  <span className="text-xs font-ibm-mono font-medium px-2 py-0.5 rounded-[4px] bg-[#0078d4]/10 text-[#4cc2ff] border border-[#0078d4]/20">
-                    {formatBytes(totalCleanableBytes)}
-                  </span>
-                )}
-                <ChevronRight16Regular className="w-4 h-4 text-[var(--text-muted)]" />
-              </div>
-            }
-          />
-          <WinUISettingRow
-            icon={<DocumentFolder20Filled className="w-4 h-4 text-[#8764b8]" />}
-            title={t.nav.largeFiles}
-            subtitle="Identify files taking up significant capacity (> 500 MB)"
-            onClick={() => onNavigate("large_files")}
-            action={<ChevronRight16Regular className="w-4 h-4 text-[var(--text-muted)]" />}
-          />
-          <WinUISettingRow
-            icon={<DocumentCopy20Filled className="w-4 h-4 text-[#00b7c3]" />}
-            title={t.nav.duplicates}
-            subtitle={t.dashboard.duplicatesEngineDesc}
-            onClick={() => onNavigate("duplicates")}
-            action={<ChevronRight16Regular className="w-4 h-4 text-[var(--text-muted)]" />}
-          />
-        </WinUICard>
-      </div>
-
-      {/* WinUI 3 Group 2: Protection & System Safety */}
-      <div className="space-y-1.5">
-        <h3 className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider px-1">
-          Protection & Safety
-        </h3>
-        <WinUICard>
-          <WinUISettingRow
-            icon={<Shield20Filled className="w-4 h-4 text-emerald-400" />}
-            title={t.nav.privacy}
-            subtitle="Purge browser histories, tracking cookies, and session locks"
-            onClick={() => onNavigate("privacy")}
-            action={<ChevronRight16Regular className="w-4 h-4 text-[var(--text-muted)]" />}
-          />
-          <WinUISettingRow
-            icon={<Flash20Filled className="w-4 h-4 text-rose-400" />}
-            title={t.dashboard.emergencyBannerTitle}
-            subtitle={t.dashboard.emergencyBannerDesc}
-            badge={
-              <span className={`text-xs font-ibm-mono px-2 py-0.2 rounded-[4px] font-semibold uppercase ${
-                isDiskCritical
-                  ? "bg-rose-600 text-white"
-                  : "bg-rose-500/10 text-rose-400 border border-rose-500/20"
-              }`}>
-                {isDiskCritical ? "CRITICAL DISK SPACE" : "10GB–40GB Rescue"}
+        <Card className="flex flex-col gap-3">
+          <div className="flex items-center justify-between text-sm text-[var(--text-secondary)]">
+            <span>{t.dashboard.memoryTitle}</span>
+            <Gauge20Regular className="w-4 h-4 text-[var(--text-muted)]" />
+          </div>
+          <div className="space-y-2">
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="text-2xl font-semibold font-ibm-mono">
+                {vitals ? `${vitals.memory_load_percent}%` : "—"}
               </span>
-            }
-            action={
-              <WinUIButton
-                variant="danger"
-                size="sm"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  openRescueModal();
-                }}
-              >
-                {t.dashboard.emergencyRescueButton}
-              </WinUIButton>
-            }
-          />
-        </WinUICard>
+              {vitals && (
+                <span className="text-xs text-[var(--text-muted)] font-ibm-mono">
+                  {fill(t.dashboard.usedOfTotal, {
+                    used: formatBytes(vitals.used_ram_bytes || 0),
+                    total: formatBytes(vitals.total_ram_bytes || 0),
+                  })}
+                </span>
+              )}
+            </div>
+            <ProgressBar
+              value={vitals?.memory_load_percent ?? 0}
+              tone={(vitals?.memory_load_percent ?? 0) > 85 ? "danger" : (vitals?.memory_load_percent ?? 0) > 70 ? "warning" : "accent"}
+            />
+          </div>
+          <div className="mt-auto">
+            <WinUIButton variant="standard" size="sm" onClick={handleBoostRam} disabled={boostingRam || !vitals}>
+              {boostingRam ? t.dashboard.boostingMemory : t.dashboard.boostMemory}
+            </WinUIButton>
+          </div>
+        </Card>
+
+        <Card
+          className={`flex flex-col gap-3 ${isDiskCritical ? "border-[color-mix(in_srgb,var(--danger)_45%,transparent)]" : ""}`}
+        >
+          <div className="flex items-center justify-between text-sm text-[var(--text-secondary)]">
+            <span>{t.dashboard.diskSpaceTitle}</span>
+            {isDiskCritical ? (
+              <Warning16Filled className="w-4 h-4 text-[var(--danger)]" />
+            ) : (
+              <CheckmarkCircle24Filled className="w-4 h-4 text-[var(--success)]" />
+            )}
+          </div>
+          <div>
+            <div
+              className={`text-base font-semibold ${isDiskCritical ? "text-[var(--danger)]" : "text-[var(--success)]"}`}
+            >
+              {isDiskCritical ? t.dashboard.diskLow : t.dashboard.diskOk}
+            </div>
+            <div className="text-xs text-[var(--text-muted)]">
+              {isDiskCritical ? t.dashboard.emergencyBannerDesc : t.dashboard.diskOkDesc}
+            </div>
+          </div>
+          <div className="mt-auto">
+            <WinUIButton variant={isDiskCritical ? "danger" : "subtle"} size="sm" onClick={openRescueModal}>
+              {isDiskCritical ? t.dashboard.emergencyRescueButton : t.dashboard.emergencyRescueShort}
+            </WinUIButton>
+          </div>
+        </Card>
       </div>
 
-      {/* WinUI 3 Group 3: Applications & Performance */}
-      <div className="space-y-1.5">
-        <h3 className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider px-1">
-          Applications & Diagnostics
-        </h3>
-        <WinUICard>
-          <WinUISettingRow
-            icon={<Apps20Filled className="w-4 h-4 text-[#0078d4]" />}
-            title={t.nav.applications}
-            subtitle="Uninstall desktop applications, UWP components, and leftover registry files"
-            onClick={() => onNavigate("applications")}
-            action={<ChevronRight16Regular className="w-4 h-4 text-[var(--text-muted)]" />}
-          />
-          <WinUISettingRow
-            icon={<Flash20Filled className="w-4 h-4 text-amber-400" />}
-            title={t.dashboard.startupCard}
-            subtitle={t.dashboard.startupDesc}
-            badge={
-              highImpactStartups > 0 ? (
-                <span className="text-xs font-ibm-mono font-semibold px-2 py-0.2 rounded-[4px] bg-amber-500/15 text-amber-300 border border-amber-500/20">
-                  {highImpactStartups} High Impact
-                </span>
-              ) : undefined
-            }
-            onClick={() => onNavigate("startup")}
-            action={<ChevronRight16Regular className="w-4 h-4 text-[var(--text-muted)]" />}
-          />
-          <WinUISettingRow
-            icon={<Wrench20Filled className="w-4 h-4 text-cyan-400" />}
-            title={t.nav.maintenance}
-            subtitle="Perform DISM component repair, SFC scan, and icon/font cache rebuilds"
-            onClick={() => onNavigate("maintenance")}
-            action={<ChevronRight16Regular className="w-4 h-4 text-[var(--text-muted)]" />}
-          />
-        </WinUICard>
+      {/* Tools */}
+      <SectionTitle>{t.dashboard.toolsTitle}</SectionTitle>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {tools.map((tool) => (
+          <button
+            key={tool.id}
+            onClick={() => onNavigate(tool.id)}
+            className="group text-left bg-[var(--bg-card)] hover:bg-[var(--bg-card-hover)] border border-[var(--border-card)] rounded-lg p-4 flex items-start gap-3 transition-colors shadow-[var(--shadow-card)]"
+          >
+            <span className="w-9 h-9 shrink-0 rounded-md bg-[var(--fill-subtle)] flex items-center justify-center text-[var(--accent-text)] [&_svg]:w-5 [&_svg]:h-5">
+              {tool.icon}
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="flex items-center justify-between gap-2">
+                <span className="text-sm font-semibold truncate">{tool.title}</span>
+                {tool.badge}
+              </span>
+              <span className="block text-xs text-[var(--text-secondary)] mt-0.5 line-clamp-2">{tool.desc}</span>
+            </span>
+          </button>
+        ))}
       </div>
 
       {/* Emergency Rescue Modal - WinUI 3 ContentDialog */}
@@ -1083,8 +960,47 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
           </div>
         </div>
       )}
-    </div>
+    </Page>
   );
 };
 
 export default DashboardPage;
+
+/** Ring showing how full a drive is. Turns red when free space is low. */
+const DriveRing: React.FC<{ percent: number; danger?: boolean }> = ({ percent, danger }) => {
+  const size = 96;
+  const stroke = 9;
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  const p = Math.max(0, Math.min(100, percent));
+  return (
+    <div className="relative shrink-0" style={{ width: size, height: size }}>
+      <svg width={size} height={size} className="-rotate-90">
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--fill-subtle-hover)" strokeWidth={stroke} />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          fill="none"
+          stroke={danger ? "var(--danger-fill)" : "var(--accent)"}
+          strokeWidth={stroke}
+          strokeLinecap="round"
+          strokeDasharray={c}
+          strokeDashoffset={c * (1 - p / 100)}
+          style={{ transition: "stroke-dashoffset 0.5s ease" }}
+        />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="text-xl font-semibold font-ibm-mono">{p}%</span>
+      </div>
+    </div>
+  );
+};
+
+/** Small amber note line with a warning icon. */
+const Note: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <div className="flex items-center gap-1.5 text-xs text-[var(--brand-amber)]">
+    <Warning16Filled className="w-3.5 h-3.5 shrink-0" />
+    <span className="truncate">{children}</span>
+  </div>
+);
