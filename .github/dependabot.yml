@@ -1,8 +1,13 @@
 version: 2
 updates:
-  # Workflow actions are pinned to commit SHAs; Dependabot proposes updates
-  # as pull requests so they are reviewed before they run.
+  # Workflow actions are pinned to commit SHAs. Dependabot proposes their
+  # updates once a month as a single grouped pull request, so there is at
+  # most one extra branch at a time and every update is reviewed before it runs.
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: weekly
+      interval: monthly
+    open-pull-requests-limit: 1
+    groups:
+      github-actions:
+        patterns: ["*"]
