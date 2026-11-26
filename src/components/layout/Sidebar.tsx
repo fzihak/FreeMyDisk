@@ -28,8 +28,7 @@ import {
   History20Filled,
   Settings20Regular,
   Settings20Filled,
-  ChevronLeft16Regular,
-  ChevronRight16Regular,
+  Navigation20Regular,
 } from "@fluentui/react-icons";
 
 export type NavTab =
@@ -74,6 +73,9 @@ interface SystemVitals {
   computer_name: string;
   cpu_cores: number;
 }
+
+const focusRing =
+  "outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--accent-text)]";
 
 export const Sidebar: React.FC<SidebarProps> = ({
   currentTab,
@@ -213,7 +215,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         onClick={() => onSelectTab(id)}
         title={collapsed ? label : undefined}
         aria-current={isActive ? "page" : undefined}
-        className={`w-full h-9 relative flex items-center rounded-md text-sm transition-colors ${
+        className={`w-full h-9 relative flex items-center rounded-md text-sm transition-colors ${focusRing} ${
           collapsed ? "justify-center" : "gap-3 px-3"
         } ${
           isActive
@@ -238,15 +240,31 @@ export const Sidebar: React.FC<SidebarProps> = ({
         collapsed ? "w-[60px]" : "w-60"
       }`}
     >
-      {/* Collapse toggle, like the Windows 11 navigation view */}
-      <div className={`h-11 flex items-center shrink-0 ${collapsed ? "justify-center" : "px-2"}`}>
+      {/* Top row: menu button and app name, level with the window buttons.
+          The empty part of the row drags the window. */}
+      <div
+        data-tauri-drag-region
+        className={`h-12 flex items-center gap-2 shrink-0 ${collapsed ? "justify-center px-2" : "px-2"}`}
+      >
         <button
           onClick={onToggleCollapse}
           title={collapsed ? t.layout.expandSidebar : t.layout.collapseSidebar}
-          className="w-10 h-9 rounded-md flex items-center justify-center text-[var(--text-secondary)] hover:bg-[var(--fill-subtle)] hover:text-[var(--text-primary)] transition-colors"
+          aria-label={collapsed ? t.layout.expandSidebar : t.layout.collapseSidebar}
+          aria-expanded={!collapsed}
+          className={`w-10 h-9 shrink-0 rounded-md flex items-center justify-center text-[var(--text-primary)] hover:bg-[var(--fill-subtle)] active:bg-[var(--fill-subtle-hover)] transition-colors ${focusRing}`}
         >
-          {collapsed ? <ChevronRight16Regular className="w-4 h-4" /> : <ChevronLeft16Regular className="w-4 h-4" />}
+          <Navigation20Regular className="w-5 h-5" />
         </button>
+        {!collapsed && (
+          <button
+            onClick={() => onSelectTab("dashboard")}
+            title={t.layout.goToDashboard}
+            className={`flex items-center gap-2.5 min-w-0 h-9 pr-2 rounded-md ${focusRing}`}
+          >
+            <img src="/logo.png" alt="" className="w-5 h-5 shrink-0 object-contain" />
+            <span className="text-sm font-semibold text-[var(--text-primary)] truncate">FreeMyDisk</span>
+          </button>
+        )}
       </div>
 
       <nav className="flex-1 overflow-y-auto px-2 pb-2">

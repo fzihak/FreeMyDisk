@@ -55,12 +55,10 @@ export const TitleBar: React.FC<TitleBarProps> = ({ title = "FreeMyDisk" }) => {
     <div
       data-tauri-drag-region
       onDoubleClick={() => run("toggleMaximize")}
-      className="h-10 flex items-center shrink-0 select-none bg-[var(--bg-shell)] z-50"
+      className="h-12 flex items-center shrink-0 select-none bg-[var(--bg-shell)] z-50"
     >
-      <div data-tauri-drag-region className="flex items-center gap-3 pl-4 pointer-events-none">
-        <img src="/logo.png" alt="" className="w-4 h-4 object-contain" />
-        <span className="text-xs text-[var(--text-secondary)]">{title}</span>
-      </div>
+      {/* The app name lives in the sidebar; the title is kept for screen readers. */}
+      <span className="sr-only">{title}</span>
 
       <div data-tauri-drag-region className="flex-1 h-full" />
 

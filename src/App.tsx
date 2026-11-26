@@ -31,7 +31,26 @@ const PageLoadingFallback: React.FC = () => (
 
 export const App: React.FC = () => {
   const [currentTab, setCurrentTab] = useState<NavTab>("dashboard");
-  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
+  // The sidebar remembers whether it was collapsed, and starts collapsed in a
+  // narrow window so the page keeps enough room.
+  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem("fmd.sidebarCollapsed");
+      if (saved !== null) return saved === "1";
+    } catch {
+      /* storage unavailable */
+    }
+    return typeof window !== "undefined" && window.innerWidth < 1000;
+  });
+  const toggleSidebar = () =>
+    setSidebarCollapsed((prev) => {
+      try {
+        localStorage.setItem("fmd.sidebarCollapsed", prev ? "0" : "1");
+      } catch {
+        /* storage unavailable */
+      }
+      return !prev;
+    });
 
   const { checkForUpdates } = useUpdaterStore();
   const { autoCheckUpdates } = useSettingsStore();
@@ -76,9 +95,6 @@ export const App: React.FC = () => {
   return (
     <ErrorBoundary onReset={() => setCurrentTab("dashboard")}>
       <div className="flex flex-col h-screen bg-[var(--bg-shell)] text-[var(--text-primary)] font-sans overflow-hidden select-none transition-colors duration-200">
-        {/* Native-style custom titlebar with drag region and window controls */}
-        <TitleBar title="FreeMyDisk" />
-
         {/* App Body: Sidebar + Content */}
         <div className="flex flex-1 min-h-0 overflow-hidden">
           {/* Collapsible Navigation Sidebar */}
@@ -86,11 +102,13 @@ export const App: React.FC = () => {
             currentTab={currentTab}
             onSelectTab={setCurrentTab}
             collapsed={sidebarCollapsed}
-            onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
+            onToggleCollapse={toggleSidebar}
           />
 
           {/* Main Content Column */}
-          <div className="flex-1 flex flex-col min-w-0 bg-[var(--bg-page)] rounded-tl-lg border-l border-t border-[var(--border-divider)] overflow-hidden">
+          <div className="flex-1 flex flex-col min-w-0">
+          <TitleBar title="FreeMyDisk" />
+          <div className="flex-1 flex flex-col min-h-0 bg-[var(--bg-page)] rounded-tl-lg border-l border-t border-[var(--border-divider)] overflow-hidden">
             <UpdateBanner />
             <RecoveryAlert onNavigateToHistory={() => setCurrentTab("history")} />
 
@@ -100,6 +118,7 @@ export const App: React.FC = () => {
                 {renderContent()}
               </Suspense>
             </main>
+          </div>
           </div>
         </div>
         <ToastContainer />
