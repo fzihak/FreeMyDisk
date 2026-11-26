@@ -68,7 +68,11 @@ export const ko: TranslationSchema = {
     "keepFile": "파일 유지",
     "permanentDelete": "영구 삭제",
     "items": "개 항목",
-    "files": "개 파일"
+    "files": "개 파일",
+    "allDrives": "모든 드라이브",
+    "freeOf": "사용 가능 / 전체",
+    "notScannedYet": "아직 검사하지 않음",
+    "protectedSystemFile": "보호된 Windows 시스템 파일(삭제 불가)"
   },
   "dashboard": {
     "title": "디스크 상태 및 개요",
@@ -121,7 +125,43 @@ export const ko: TranslationSchema = {
     "systemReservedCategory": "시스템 및 예약 파일",
     "tempFilesCategory": "임시 파일 및 캐시",
     "usedSpaceCategory": "사용 중",
-    "freeSpaceCategory": "사용 가능한 여유 공간"
+    "freeSpaceCategory": "사용 가능한 여유 공간",
+    "scanningHeadline": "Scanning…",
+    "categoriesInspected": "{count} categories inspected",
+    "categoriesHint": "Temporary files, cache & logs",
+    "reclaimable": "reclaimable",
+    "nothingToClean": "Nothing to clean right now",
+    "moreNeedsAdmin": "{size} more needs administrator rights",
+    "moreNeedsAppsClosed": "{size} more needs {apps} closed",
+    "lastCleanTitle": "Last clean",
+    "lastCleanFreed": "{size} freed",
+    "lastCleanRecycled": "{size} moved to Recycle Bin",
+    "lastCleanItems": "{count} items cleaned",
+    "lastCleanSkipped": "{count} skipped",
+    "lastCleanFailed": "{count} failed",
+    "reasonNeedsAdmin": "needs administrator",
+    "reasonInUse": "in use",
+    "reasonTrashUnavailable": "Recycle Bin unavailable",
+    "reasonProtected": "protected",
+    "refreshingResults": "Updating results…",
+    "duplicatesEngineDesc": "Byte-identical duplicate detection (BLAKE3) with hard-link protection",
+    "rescueWillDoTitle": "Emergency Rescue will:",
+    "rescueBinPermanent": "Permanently delete everything in the Recycle Bin ({items} items, {size}). This cannot be undone.",
+    "rescueBinEmpty": "Empty the Recycle Bin (it is empty now)",
+    "rescueTempSafe": "Remove temporary files, crash dumps, error reports and shader caches older than 24 hours. Files in use are kept.",
+    "rescueHiberAdmin": "Turn off hibernation and remove hiberfil.sys (needs administrator; skipped otherwise)",
+    "rescueWslNote": "Shut down WSL if it is running",
+    "rescueStepCounter": "Step {current} of {total}",
+    "rescueStepRecycleBin": "Emptying the Recycle Bin",
+    "rescueStepTemp": "Removing old temporary files",
+    "rescueStepHibernation": "Turning off hibernation",
+    "rescueStepWsl": "Shutting down WSL",
+    "rescueFreedSoFar": "{size} freed so far",
+    "rescueFinished": "Emergency Rescue finished: {size} freed",
+    "rescueStopped": "Emergency Rescue stopped before it finished",
+    "rescueStatusDone": "Done",
+    "rescueStatusSkipped": "Skipped",
+    "rescueStatusFailed": "Failed"
   },
   "cleanup": {
     "title": "딥 클린업",
@@ -169,7 +209,10 @@ export const ko: TranslationSchema = {
     "closeToUnlock": "폴더 잠금을 해제하기 위해 닫기",
     "appsClosedSuccess": "캐시 폴더 잠금을 해제하기 위해 활성 앱을 닫았습니다.",
     "retryFailed": "재시도 실패",
-    "permanentDeleteFailed": "영구 삭제 실패"
+    "permanentDeleteFailed": "영구 삭제 실패",
+    "routeRecycleBinNote": "파일은 휴지통으로 이동되어 복원할 수 있습니다.",
+    "routePermanentNote": "설정에서 휴지통 이동이 꺼져 있습니다: 파일이 영구 삭제됩니다.",
+    "selectToClean": "정리할 항목을 선택하세요"
   },
   "storage": {
     "title": "저장소 시각화",
@@ -229,7 +272,8 @@ export const ko: TranslationSchema = {
     "trashSelected": "선택 항목 휴지통으로 이동",
     "trashConfirm": "선택한 파일을 휴지통으로 이동하시겠습니까?",
     "noFilesFound": "대용량 파일 없음",
-    "noFilesDesc": "지정한 크기 이상의 파일이 없습니다."
+    "noFilesDesc": "지정한 크기 이상의 파일이 없습니다.",
+    "statFiles": "대용량 파일"
   },
   "duplicates": {
     "title": "중복 파일 검색",
@@ -260,7 +304,11 @@ export const ko: TranslationSchema = {
     "potentialSavings": "절약 가능한 용량",
     "hardlinkNotice": "동일한 i-node(하드링크)는 중복 계산을 방지하기 위해 안전하게 제외됩니다.",
     "noDuplicatesFound": "중복 파일 없음",
-    "noDuplicatesDesc": "일치하는 중복 파일이 없습니다."
+    "noDuplicatesDesc": "일치하는 중복 파일이 없습니다.",
+    "statSets": "중복 세트",
+    "statFiles": "중복 파일",
+    "setsShown": "개가 현재 필터에 표시됨",
+    "filesSelected": "개 삭제 대상으로 선택됨"
   },
   "applications": {
     "title": "앱 및 잔여 파일",
@@ -339,7 +387,11 @@ export const ko: TranslationSchema = {
     "confirmDeleteTitle": "시작 항목 삭제",
     "confirmDeleteDesc": "이 자동 실행 항목을 완전히 삭제하시겠습니까?",
     "noItemsFound": "항목 없음",
-    "noItemsDesc": "등록된 시작 프로그램이 없습니다."
+    "noItemsDesc": "등록된 시작 프로그램이 없습니다.",
+    "statAllDesc": "레지스트리, 시작 폴더 및 예약된 작업",
+    "statEnabledDesc": "로그인 시 자동으로 실행",
+    "statHighDesc": "부팅을 느리게 하는 활성 항목",
+    "statCriticalDesc": "Windows에 필요, 비활성화 불가"
   },
   "privacy": {
     "title": "개인정보 보호",
@@ -362,7 +414,9 @@ export const ko: TranslationSchema = {
     "addDomain": "도메인 추가",
     "domainPlaceholder": "예: google.com, naver.com",
     "noItemsFound": "항목 없음",
-    "noItemsDesc": "정리할 개인정보 기록이 없습니다."
+    "noItemsDesc": "정리할 개인정보 기록이 없습니다.",
+    "runningBrowsers": "실행 중",
+    "allTypes": "모든 유형"
   },
   "maintenance": {
     "title": "시스템 유지보수",
@@ -378,7 +432,12 @@ export const ko: TranslationSchema = {
     "taskSuccess": "작업이 성공적으로 완료되었습니다",
     "taskFailed": "작업 실행 실패",
     "allCompleted": "모든 유지보수 작업 완료",
-    "noTasksFound": "작업 없음"
+    "noTasksFound": "작업 없음",
+    "availableTasks": "사용 가능한 작업",
+    "tasksRun": "실행한 작업",
+    "noTasksRunYet": "이번 세션에서 아직 실행한 작업이 없습니다",
+    "tasksSucceeded": "개 성공",
+    "tasksFailed": "개 실패"
   },
   "optimization": {
     "title": "Windows 최적화",
@@ -523,7 +582,10 @@ export const ko: TranslationSchema = {
     "versionLabel": "버전",
     "releaseStatus": "안정 버전",
     "checkForUpdates": "업데이트 확인",
-    "repoLink": "공식 GitHub 저장소"
+    "repoLink": "공식 GitHub 저장소",
+    "themeNight": "OLED 나이트",
+    "themeNightDesc": "OLED 화면용 완전한 검정",
+    "autoUpdateDesc": "앱을 시작할 때마다 GitHub에서 FreeMyDisk 새 버전을 확인합니다."
   },
   "layout": {
     "physicalRam": "물리 메모리",

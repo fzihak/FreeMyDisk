@@ -1,15 +1,73 @@
 use crate::traits::{
-    EmergencyRescueSummary, MaintenanceTaskKind, PlatformError, PlatformSystemMaintenance,
+    EmergencyRescueSummary, MaintenanceTaskKind, PlatformApplications, PlatformError,
+    PlatformSystemMaintenance, RescueStepOutcome, RescueStepStatus,
 };
 use std::os::windows::process::CommandExt;
 use std::path::PathBuf;
+use std::process::{ExitStatus, Stdio};
+use std::time::{Duration, Instant};
 
 const CREATE_NO_WINDOW: u32 = 0x08000000;
+
+/// Longest time an external tool (wsl, powercfg) may run during Emergency Rescue.
+pub const RESCUE_COMMAND_TIMEOUT: Duration = Duration::from_secs(30);
+
+/// Longest time Emergency Rescue waits for the Recycle Bin to empty. Emptying
+/// continues in the background after that; the step reports what left so far.
+const RECYCLE_BIN_TIMEOUT: Duration = Duration::from_secs(120);
 
 fn hidden_cmd(prog: &str) -> std::process::Command {
     let mut cmd = std::process::Command::new(prog);
     cmd.creation_flags(CREATE_NO_WINDOW);
     cmd
+}
+
+/// How a command started by [`run_hidden_with_timeout`] ended.
+#[derive(Debug)]
+pub enum TimedCommand {
+    Exited(ExitStatus),
+    /// The command ran past its time limit and was killed.
+    TimedOut,
+    SpawnFailed(std::io::Error),
+}
+
+/// Runs a console tool without a window and kills it once `timeout` runs out.
+/// Output is discarded, so a chatty tool cannot block on a full pipe.
+pub fn run_hidden_with_timeout(prog: &str, args: &[&str], timeout: Duration) -> TimedCommand {
+    let mut child = match hidden_cmd(prog)
+        .args(args)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+    {
+        Ok(c) => c,
+        Err(e) => return TimedCommand::SpawnFailed(e),
+    };
+    let deadline = Instant::now() + timeout;
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => return TimedCommand::Exited(status),
+            Ok(None) if Instant::now() >= deadline => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return TimedCommand::TimedOut;
+            }
+            Ok(None) => std::thread::sleep(Duration::from_millis(100)),
+            Err(e) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return TimedCommand::SpawnFailed(e);
+            }
+        }
+    }
+}
+
+fn system_drive() -> String {
+    std::env::var("SystemDrive")
+        .unwrap_or_else(|_| "C:".to_string())
+        .trim_end_matches('\\')
+        .to_string()
 }
 
 pub struct WindowsSystemMaintenanceHandler;
@@ -172,6 +230,171 @@ impl WindowsSystemMaintenanceHandler {
             }
         }
         (size, count)
+    }
+
+    /// Emergency Rescue step: empties the Recycle Bin on every drive. The size is
+    /// read first, so the reclaimed bytes are known even when Windows reports
+    /// nothing afterwards.
+    pub fn rescue_empty_recycle_bin() -> RescueStepOutcome {
+        const STEP: &str = "recycle_bin";
+        let (before_bytes, before_items) = Self::query_recycle_bin().unwrap_or((0, 0));
+        if before_bytes == 0 && before_items == 0 {
+            return RescueStepOutcome::skipped(STEP, "Recycle Bin is already empty");
+        }
+
+        // SHEmptyRecycleBinW cannot be cancelled, so it runs on its own thread and
+        // the step stops waiting after RECYCLE_BIN_TIMEOUT.
+        let (tx, rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            use windows_sys::Win32::UI::Shell::{
+                SHEmptyRecycleBinW, SHERB_NOCONFIRMATION, SHERB_NOPROGRESSUI, SHERB_NOSOUND,
+            };
+            let flags = SHERB_NOCONFIRMATION | SHERB_NOPROGRESSUI | SHERB_NOSOUND;
+            let hr = unsafe { SHEmptyRecycleBinW(std::ptr::null_mut(), std::ptr::null(), flags) };
+            let _ = tx.send(hr);
+        });
+
+        match rx.recv_timeout(RECYCLE_BIN_TIMEOUT) {
+            Ok(hr) if hr >= 0 => RescueStepOutcome::done(
+                STEP,
+                before_bytes,
+                format!(
+                    "Emptied the Recycle Bin: {} items, {} permanently deleted",
+                    before_items,
+                    format_size(before_bytes)
+                ),
+            ),
+            Ok(hr) => {
+                let after = Self::query_recycle_bin()
+                    .map(|(b, _)| b)
+                    .unwrap_or(before_bytes);
+                let freed = before_bytes.saturating_sub(after);
+                let mut outcome = RescueStepOutcome::failed(
+                    STEP,
+                    format!(
+                        "The Recycle Bin could not be fully emptied (0x{:08X})",
+                        hr as u32
+                    ),
+                );
+                outcome.bytes_reclaimed = freed;
+                outcome
+            }
+            Err(_) => {
+                let after = Self::query_recycle_bin()
+                    .map(|(b, _)| b)
+                    .unwrap_or(before_bytes);
+                let freed = before_bytes.saturating_sub(after);
+                RescueStepOutcome::done(
+                    STEP,
+                    freed,
+                    format!(
+                        "Recycle Bin is still emptying in the background ({} freed so far)",
+                        format_size(freed)
+                    ),
+                )
+            }
+        }
+    }
+
+    /// Emergency Rescue step: turns hibernation off, which removes hiberfil.sys.
+    /// Needs administrator rights; without them the step is skipped.
+    pub fn rescue_disable_hibernation() -> RescueStepOutcome {
+        const STEP: &str = "hibernation";
+        let hiber_path = PathBuf::from(format!(r"{}\hiberfil.sys", system_drive()));
+        if !hiber_path.exists() {
+            return RescueStepOutcome::skipped(STEP, "Hibernation is already off");
+        }
+        if !crate::windows::is_elevated_windows() {
+            return RescueStepOutcome::skipped(
+                STEP,
+                "Skipped – needs administrator (turning off hibernation)",
+            );
+        }
+        let size = hiber_path.metadata().map(|m| m.len()).unwrap_or(0);
+        match run_hidden_with_timeout("powercfg", &["/hibernate", "off"], RESCUE_COMMAND_TIMEOUT) {
+            TimedCommand::Exited(status) if status.success() || !hiber_path.exists() => {
+                RescueStepOutcome::done(
+                    STEP,
+                    size,
+                    format!(
+                        "Turned off hibernation and removed hiberfil.sys ({})",
+                        format_size(size)
+                    ),
+                )
+            }
+            TimedCommand::Exited(status) => RescueStepOutcome::failed(
+                STEP,
+                format!(
+                    "powercfg could not turn off hibernation (exit code {})",
+                    status.code().unwrap_or(-1)
+                ),
+            ),
+            TimedCommand::TimedOut => RescueStepOutcome::failed(
+                STEP,
+                format!(
+                    "powercfg did not respond within {} s and was stopped",
+                    RESCUE_COMMAND_TIMEOUT.as_secs()
+                ),
+            ),
+            TimedCommand::SpawnFailed(e) => {
+                RescueStepOutcome::failed(STEP, format!("powercfg could not be started: {}", e))
+            }
+        }
+    }
+
+    /// Emergency Rescue step: shuts down WSL so its virtual disks release their
+    /// space. Skipped when WSL is not installed or not running.
+    pub fn rescue_shutdown_wsl() -> RescueStepOutcome {
+        const STEP: &str = "wsl";
+        let windir = std::env::var("SystemRoot")
+            .or_else(|_| std::env::var("WINDIR"))
+            .unwrap_or_else(|_| r"C:\Windows".to_string());
+        let wsl_exe = PathBuf::from(&windir).join(r"System32\wsl.exe");
+        if !wsl_exe.exists() {
+            return RescueStepOutcome::skipped(STEP, "WSL is not installed");
+        }
+        if !Self::wsl_is_running() {
+            return RescueStepOutcome::skipped(STEP, "WSL is not running");
+        }
+        let exe = wsl_exe.to_string_lossy().to_string();
+        match run_hidden_with_timeout(&exe, &["--shutdown"], RESCUE_COMMAND_TIMEOUT) {
+            TimedCommand::Exited(status) if status.success() => {
+                RescueStepOutcome::done(STEP, 0, "Shut down WSL virtual machines")
+            }
+            TimedCommand::Exited(status) => RescueStepOutcome::failed(
+                STEP,
+                format!(
+                    "wsl --shutdown failed (exit code {})",
+                    status.code().unwrap_or(-1)
+                ),
+            ),
+            TimedCommand::TimedOut => RescueStepOutcome::failed(
+                STEP,
+                format!(
+                    "wsl --shutdown did not respond within {} s and was stopped",
+                    RESCUE_COMMAND_TIMEOUT.as_secs()
+                ),
+            ),
+            TimedCommand::SpawnFailed(e) => {
+                RescueStepOutcome::failed(STEP, format!("wsl could not be started: {}", e))
+            }
+        }
+    }
+
+    /// True when a WSL virtual machine or service process is running.
+    fn wsl_is_running() -> bool {
+        const WSL_PROCESSES: &[&str] = &["vmmemwsl", "vmmem", "wslservice", "wslhost"];
+        let Ok(procs) = crate::windows::applications::WindowsApplicationsHandler::new()
+            .list_running_processes()
+        else {
+            // Unknown: let wsl decide; the command is bounded by a timeout.
+            return true;
+        };
+        procs.iter().any(|p| {
+            let name = p.name.to_lowercase();
+            let name = name.strip_suffix(".exe").unwrap_or(&name);
+            WSL_PROCESSES.contains(&name)
+        })
     }
 }
 
@@ -408,106 +631,27 @@ impl PlatformSystemMaintenance for WindowsSystemMaintenanceHandler {
         }
     }
 
+    /// Runs the steps that need no file-by-file cleanup: Recycle Bin, hibernation
+    /// and WSL. Temporary files are cleaned by the rule-based pipeline in
+    /// `freemydisk-core`, which keeps recent and in-use files and is journaled.
     fn execute_emergency_rescue(&self) -> Result<EmergencyRescueSummary, PlatformError> {
-        let mut total_bytes = 0u64;
-        let mut actions = Vec::new();
-        let mut hibernation_disabled = false;
-        let mut recycle_bin_emptied = false;
-        let mut temp_bytes = 0u64;
-        let mut wsl_shutdown = false;
-
-        // 1. Hibernation File (C:\hiberfil.sys)
-        let hiber_path = PathBuf::from(r"C:\hiberfil.sys");
-        if hiber_path.exists() {
-            let size = hiber_path.metadata().map(|m| m.len()).unwrap_or(0);
-            let out = hidden_cmd("powercfg").args(["/hibernate", "off"]).output();
-            if let Ok(o) = out {
-                if o.status.success() || !hiber_path.exists() {
-                    hibernation_disabled = true;
-                    total_bytes += size;
-                    actions.push(format!(
-                        "Disabled Windows Hibernation and reclaimed {} of disk space",
-                        format_size(size)
-                    ));
-                }
-            }
-        }
-
-        // 2. Empty Recycle Bin on all drives via Win32 Shell API
-        unsafe {
-            use windows_sys::Win32::UI::Shell::{
-                SHEmptyRecycleBinW, SHERB_NOCONFIRMATION, SHERB_NOPROGRESSUI, SHERB_NOSOUND,
-            };
-            let flags = SHERB_NOCONFIRMATION | SHERB_NOPROGRESSUI | SHERB_NOSOUND;
-            let res = SHEmptyRecycleBinW(std::ptr::null_mut(), std::ptr::null(), flags);
-            if res == 0 {
-                recycle_bin_emptied = true;
-                actions.push("Emptied Windows Recycle Bin across all drives".to_string());
-            }
-        }
-
-        // 3. Clean Temp Directories
-        if let Ok(user_temp) = std::env::var("TEMP") {
-            let b = Self::clean_target_dir(PathBuf::from(user_temp), "User %TEMP%", &mut actions);
-            temp_bytes += b;
-            total_bytes += b;
-        }
-
-        if let Ok(windir) = std::env::var("WINDIR") {
-            let win_temp = PathBuf::from(&windir).join("Temp");
-            let b = Self::clean_target_dir(win_temp, "Windows System Temp", &mut actions);
-            temp_bytes += b;
-            total_bytes += b;
-
-            let minidump = PathBuf::from(&windir).join("Minidump");
-            let b2 = Self::clean_target_dir(minidump, "Windows Crash Minidumps", &mut actions);
-            total_bytes += b2;
-
-            let mem_dmp = PathBuf::from(&windir).join("MEMORY.DMP");
-            if mem_dmp.exists() {
-                if let Ok(meta) = mem_dmp.metadata() {
-                    let s = meta.len();
-                    if std::fs::remove_file(&mem_dmp).is_ok() {
-                        total_bytes += s;
-                        actions.push(format!("Removed MEMORY.DMP ({})", format_size(s)));
-                    }
-                }
-            }
-        }
-
-        if let Ok(local_app_data) = std::env::var("LOCALAPPDATA") {
-            let crash_dumps = PathBuf::from(&local_app_data).join("CrashDumps");
-            let b = Self::clean_target_dir(crash_dumps, "Application Crash Dumps", &mut actions);
-            total_bytes += b;
-
-            let wer = PathBuf::from(&local_app_data).join(r"Microsoft\Windows\WER\ReportArchive");
-            let b2 = Self::clean_target_dir(wer, "Windows Error Reports", &mut actions);
-            total_bytes += b2;
-
-            let d3d = PathBuf::from(&local_app_data).join("D3DSCache");
-            let b3 = Self::clean_target_dir(d3d, "DirectX Shader Cache", &mut actions);
-            total_bytes += b3;
-        }
-
-        // 4. WSL Shutdown
-        let wsl_out = hidden_cmd("wsl").arg("--shutdown").output();
-        if let Ok(o) = wsl_out {
-            if o.status.success() {
-                wsl_shutdown = true;
-                actions.push(
-                    "Shut down active WSL2 virtual machines to release memory & disk handles"
-                        .to_string(),
-                );
-            }
-        }
-
+        let steps = [
+            Self::rescue_empty_recycle_bin(),
+            Self::rescue_disable_hibernation(),
+            Self::rescue_shutdown_wsl(),
+        ];
+        let is_done = |id: &str| {
+            steps
+                .iter()
+                .any(|s| s.step == id && s.status == RescueStepStatus::Done)
+        };
         Ok(EmergencyRescueSummary {
-            total_bytes_reclaimed: total_bytes,
-            hibernation_disabled,
-            recycle_bin_emptied,
-            temp_cleaned_bytes: temp_bytes,
-            wsl_shutdown,
-            actions_performed: actions,
+            total_bytes_reclaimed: steps.iter().map(|s| s.bytes_reclaimed).sum(),
+            hibernation_disabled: is_done("hibernation"),
+            recycle_bin_emptied: is_done("recycle_bin"),
+            temp_cleaned_bytes: 0,
+            wsl_shutdown: is_done("wsl"),
+            actions_performed: steps.iter().map(|s| s.message.clone()).collect(),
         })
     }
 }

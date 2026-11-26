@@ -30,6 +30,22 @@ export interface PendingRebootItem {
   size_bytes: number;
 }
 
+/**
+ * Display form of a path recorded by the backend. Pending reboot deletions come
+ * straight from the PendingFileRenameOperations registry value, whose entries look
+ * like `*1!\??\C:\ProgramData\...`; strip the `*N!` marker and the NT `\??\`
+ * prefix, and normalise mixed separators to backslashes for Windows-style paths.
+ */
+export const formatDisplayPath = (raw: string): string => {
+  let path = raw.trim().replace(/^\*\d+!/, "");
+  // NT object prefix `\??\` and Win32 long-path prefix `\\?\`
+  path = path.replace(/^\\(?:\?\?|\\\?)\\/, "");
+  if (/^[A-Za-z]:[\\/]/.test(path) || path.startsWith("\\\\")) {
+    path = path.replace(/\//g, "\\");
+  }
+  return path;
+};
+
 export const HistoryPage: React.FC = () => {
   const { t } = useI18nStore();
   const [historyRecords, setHistoryRecords] = useState<HistoryRecord[]>([]);
@@ -214,7 +230,7 @@ export const HistoryPage: React.FC = () => {
               <tbody className="divide-y divide-[var(--border-divider)]">
                 {pendingReboots.map((item, idx) => (
                   <tr key={idx} className="hover:bg-white/[0.02] transition-colors">
-                    <td className="p-2.5 text-[var(--text-primary)] break-all text-[11px] select-all">{item.path}</td>
+                    <td className="p-2.5 text-[var(--text-primary)] break-all text-[11px] select-all" title={item.path}>{formatDisplayPath(item.path)}</td>
                     <td className="p-2.5 text-[var(--text-secondary)] font-medium tabular-nums">
                       {item.size_bytes ? `${Math.round(item.size_bytes / 1024)} KB` : "—"}
                     </td>
@@ -282,7 +298,7 @@ export const HistoryPage: React.FC = () => {
                         {formatDate(rec.timestamp)}
                       </td>
                       <td className="p-2.5 text-[var(--text-primary)] text-[11px] break-all select-all">
-                        {rec.target_path}
+                        {formatDisplayPath(rec.target_path)}
                       </td>
                       <td className="p-2.5 text-[var(--text-secondary)] whitespace-nowrap">
                         <span className="px-1.5 py-0.2 rounded-[3px] bg-black/20 text-[10px] uppercase font-ibm-mono text-[var(--text-secondary)]">

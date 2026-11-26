@@ -68,7 +68,11 @@ export const zhCN: TranslationSchema = {
     "keepFile": "保留文件",
     "permanentDelete": "永久删除",
     "items": "个项目",
-    "files": "个文件"
+    "files": "个文件",
+    "allDrives": "所有驱动器",
+    "freeOf": "可用，共",
+    "notScannedYet": "尚未扫描",
+    "protectedSystemFile": "受保护的 Windows 系统文件（无法删除）"
   },
   "dashboard": {
     "title": "磁盘健康与概览",
@@ -121,11 +125,47 @@ export const zhCN: TranslationSchema = {
     "systemReservedCategory": "系统与保留空间",
     "tempFilesCategory": "临时文件与缓存",
     "usedSpaceCategory": "已使用",
-    "freeSpaceCategory": "可用空间"
+    "freeSpaceCategory": "可用空间",
+    "scanningHeadline": "Scanning…",
+    "categoriesInspected": "{count} categories inspected",
+    "categoriesHint": "Temporary files, cache & logs",
+    "reclaimable": "reclaimable",
+    "nothingToClean": "Nothing to clean right now",
+    "moreNeedsAdmin": "{size} more needs administrator rights",
+    "moreNeedsAppsClosed": "{size} more needs {apps} closed",
+    "lastCleanTitle": "Last clean",
+    "lastCleanFreed": "{size} freed",
+    "lastCleanRecycled": "{size} moved to Recycle Bin",
+    "lastCleanItems": "{count} items cleaned",
+    "lastCleanSkipped": "{count} skipped",
+    "lastCleanFailed": "{count} failed",
+    "reasonNeedsAdmin": "needs administrator",
+    "reasonInUse": "in use",
+    "reasonTrashUnavailable": "Recycle Bin unavailable",
+    "reasonProtected": "protected",
+    "refreshingResults": "Updating results…",
+    "duplicatesEngineDesc": "Byte-identical duplicate detection (BLAKE3) with hard-link protection",
+    "rescueWillDoTitle": "Emergency Rescue will:",
+    "rescueBinPermanent": "Permanently delete everything in the Recycle Bin ({items} items, {size}). This cannot be undone.",
+    "rescueBinEmpty": "Empty the Recycle Bin (it is empty now)",
+    "rescueTempSafe": "Remove temporary files, crash dumps, error reports and shader caches older than 24 hours. Files in use are kept.",
+    "rescueHiberAdmin": "Turn off hibernation and remove hiberfil.sys (needs administrator; skipped otherwise)",
+    "rescueWslNote": "Shut down WSL if it is running",
+    "rescueStepCounter": "Step {current} of {total}",
+    "rescueStepRecycleBin": "Emptying the Recycle Bin",
+    "rescueStepTemp": "Removing old temporary files",
+    "rescueStepHibernation": "Turning off hibernation",
+    "rescueStepWsl": "Shutting down WSL",
+    "rescueFreedSoFar": "{size} freed so far",
+    "rescueFinished": "Emergency Rescue finished: {size} freed",
+    "rescueStopped": "Emergency Rescue stopped before it finished",
+    "rescueStatusDone": "Done",
+    "rescueStatusSkipped": "Skipped",
+    "rescueStatusFailed": "Failed"
   },
   "cleanup": {
     "title": "深度系统与缓存清理",
-    "subtitle": "精准清理系统临时文件、着色器缓存、浏览器数据库、构建残留与临时下载。默认安全移至回收站。",
+    "subtitle": "精准清理系统临时文件、着色器缓存、浏览器数据库、构建残留与临时下载。",
     "safeBadge": "安全清理",
     "rescan": "重新扫描规则",
     "scanningFiles": "正在扫描磁盘中的可清理垃圾文件...",
@@ -169,7 +209,10 @@ export const zhCN: TranslationSchema = {
     "closeToUnlock": "关闭以解锁目录",
     "appsClosedSuccess": "已关闭活动应用程序以解锁缓存目录。",
     "retryFailed": "重试失败",
-    "permanentDeleteFailed": "永久删除失败"
+    "permanentDeleteFailed": "永久删除失败",
+    "routeRecycleBinNote": "文件将移至回收站，可随时还原。",
+    "routePermanentNote": "已在设置中关闭回收站路由：文件将被永久删除。",
+    "selectToClean": "请选择要清理的项目"
   },
   "storage": {
     "title": "存储空间可视化与重型文件夹",
@@ -229,7 +272,8 @@ export const zhCN: TranslationSchema = {
     "trashSelected": "移动到回收站",
     "trashConfirm": "确定要将此文件移动到系统回收站吗？",
     "noFilesFound": "未找到大文件",
-    "noFilesDesc": "在当前筛选条件下未发现超出阈值的文件。"
+    "noFilesDesc": "在当前筛选条件下未发现超出阈值的文件。",
+    "statFiles": "大文件"
   },
   "duplicates": {
     "title": "重复文件查找器",
@@ -260,7 +304,11 @@ export const zhCN: TranslationSchema = {
     "potentialSavings": "预计可释放空间",
     "hardlinkNotice": "硬链接副本 (共享磁盘物理块，删除不释放空间)",
     "noDuplicatesFound": "未发现重复文件",
-    "noDuplicatesDesc": "当前位置下的所有文件皆为独一无二的副本。"
+    "noDuplicatesDesc": "当前位置下的所有文件皆为独一无二的副本。",
+    "statSets": "重复组",
+    "statFiles": "重复文件",
+    "setsShown": "个符合当前筛选",
+    "filesSelected": "个已选择删除"
   },
   "applications": {
     "title": "软件与预装应用管理",
@@ -339,7 +387,11 @@ export const zhCN: TranslationSchema = {
     "confirmDeleteTitle": "确认彻底移除开机注册项",
     "confirmDeleteDesc": "确定要永久从 Windows 注册表中删除该自启动配置吗？",
     "noItemsFound": "未找到开机自启项目",
-    "noItemsDesc": "当前筛选条件下没有匹配的开机项。"
+    "noItemsDesc": "当前筛选条件下没有匹配的开机项。",
+    "statAllDesc": "注册表、启动文件夹和计划任务",
+    "statEnabledDesc": "登录时自动启动",
+    "statHighDesc": "拖慢开机的已启用项",
+    "statCriticalDesc": "Windows 必需，无法禁用"
   },
   "privacy": {
     "title": "浏览器与隐私清理器",
@@ -362,7 +414,9 @@ export const zhCN: TranslationSchema = {
     "addDomain": "添加保护域名",
     "domainPlaceholder": "例如 github.com",
     "noItemsFound": "未发现隐私痕迹",
-    "noItemsDesc": "没有匹配您筛选条件的上网记录或临时追踪文件。"
+    "noItemsDesc": "没有匹配您筛选条件的上网记录或临时追踪文件。",
+    "runningBrowsers": "正在运行",
+    "allTypes": "所有类型"
   },
   "maintenance": {
     "title": "系统健康与日常维护",
@@ -378,7 +432,12 @@ export const zhCN: TranslationSchema = {
     "taskSuccess": "维护任务顺利执行完毕。",
     "taskFailed": "任务执行未成功。",
     "allCompleted": "所有推荐的系统维护例程已全部完成。",
-    "noTasksFound": "暂无适用的维护任务。"
+    "noTasksFound": "暂无适用的维护任务。",
+    "availableTasks": "可用任务",
+    "tasksRun": "已运行任务",
+    "noTasksRunYet": "本次会话尚未运行任务",
+    "tasksSucceeded": "个成功",
+    "tasksFailed": "个失败"
   },
   "optimization": {
     "title": "Windows 系统性能优化",
@@ -523,7 +582,10 @@ export const zhCN: TranslationSchema = {
     "versionLabel": "软件版本",
     "releaseStatus": "正式发布版 (Enterprise)",
     "checkForUpdates": "检查新版本",
-    "repoLink": "GitHub 开源仓库"
+    "repoLink": "GitHub 开源仓库",
+    "themeNight": "OLED 夜间",
+    "themeNightDesc": "适用于 OLED 屏幕的纯黑主题",
+    "autoUpdateDesc": "每次启动应用时在 GitHub 上检查 FreeMyDisk 新版本。"
   },
   "layout": {
     "physicalRam": "物理内存",

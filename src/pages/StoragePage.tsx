@@ -172,7 +172,7 @@ export const StoragePage: React.FC = () => {
     const k = 1024;
     const sizes = ["B", "KB", "MB", "GB", "TB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return `${(bytes / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`;
+    return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
   };
 
   useEffect(() => {
@@ -450,7 +450,7 @@ export const StoragePage: React.FC = () => {
                   <span className="px-1.5 py-0.2 rounded-[3px] bg-[#0078d4]/20 text-[#0078d4] font-ibm-mono text-[11px] font-bold border border-[#0078d4]/30">
                     {v.mount_point}
                   </span>
-                  {v.volume_name || "Drive"}
+                  {v.volume_name || t.common.drive}
                 </span>
                 <span className="text-[10px] px-1.5 py-0.2 rounded-[3px] bg-black/20 text-[var(--text-secondary)] font-ibm-mono border border-[var(--border-card)]">
                   {v.file_system}
@@ -464,9 +464,9 @@ export const StoragePage: React.FC = () => {
                 />
               </div>
 
-              <div className="flex justify-between text-[11px] font-ibm-mono text-[var(--text-secondary)] tabular-nums">
-                <span>{t.common.usedSpace}: <strong className="text-[var(--text-primary)]">{formatBytes(usedBytes)}</strong></span>
-                <span>{t.common.freeSpace}: <strong className="text-emerald-400">{formatBytes(v.available_bytes)}</strong></span>
+              <div className="flex flex-wrap justify-between gap-x-3 gap-y-0.5 text-[11px] font-ibm-mono text-[var(--text-secondary)] tabular-nums">
+                <span className="whitespace-nowrap">{t.common.usedSpace}: <strong className="text-[var(--text-primary)] whitespace-nowrap">{formatBytes(usedBytes)}</strong></span>
+                <span className="whitespace-nowrap">{t.common.freeSpace}: <strong className="text-emerald-400 whitespace-nowrap">{formatBytes(v.available_bytes)}</strong></span>
               </div>
             </WinUICard>
           );

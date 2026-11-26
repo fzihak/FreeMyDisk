@@ -31,7 +31,20 @@ pub fn expand_path_variables(template: &str) -> PathBuf {
     resolved = resolved.replace("${windir}", &win_dir);
     resolved = resolved.replace("${systemroot}", &win_dir);
 
-    PathBuf::from(resolved)
+    PathBuf::from(to_platform_separators(&resolved))
+}
+
+/// Rewrites `/` to the platform separator so a rule template such as
+/// `${win_dir}/SoftwareDistribution/Download` never yields a mixed path like
+/// `C:\WINDOWS/SoftwareDistribution/Download\f1ba`. Backslashes are left alone, so
+/// UNC (`\\server\share`) and verbatim (`\\?\C:\...`) prefixes keep their form.
+/// On other platforms the string is returned unchanged.
+pub fn to_platform_separators(path: &str) -> String {
+    if cfg!(windows) {
+        path.replace('/', r"\")
+    } else {
+        path.to_string()
+    }
 }
 
 /// Bundle identifier of the desktop app; its data folder is named after it.
@@ -70,5 +83,49 @@ pub fn to_extended_path(path: &Path) -> PathBuf {
         }
     } else {
         path.to_path_buf()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    #[cfg(windows)]
+    fn expanded_paths_use_backslashes_only() {
+        for template in [
+            "${win_dir}/SoftwareDistribution/Download/*",
+            "${home}/.claude/cache/model-catalog",
+            r"${local_app_data}\Temp/sub\file.tmp",
+        ] {
+            let expanded = expand_path_variables(template);
+            let s = expanded.to_string_lossy();
+            assert!(!s.contains('/'), "mixed separators in {s}");
+            assert!(!s.contains('$'), "unexpanded variable in {s}");
+        }
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn unc_and_verbatim_prefixes_survive() {
+        assert_eq!(
+            to_platform_separators(r"\\server\share/dir/file"),
+            r"\\server\share\dir\file"
+        );
+        assert_eq!(
+            to_platform_separators(r"\\?\C:\Users/u/cache"),
+            r"\\?\C:\Users\u\cache"
+        );
+        assert_eq!(
+            to_platform_separators(r"\\?\UNC\server\share\x"),
+            r"\\?\UNC\server\share\x"
+        );
+        assert_eq!(to_platform_separators("C:/a/b"), r"C:\a\b");
+    }
+
+    #[test]
+    #[cfg(not(windows))]
+    fn non_windows_paths_are_unchanged() {
+        assert_eq!(to_platform_separators("/home/u/.cache"), "/home/u/.cache");
     }
 }

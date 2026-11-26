@@ -164,3 +164,40 @@ fn test_large_files_batch_trash() {
     assert!(!file2.exists());
     assert!(!file3.exists());
 }
+
+#[test]
+fn test_large_files_never_lists_os_files() {
+    let temp = tempdir().unwrap();
+    let root = temp.path();
+    for name in [
+        "pagefile.sys",
+        "swapfile.sys",
+        "hiberfil.sys",
+        "DumpStack.log.tmp",
+        "HIBERFIL.SYS.old",
+    ] {
+        fs::write(root.join(name), vec![0u8; 50_000]).unwrap();
+    }
+    for dir in ["System Volume Information", "$Recycle.Bin"] {
+        let d = root.join(dir).join("S-1-5-21");
+        fs::create_dir_all(&d).unwrap();
+        fs::write(d.join("$RXYZ.iso"), vec![0u8; 50_000]).unwrap();
+    }
+    let nested = root.join("Games").join("data");
+    fs::create_dir_all(&nested).unwrap();
+    fs::write(nested.join("level.pak"), vec![0u8; 60_000]).unwrap();
+
+    let result = LargeFilesScanner::scan_large_files(
+        &[root.to_path_buf()],
+        10_000,
+        &CancellationToken::new(),
+    )
+    .unwrap();
+    let names: Vec<_> = result.files.iter().map(|f| f.name.clone()).collect();
+    assert_eq!(
+        names,
+        vec!["level.pak".to_string(), "HIBERFIL.SYS.old".to_string()]
+    );
+    assert_eq!(result.total_bytes, 110_000);
+    assert!(result.files[0].modified_at > 0);
+}

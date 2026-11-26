@@ -6,12 +6,18 @@ use crate::cleanup::protected_paths::ProtectedPathRegistry;
 use crate::filesystem::journal::CrashRecoveryJournal;
 use crate::shared::errors::CoreError;
 use crate::shared::progress::CancellationToken;
+use crate::storage::discovery::{
+    discover_files, run_with_ticks, DiscoveredFile, DiscoveryProgress, ScanExclusions,
+};
 use freemydisk_platform::traits::{FileIdentity, PlatformFilesystem};
+use parking_lot::Mutex;
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::time::Instant;
 use uuid::Uuid;
 
@@ -115,289 +121,239 @@ impl DuplicateDetector {
     {
         let _bg_guard = freemydisk_platform::io_priority::BackgroundExecutionGuard::enter();
         let start_time = Instant::now();
-        let mut cache_hits = 0usize;
-        let mut unknown_identities = 0u64;
-        let mut items_scanned = 0u64;
-        let mut last_emit = Instant::now();
 
         // --- Phase 1: Gather and group by file size ---
-        let mut size_groups: HashMap<u64, Vec<PathBuf>> = HashMap::new();
-
-        for root in roots {
-            if cancel.is_cancelled() {
-                return Err(CoreError::Cancelled);
-            }
-
-            if !root.exists() {
-                continue;
-            }
-
-            #[cfg(target_os = "windows")]
-            {
-                let cancel_fn = || cancel.is_cancelled();
-                let mut callback =
-                    |entry_path: &Path, _name: &str, size: u64, is_dir: bool| -> bool {
-                        items_scanned += 1;
-                        if last_emit.elapsed().as_millis() >= 33 {
-                            let pct = ((items_scanned % 29) + 1).min(29) as u8;
-                            on_progress(
-                                "Phase 1/4: Discovering candidate files...",
-                                pct,
-                                items_scanned,
-                                entry_path,
-                                0,
-                            );
-                            last_emit = Instant::now();
+        // All drives and folders are listed in parallel; system folders and OS files
+        // are skipped, and cloud placeholders are dropped (reading them would
+        // download them).
+        let exclusions = ScanExclusions::new();
+        let discovery = DiscoveryProgress::default();
+        let size_groups: Mutex<HashMap<u64, Vec<DiscoveredFile>>> = Mutex::new(HashMap::new());
+        let roots: Vec<PathBuf> = roots.iter().filter(|r| r.exists()).cloned().collect();
+        let found = run_with_ticks(
+            || {
+                discover_files(
+                    &roots,
+                    min_size.max(1),
+                    &exclusions,
+                    cancel,
+                    &discovery,
+                    |f| {
+                        if !f.is_cloud_placeholder {
+                            size_groups.lock().entry(f.size).or_default().push(f);
                         }
+                    },
+                )
+            },
+            || {
+                let items = discovery.items_scanned.load(Ordering::Relaxed);
+                let pct = ((items % 29) + 1).min(29) as u8;
+                let current = discovery.current_path.lock().clone();
+                on_progress(
+                    "Phase 1/4: Discovering candidate files...",
+                    pct,
+                    items,
+                    &current,
+                    0,
+                );
+            },
+        );
+        found?;
+        let items_scanned = discovery.items_scanned.load(Ordering::Relaxed);
 
-                        if ProtectedPathRegistry::is_protected_lexical(entry_path) {
-                            return false;
-                        }
-                        if !is_dir && size >= min_size && size > 0 {
-                            size_groups
-                                .entry(size)
-                                .or_default()
-                                .push(entry_path.to_path_buf());
-                        }
-                        true
-                    };
-
-                if let Err(e) = freemydisk_platform::windows::win32_fast_scan::win32_traverse_tree(
-                    root,
-                    &cancel_fn,
-                    &mut callback,
-                ) {
-                    if e.kind() == std::io::ErrorKind::Interrupted {
-                        return Err(CoreError::Cancelled);
-                    }
-                }
-            }
-
-            #[cfg(not(target_os = "windows"))]
-            {
-                let mut it = walkdir::WalkDir::new(root)
-                    .min_depth(1)
-                    .follow_links(false)
-                    .into_iter();
-
-                while let Some(entry_res) = it.next() {
-                    if cancel.is_cancelled() {
-                        return Err(CoreError::Cancelled);
-                    }
-
-                    let entry = match entry_res {
-                        Ok(e) => e,
-                        Err(_) => continue,
-                    };
-
-                    let path = entry.path();
-                    items_scanned += 1;
-                    if last_emit.elapsed().as_millis() >= 33 {
-                        let pct = ((items_scanned % 29) + 1).min(29) as u8;
-                        on_progress(
-                            "Phase 1/4: Discovering candidate files...",
-                            pct,
-                            items_scanned,
-                            path,
-                            0,
-                        );
-                        last_emit = Instant::now();
-                    }
-
-                    if entry.file_type().is_dir() {
-                        if ProtectedPathRegistry::is_protected_lexical(path) {
-                            it.skip_current_dir();
-                        }
-                        continue;
-                    }
-
-                    if entry.file_type().is_file() {
-                        if ProtectedPathRegistry::is_protected_lexical(path) {
-                            continue;
-                        }
-
-                        let len = entry.metadata().map(|m| m.len()).unwrap_or(0);
-                        if len >= min_size && len > 0 {
-                            size_groups.entry(len).or_default().push(path.to_path_buf());
-                        }
-                    }
-                }
-            }
-        }
-
-        // Filter out unique sizes
-        let candidate_sizes: Vec<(u64, Vec<PathBuf>)> = size_groups
-            .into_iter()
-            .filter(|(_, files)| files.len() > 1)
+        // Only files that share their exact size with another file can be
+        // duplicates; every other file is never opened.
+        let size_collisions: Vec<DiscoveredFile> = size_groups
+            .into_inner()
+            .into_values()
+            .filter(|files| files.len() > 1)
+            .flatten()
             .collect();
 
-        // --- Phase 2: Identity check & Phase 3: Partial Hash ---
-        struct CandidateWithIdentity {
-            path: PathBuf,
-            size: u64,
-            modified_at: u64,
-            cache_stamp: u64,
-            identity: FileIdentity,
-            sample_hash: String,
-            cached_full_hash: Option<String>,
-        }
+        // Hashing reads file data, so it runs on a small dedicated pool: enough
+        // parallel reads to keep SSDs and several drives busy without flooding a
+        // single hard disk with random reads.
+        let io_threads = freemydisk_platform::power::get_adaptive_concurrency_limit().clamp(1, 4);
+        let pool = rayon::ThreadPoolBuilder::new()
+            .num_threads(io_threads)
+            .thread_name(|i| format!("fmd-hash-{}", i))
+            .build()
+            .map_err(|e| CoreError::Io {
+                path: PathBuf::new(),
+                source: std::io::Error::other(e.to_string()),
+            })?;
 
-        let total_cands: usize = candidate_sizes.iter().map(|(_, files)| files.len()).sum();
-        let mut processed_cands = 0usize;
-        let mut partial_hash_groups: HashMap<(u64, String), Vec<CandidateWithIdentity>> =
-            HashMap::new();
+        let current = Mutex::new(PathBuf::new());
+        let processed = AtomicUsize::new(0);
+        let cache_hit_count = AtomicUsize::new(0);
 
-        for (size, files) in candidate_sizes {
-            if cancel.is_cancelled() {
-                return Err(CoreError::Cancelled);
-            }
-
-            for path in files {
-                processed_cands += 1;
-                if last_emit.elapsed().as_millis() >= 33 {
-                    let pct = 30 + ((processed_cands * 30) / total_cands.max(1)).min(30) as u8;
-                    on_progress(
-                        "Phase 2/4: Computing fast sample hashes...",
-                        pct,
-                        items_scanned,
-                        &path,
-                        0,
-                    );
-                    last_emit = Instant::now();
-                }
-
-                if platform.is_cloud_placeholder(&path).unwrap_or(false) {
-                    continue;
-                }
-
-                // An unknown identity must never make two different files look like one
-                // physical file, so each gets a key no real file can share.
-                let identity = platform.get_file_identity(&path).unwrap_or_else(|_| {
-                    unknown_identities += 1;
-                    FileIdentity {
-                        device_id: u64::MAX,
-                        file_index: unknown_identities,
-                        link_count: 1,
-                        is_reparse_or_symlink: false,
-                    }
-                });
-
-                let modified = std::fs::metadata(&path)
-                    .and_then(|m| m.modified())
-                    .ok()
-                    .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-                    .unwrap_or_default();
-                let modified_at = modified.as_secs();
-                let cache_stamp = u64::try_from(modified.as_nanos()).unwrap_or(u64::MAX);
-
-                let cached_entry = cache.and_then(|c| c.lookup(&path, size, cache_stamp));
-                let (partial_hash, cached_full_hash) = if let Some(cached) = cached_entry {
-                    cache_hits += 1;
-                    (cached.sample_hash, Some(cached.full_hash))
-                } else {
-                    let h = match compute_partial_hash(&path, size) {
-                        Ok(hash) => hash,
-                        Err(_) => continue,
-                    };
-                    (h, None)
-                };
-
-                partial_hash_groups
-                    .entry((size, partial_hash.clone()))
-                    .or_default()
-                    .push(CandidateWithIdentity {
-                        path,
-                        size,
-                        modified_at,
-                        cache_stamp,
-                        identity,
-                        sample_hash: partial_hash,
-                        cached_full_hash,
-                    });
-            }
-        }
-
-        // --- Phase 4: Full Streaming BLAKE3 Hash ---
-        let total_partial_cands: usize = partial_hash_groups
-            .values()
-            .filter(|c| c.len() >= 2)
-            .map(|c| c.len())
-            .sum();
-        let mut processed_partial = 0usize;
-        let mut full_hash_groups: HashMap<(u64, String), Vec<CandidateWithIdentity>> =
-            HashMap::new();
-
-        for ((size, _), candidates) in partial_hash_groups {
-            if cancel.is_cancelled() {
-                return Err(CoreError::Cancelled);
-            }
-
-            if candidates.len() < 2 {
-                continue;
-            }
-
-            for cand in candidates {
-                processed_partial += 1;
-                if last_emit.elapsed().as_millis() >= 33 {
-                    let pct =
-                        60 + ((processed_partial * 30) / total_partial_cands.max(1)).min(30) as u8;
-                    on_progress(
-                        "Phase 3/4: Computing streaming BLAKE3 hashes...",
-                        pct,
-                        items_scanned,
-                        &cand.path,
-                        0,
-                    );
-                    last_emit = Instant::now();
-                }
-
-                let full_hash = if let Some(ref fh) = cand.cached_full_hash {
-                    fh.clone()
-                } else {
-                    match compute_full_hash(&cand.path) {
-                        Ok(fh) => {
-                            if let Some(c) = cache {
-                                c.store(
-                                    &cand.path,
-                                    cand.size,
-                                    cand.cache_stamp,
-                                    &cand.sample_hash,
-                                    &fh,
-                                );
+        // --- Phase 2: sampled hash (head, middle and tail) ---
+        let total_cands = size_collisions.len();
+        let sampled: Vec<Candidate> = run_with_ticks(
+            || {
+                pool.install(|| {
+                    size_collisions
+                        .into_par_iter()
+                        .filter_map(|f| {
+                            if cancel.is_cancelled() {
+                                return None;
                             }
-                            fh
-                        }
-                        Err(_) => continue,
-                    }
-                };
-
-                full_hash_groups
-                    .entry((size, full_hash))
-                    .or_default()
-                    .push(cand);
-            }
+                            processed.fetch_add(1, Ordering::Relaxed);
+                            if let Some(mut c) = current.try_lock() {
+                                c.clone_from(&f.path);
+                            }
+                            if platform.is_cloud_placeholder(&f.path).unwrap_or(false) {
+                                return None;
+                            }
+                            let cache_stamp = f.modified_nanos;
+                            let cached = cache
+                                .and_then(|c| c.lookup(&f.path, f.size, cache_stamp))
+                                .filter(|c| c.sample_hash.starts_with(SAMPLE_HASH_PREFIX));
+                            let (sample_hash, cached_full_hash) = match cached {
+                                Some(hit) => {
+                                    cache_hit_count.fetch_add(1, Ordering::Relaxed);
+                                    (hit.sample_hash, Some(hit.full_hash))
+                                }
+                                None => (compute_partial_hash(&f.path, f.size).ok()?, None),
+                            };
+                            Some(Candidate {
+                                modified_at: f.modified_nanos / 1_000_000_000,
+                                size: f.size,
+                                path: f.path,
+                                cache_stamp,
+                                sample_hash,
+                                cached_full_hash,
+                            })
+                        })
+                        .collect()
+                })
+            },
+            || {
+                let done = processed.load(Ordering::Relaxed);
+                let pct = 30 + ((done * 30) / total_cands.max(1)).min(30) as u8;
+                let path = current.lock().clone();
+                on_progress(
+                    "Phase 2/4: Computing fast sample hashes...",
+                    pct,
+                    items_scanned,
+                    &path,
+                    0,
+                );
+            },
+        );
+        if cancel.is_cancelled() {
+            return Err(CoreError::Cancelled);
         }
+
+        // --- Phase 3: full streaming BLAKE3 hash, only for sample collisions ---
+        let to_hash: Vec<Candidate> = group_by_key(sampled, |c| (c.size, c.sample_hash.clone()))
+            .into_iter()
+            .flatten()
+            .collect();
+        let total_partial_cands = to_hash.len();
+        processed.store(0, Ordering::Relaxed);
+        let hashed: Vec<(Candidate, String)> = run_with_ticks(
+            || {
+                pool.install(|| {
+                    to_hash
+                        .into_par_iter()
+                        .filter_map(|cand| {
+                            if cancel.is_cancelled() {
+                                return None;
+                            }
+                            processed.fetch_add(1, Ordering::Relaxed);
+                            if let Some(mut c) = current.try_lock() {
+                                c.clone_from(&cand.path);
+                            }
+                            let full_hash = match cand.cached_full_hash.clone() {
+                                Some(fh) => fh,
+                                None => {
+                                    let fh = compute_full_hash(&cand.path).ok()?;
+                                    if let Some(c) = cache {
+                                        c.store(
+                                            &cand.path,
+                                            cand.size,
+                                            cand.cache_stamp,
+                                            &cand.sample_hash,
+                                            &fh,
+                                        );
+                                    }
+                                    fh
+                                }
+                            };
+                            Some((cand, full_hash))
+                        })
+                        .collect()
+                })
+            },
+            || {
+                let done = processed.load(Ordering::Relaxed);
+                let pct = 60 + ((done * 30) / total_partial_cands.max(1)).min(30) as u8;
+                let path = current.lock().clone();
+                on_progress(
+                    "Phase 3/4: Computing streaming BLAKE3 hashes...",
+                    pct,
+                    items_scanned,
+                    &path,
+                    0,
+                );
+            },
+        );
+        if cancel.is_cancelled() {
+            return Err(CoreError::Cancelled);
+        }
+        let cache_hits = cache_hit_count.load(Ordering::Relaxed);
+
+        // File identity (for hard links and clones) is only needed for confirmed
+        // duplicates, so it is read for those files alone.
+        let unknown_identities = AtomicU64::new(0);
+        let full_hash_groups: Vec<HashGroup> = pool.install(|| {
+            group_by_key(hashed, |(c, h)| (c.size, h.clone()))
+                .into_par_iter()
+                .map(|members| {
+                    let size = members[0].0.size;
+                    let hash = members[0].1.clone();
+                    let mut with_identity: Vec<(Candidate, FileIdentity)> = members
+                        .into_iter()
+                        .map(|(cand, _)| {
+                            // An unknown identity must never make two different
+                            // files look like one physical file, so each gets a
+                            // key no real file can share.
+                            let identity =
+                                platform.get_file_identity(&cand.path).unwrap_or_else(|_| {
+                                    FileIdentity {
+                                        device_id: u64::MAX,
+                                        file_index: unknown_identities
+                                            .fetch_add(1, Ordering::Relaxed)
+                                            + 1,
+                                        link_count: 1,
+                                        is_reparse_or_symlink: false,
+                                    }
+                                });
+                            (cand, identity)
+                        })
+                        .collect();
+                    // A stable order: the first file is the copy kept by default.
+                    with_identity.sort_by(|a, b| a.0.path.cmp(&b.0.path));
+                    (size, hash, with_identity)
+                })
+                .collect()
+        });
 
         // Build final DuplicateGroup list
         let mut groups = Vec::new();
         let mut total_duplicate_files = 0usize;
         let mut total_potential_savings = 0u64;
 
-        for ((size, hash), candidates) in full_hash_groups {
-            if candidates.len() < 2 {
-                continue;
-            }
-
+        for (size, hash, candidates) in full_hash_groups {
             // Check hardlinks / clone identity
-            let mut seen_identities: HashSet<(u64, u64)> = HashSet::new();
-            let mut unique_identity_count = 0usize;
-
-            for cand in &candidates {
-                let key = (cand.identity.device_id, cand.identity.file_index);
-                if seen_identities.insert(key) {
-                    unique_identity_count += 1;
-                }
+            let mut identity_count_map: HashMap<(u64, u64), usize> = HashMap::new();
+            for (_, identity) in &candidates {
+                *identity_count_map
+                    .entry((identity.device_id, identity.file_index))
+                    .or_default() += 1;
             }
+            let unique_identity_count = identity_count_map.len();
 
             let potential_savings_bytes = if unique_identity_count > 1 {
                 (unique_identity_count as u64 - 1) * size
@@ -406,24 +362,17 @@ impl DuplicateDetector {
             };
 
             let mut files = Vec::new();
-            let mut identity_count_map: HashMap<(u64, u64), usize> = HashMap::new();
-            for c in &candidates {
-                *identity_count_map
-                    .entry((c.identity.device_id, c.identity.file_index))
-                    .or_default() += 1;
-            }
-
-            for (idx, cand) in candidates.into_iter().enumerate() {
-                let key = (cand.identity.device_id, cand.identity.file_index);
-                let is_hardlink_or_clone = cand.identity.link_count > 1
+            for (idx, (cand, identity)) in candidates.into_iter().enumerate() {
+                let key = (identity.device_id, identity.file_index);
+                let is_hardlink_or_clone = identity.link_count > 1
                     || identity_count_map.get(&key).copied().unwrap_or(0) > 1;
 
                 files.push(DuplicateFileEntry {
                     path: cand.path,
                     size_bytes: cand.size,
                     modified_at: cand.modified_at,
-                    device_id: cand.identity.device_id,
-                    file_index: cand.identity.file_index,
+                    device_id: identity.device_id,
+                    file_index: identity.file_index,
                     is_hardlink_or_clone,
                     // By default, select all duplicates except the first one
                     selected: idx > 0,
@@ -658,6 +607,34 @@ impl DuplicateDetector {
     }
 }
 
+/// Size, full hash and the files (with their identity) of one duplicate group.
+type HashGroup = (u64, String, Vec<(Candidate, FileIdentity)>);
+
+/// A file that shares its size with at least one other file.
+struct Candidate {
+    path: PathBuf,
+    size: u64,
+    modified_at: u64,
+    /// Modification time in nanoseconds; part of the hash-cache key.
+    cache_stamp: u64,
+    sample_hash: String,
+    cached_full_hash: Option<String>,
+}
+
+/// Splits `items` into groups that share a key and keeps only the groups with at
+/// least two members: a value seen once cannot have a duplicate.
+fn group_by_key<T, K, F>(items: Vec<T>, key: F) -> Vec<Vec<T>>
+where
+    K: std::hash::Hash + Eq,
+    F: Fn(&T) -> K,
+{
+    let mut map: HashMap<K, Vec<T>> = HashMap::new();
+    for item in items {
+        map.entry(key(&item)).or_default().push(item);
+    }
+    map.into_values().filter(|g| g.len() >= 2).collect()
+}
+
 fn reject(path: &Path, reason: &str) -> DisposalItemResult {
     DisposalItemResult {
         path: path.to_path_buf(),
@@ -668,35 +645,47 @@ fn reject(path: &Path, reason: &str) -> DisposalItemResult {
     }
 }
 
-fn compute_partial_hash(path: &Path, size: u64) -> Result<String, std::io::Error> {
-    let mut file = File::open(path)?;
-    let mut hasher = blake3::Hasher::new();
+/// Marks sample hashes made by [`compute_partial_hash`]. Cached samples from the
+/// older head-and-tail scheme lack it and are recomputed, so samples from both
+/// schemes are never compared with each other.
+const SAMPLE_HASH_PREFIX: &str = "s3:";
 
-    if size <= 16384 {
-        // File is 16KB or smaller: hash all bytes
+/// Bytes read at each sample point.
+const SAMPLE_CHUNK: u64 = 16 * 1024;
+
+/// Hashes three samples of the file (start, middle and end) together with its
+/// size. Files up to four samples long are hashed whole. Two files with different
+/// samples cannot be equal, so only files whose samples collide are read in full.
+fn compute_partial_hash(path: &Path, size: u64) -> Result<String, std::io::Error> {
+    let mut file = File::open(crate::shared::paths::to_extended_path(path))?;
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(&size.to_le_bytes());
+
+    if size <= SAMPLE_CHUNK * 4 {
         let mut buf = Vec::with_capacity(size as usize);
         file.read_to_end(&mut buf)?;
         hasher.update(&buf);
     } else {
-        // Hash first 4KB + last 4KB sample
-        let mut head = [0u8; 4096];
-        file.read_exact(&mut head)?;
-        hasher.update(&head);
-
-        file.seek(SeekFrom::End(-4096))?;
-        let mut tail = [0u8; 4096];
-        file.read_exact(&mut tail)?;
-        hasher.update(&tail);
+        let mut chunk = vec![0u8; SAMPLE_CHUNK as usize];
+        for offset in [0, size / 2 - SAMPLE_CHUNK / 2, size - SAMPLE_CHUNK] {
+            file.seek(SeekFrom::Start(offset))?;
+            file.read_exact(&mut chunk)?;
+            hasher.update(&chunk);
+        }
     }
 
-    Ok(hasher.finalize().to_hex().to_string())
+    Ok(format!(
+        "{}{}",
+        SAMPLE_HASH_PREFIX,
+        hasher.finalize().to_hex()
+    ))
 }
 
 /// Streams the file through BLAKE3 with buffered reads. Memory-mapping is avoided:
 /// if another process truncates a mapped file, Windows raises an in-page error
 /// that would crash the app.
 fn compute_full_hash(path: &Path) -> Result<String, std::io::Error> {
-    let file = File::open(path)?;
+    let file = File::open(crate::shared::paths::to_extended_path(path))?;
     let mut hasher = blake3::Hasher::new();
     hasher.update_reader(std::io::BufReader::with_capacity(1 << 20, file))?;
     Ok(hasher.finalize().to_hex().to_string())

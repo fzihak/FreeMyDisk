@@ -68,7 +68,11 @@ export const bn: TranslationSchema = {
     "keepFile": "ফাইল রাখুন",
     "permanentDelete": "স্থায়ীভাবে মুছুন",
     "items": "আইটেম",
-    "files": "ফাইল"
+    "files": "ফাইল",
+    "allDrives": "সব ড্রাইভ",
+    "freeOf": "খালি, মোট",
+    "notScannedYet": "এখনও স্ক্যান করা হয়নি",
+    "protectedSystemFile": "সুরক্ষিত Windows সিস্টেম ফাইল (মুছে ফেলা যাবে না)"
   },
   "dashboard": {
     "title": "ডিস্ক স্বাস্থ্য ও ওভারভিউ",
@@ -121,7 +125,43 @@ export const bn: TranslationSchema = {
     "systemReservedCategory": "সিস্টেম ও সংরক্ষিত স্পেস",
     "tempFilesCategory": "অস্থায়ী ফাইল ও ক্যাশ",
     "usedSpaceCategory": "ব্যবহৃত",
-    "freeSpaceCategory": "খালি জায়গা"
+    "freeSpaceCategory": "খালি জায়গা",
+    "scanningHeadline": "Scanning…",
+    "categoriesInspected": "{count} categories inspected",
+    "categoriesHint": "Temporary files, cache & logs",
+    "reclaimable": "reclaimable",
+    "nothingToClean": "Nothing to clean right now",
+    "moreNeedsAdmin": "{size} more needs administrator rights",
+    "moreNeedsAppsClosed": "{size} more needs {apps} closed",
+    "lastCleanTitle": "Last clean",
+    "lastCleanFreed": "{size} freed",
+    "lastCleanRecycled": "{size} moved to Recycle Bin",
+    "lastCleanItems": "{count} items cleaned",
+    "lastCleanSkipped": "{count} skipped",
+    "lastCleanFailed": "{count} failed",
+    "reasonNeedsAdmin": "needs administrator",
+    "reasonInUse": "in use",
+    "reasonTrashUnavailable": "Recycle Bin unavailable",
+    "reasonProtected": "protected",
+    "refreshingResults": "Updating results…",
+    "duplicatesEngineDesc": "Byte-identical duplicate detection (BLAKE3) with hard-link protection",
+    "rescueWillDoTitle": "Emergency Rescue will:",
+    "rescueBinPermanent": "Permanently delete everything in the Recycle Bin ({items} items, {size}). This cannot be undone.",
+    "rescueBinEmpty": "Empty the Recycle Bin (it is empty now)",
+    "rescueTempSafe": "Remove temporary files, crash dumps, error reports and shader caches older than 24 hours. Files in use are kept.",
+    "rescueHiberAdmin": "Turn off hibernation and remove hiberfil.sys (needs administrator; skipped otherwise)",
+    "rescueWslNote": "Shut down WSL if it is running",
+    "rescueStepCounter": "Step {current} of {total}",
+    "rescueStepRecycleBin": "Emptying the Recycle Bin",
+    "rescueStepTemp": "Removing old temporary files",
+    "rescueStepHibernation": "Turning off hibernation",
+    "rescueStepWsl": "Shutting down WSL",
+    "rescueFreedSoFar": "{size} freed so far",
+    "rescueFinished": "Emergency Rescue finished: {size} freed",
+    "rescueStopped": "Emergency Rescue stopped before it finished",
+    "rescueStatusDone": "Done",
+    "rescueStatusSkipped": "Skipped",
+    "rescueStatusFailed": "Failed"
   },
   "cleanup": {
     "title": "ডিপ ক্লিনআপ",
@@ -169,7 +209,10 @@ export const bn: TranslationSchema = {
     "closeToUnlock": "ফোল্ডার আনলক করতে বন্ধ করুন",
     "appsClosedSuccess": "ক্যাশ ফোল্ডার আনলক করতে সক্রিয় অ্যাপ সফলভাবে বন্ধ করা হয়েছে।",
     "retryFailed": "পুনরায় চেষ্টা ব্যর্থ হয়েছে",
-    "permanentDeleteFailed": "স্থায়ীভাবে মোছা ব্যর্থ হয়েছে"
+    "permanentDeleteFailed": "স্থায়ীভাবে মোছা ব্যর্থ হয়েছে",
+    "routeRecycleBinNote": "ফাইলগুলো রিসাইকেল বিনে যায়, তাই পুনরুদ্ধার করা যায়।",
+    "routePermanentNote": "সেটিংসে রিসাইকেল বিন রাউটিং বন্ধ: ফাইলগুলো স্থায়ীভাবে মুছে যাবে।",
+    "selectToClean": "পরিষ্কার করার জন্য আইটেম নির্বাচন করুন"
   },
   "storage": {
     "title": "স্টোরেজ ভিজ্যুয়ালাইজার",
@@ -229,7 +272,8 @@ export const bn: TranslationSchema = {
     "trashSelected": "রিসাইকেল বিনে পাঠান",
     "trashConfirm": "নির্বাচিত ফাইলগুলো কি রিসাইকেল বিনে পাঠাতে চান?",
     "noFilesFound": "কোন বড় ফাইল পাওয়া যায়নি",
-    "noFilesDesc": "নির্ধারিত সাইজের চেয়ে বড় কোন ফাইল নেই।"
+    "noFilesDesc": "নির্ধারিত সাইজের চেয়ে বড় কোন ফাইল নেই।",
+    "statFiles": "বড় ফাইল"
   },
   "duplicates": {
     "title": "ডুপ্লিকেট ফাইল ফাইন্ডার",
@@ -260,7 +304,11 @@ export const bn: TranslationSchema = {
     "potentialSavings": "সম্ভাব্য সাশ্রয়",
     "hardlinkNotice": "একই i-node যুক্ত ফাইল দ্বৈত গণনা এড়াতে বাদ দেওয়া হয়েছে।",
     "noDuplicatesFound": "কোন ডুপ্লিকেট ফাইল পাওয়া যায়নি",
-    "noDuplicatesDesc": "এই ড্রাইভে কোনো সদৃশ ফাইল শনাক্ত হয়নি।"
+    "noDuplicatesDesc": "এই ড্রাইভে কোনো সদৃশ ফাইল শনাক্ত হয়নি।",
+    "statSets": "ডুপ্লিকেট সেট",
+    "statFiles": "ডুপ্লিকেট ফাইল",
+    "setsShown": "টি বর্তমান ফিল্টারে দেখানো হচ্ছে",
+    "filesSelected": "টি মুছে ফেলার জন্য নির্বাচিত"
   },
   "applications": {
     "title": "অ্যাপস ও লেফটওভার",
@@ -339,7 +387,11 @@ export const bn: TranslationSchema = {
     "confirmDeleteTitle": "স্টার্টআপ আইটেম মোছা",
     "confirmDeleteDesc": "আপনি কি এই স্টার্টআপ এন্ট্রিটি স্থায়ীভাবে মুছে ফেলতে চান?",
     "noItemsFound": "কোন আইটেম নেই",
-    "noItemsDesc": "কোন স্টার্টআপ এন্ট্রি পাওয়া যায়নি।"
+    "noItemsDesc": "কোন স্টার্টআপ এন্ট্রি পাওয়া যায়নি।",
+    "statAllDesc": "রেজিস্ট্রি, স্টার্টআপ ফোল্ডার ও নির্ধারিত টাস্ক",
+    "statEnabledDesc": "সাইন-ইনের সময় স্বয়ংক্রিয়ভাবে চালু হয়",
+    "statHighDesc": "চালু থাকা এন্ট্রি যা বুট ধীর করে",
+    "statCriticalDesc": "Windows-এর জন্য প্রয়োজনীয়, বন্ধ করা যায় না"
   },
   "privacy": {
     "title": "প্রাইভেসি ক্লিনার",
@@ -362,7 +414,9 @@ export const bn: TranslationSchema = {
     "addDomain": "ডোমেন যোগ করুন",
     "domainPlaceholder": "যেমন: google.com, github.com",
     "noItemsFound": "কোন আইটেম নেই",
-    "noItemsDesc": "মুছে ফেলার মতো কোনো প্রাইভেসি রেকর্ড নেই।"
+    "noItemsDesc": "মুছে ফেলার মতো কোনো প্রাইভেসি রেকর্ড নেই।",
+    "runningBrowsers": "চলমান",
+    "allTypes": "সব ধরন"
   },
   "maintenance": {
     "title": "সিস্টেম রক্ষণাবেক্ষণ",
@@ -378,7 +432,12 @@ export const bn: TranslationSchema = {
     "taskSuccess": "টাস্ক সফলভাবে সম্পন্ন হয়েছে",
     "taskFailed": "টাস্ক চালাতে ব্যর্থ হয়েছে",
     "allCompleted": "সকল রক্ষণাবেক্ষণ সম্পন্ন হয়েছে",
-    "noTasksFound": "কোন টাস্ক নেই"
+    "noTasksFound": "কোন টাস্ক নেই",
+    "availableTasks": "উপলব্ধ টাস্ক",
+    "tasksRun": "চালানো টাস্ক",
+    "noTasksRunYet": "এই সেশনে এখনও কোনো টাস্ক চালানো হয়নি",
+    "tasksSucceeded": "টি সফল",
+    "tasksFailed": "টি ব্যর্থ"
   },
   "optimization": {
     "title": "উইন্ডোজ অপ্টিমাইজার",
@@ -523,7 +582,10 @@ export const bn: TranslationSchema = {
     "versionLabel": "ভার্সন",
     "releaseStatus": "স্থিতিশীল সংস্করণ",
     "checkForUpdates": "আপডেট চেক করুন",
-    "repoLink": "অফিসিয়াল গিটহাব রিপোজিটরি"
+    "repoLink": "অফিসিয়াল গিটহাব রিপোজিটরি",
+    "themeNight": "OLED নাইট",
+    "themeNightDesc": "OLED স্ক্রিনের জন্য সম্পূর্ণ কালো",
+    "autoUpdateDesc": "অ্যাপ চালু হলেই GitHub-এ FreeMyDisk-এর নতুন সংস্করণ খোঁজে।"
   },
   "layout": {
     "physicalRam": "ফিজিক্যাল র‍্যাম",

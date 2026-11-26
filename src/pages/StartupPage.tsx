@@ -217,7 +217,7 @@ export const StartupPage: React.FC = () => {
             <Flash20Regular className="w-3.5 h-3.5 text-[#0078d4]" />
           </div>
           <div className="text-xl font-bold text-[var(--text-primary)] tabular-nums">{items.length}</div>
-          <div className="text-[10px] text-[var(--text-muted)] mt-0.5 font-sans">{t.startup.filterAll}</div>
+          <div className="text-[10px] text-[var(--text-muted)] mt-0.5 font-sans">{t.startup.statAllDesc}</div>
         </WinUICard>
 
         <WinUICard className="p-3.5">
@@ -226,7 +226,7 @@ export const StartupPage: React.FC = () => {
             <CheckmarkCircle20Filled className="w-3.5 h-3.5 text-emerald-400" />
           </div>
           <div className="text-xl font-bold text-emerald-400 tabular-nums">{enabledCount}</div>
-          <div className="text-[10px] text-[var(--text-muted)] mt-0.5 font-sans">{t.startup.statusEnabled}</div>
+          <div className="text-[10px] text-[var(--text-muted)] mt-0.5 font-sans">{t.startup.statEnabledDesc}</div>
         </WinUICard>
 
         <WinUICard className="p-3.5">
@@ -235,7 +235,7 @@ export const StartupPage: React.FC = () => {
             <Flash20Regular className="w-3.5 h-3.5 text-rose-400" />
           </div>
           <div className="text-xl font-bold text-rose-400 tabular-nums">{highImpactCount}</div>
-          <div className="text-[10px] text-[var(--text-muted)] mt-0.5 font-sans">{t.startup.impactHigh}</div>
+          <div className="text-[10px] text-[var(--text-muted)] mt-0.5 font-sans">{t.startup.statHighDesc}</div>
         </WinUICard>
 
         <WinUICard className="p-3.5">
@@ -244,7 +244,7 @@ export const StartupPage: React.FC = () => {
             <Shield20Filled className="w-3.5 h-3.5 text-cyan-400" />
           </div>
           <div className="text-xl font-bold text-cyan-400 tabular-nums">{criticalCount}</div>
-          <div className="text-[10px] text-[var(--text-muted)] mt-0.5 font-sans">Windows Components</div>
+          <div className="text-[10px] text-[var(--text-muted)] mt-0.5 font-sans">{t.startup.statCriticalDesc}</div>
         </WinUICard>
       </div>
 
@@ -261,12 +261,12 @@ export const StartupPage: React.FC = () => {
           />
         </div>
 
-        <div className="flex items-center gap-1.5 overflow-x-auto w-full lg:w-auto pb-1 lg:pb-0 font-sans">
+        <div className="flex items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden w-full lg:w-auto font-sans">
           {(["all", "enabled", "disabled", "high", "critical"] as const).map((mode) => (
             <button
               key={mode}
               onClick={() => setFilterMode(mode)}
-              className={`px-3 py-1 rounded-[4px] text-xs font-medium capitalize transition-all cursor-pointer ${
+              className={`px-3 py-1 rounded-[4px] text-xs font-medium whitespace-nowrap transition-all cursor-pointer ${
                 filterMode === mode
                   ? "bg-amber-600 text-white shadow-xs"
                   : "bg-black/20 text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border-card)]"

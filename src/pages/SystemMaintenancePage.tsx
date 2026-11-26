@@ -131,58 +131,72 @@ export const SystemMaintenancePage: React.FC = () => {
 
   const safeCount = useMemo(() => tasks.filter((t) => t.risk_level === "Safe").length, [tasks]);
   const recommendedCount = useMemo(() => tasks.filter((t) => t.recommended).length, [tasks]);
+  const executedResults = Object.values(results);
+  const executedCount = executedResults.length;
+  const failedCount = executedResults.filter((r) => !r.success).length;
+  const allRecommendedDone =
+    recommendedCount > 0 &&
+    tasks.filter((task) => task.recommended).every((task) => results[task.id]?.success);
+  const executedSubtitle =
+    executedCount === 0
+      ? t.maintenance.noTasksRunYet
+      : failedCount > 0
+      ? `${executedCount - failedCount} ${t.maintenance.tasksSucceeded} · ${failedCount} ${t.maintenance.tasksFailed}`
+      : allRecommendedDone
+      ? t.maintenance.allCompleted
+      : `${executedCount} ${t.maintenance.tasksSucceeded}`;
 
   return (
-    <div className="p-8 max-w-5xl mx-auto space-y-6 select-none font-sans text-[var(--text-primary)] pb-28">
+    <div className="p-6 max-w-5xl mx-auto space-y-4 select-none font-sans text-[var(--text-primary)] pb-24">
       {/* WinUI 3 Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-1">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0 shadow-sm">
-            <Wrench24Filled className="w-7 h-7" />
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-10 h-10 rounded-[4px] bg-white/[0.04] border border-[var(--border-subtle)] flex items-center justify-center text-emerald-400 shrink-0">
+            <Wrench24Filled className="w-6 h-6" />
           </div>
-          <div>
-            <div className="flex items-center gap-2.5">
-              <h1 className="text-2xl font-semibold tracking-tight text-[var(--text-primary)]">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl font-semibold tracking-tight text-[var(--text-primary)]">
                 {t.maintenance.title}
               </h1>
-              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-ibm-mono font-medium uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+              <span className="px-2 py-0.5 rounded-[4px] text-[10px] font-ibm-mono uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                 Windows Tools
               </span>
             </div>
-            <p className="text-xs text-[var(--text-secondary)] mt-1">
+            <p className="text-xs text-[var(--text-secondary)] mt-0.5">
               {t.maintenance.subtitle}
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 shrink-0">
           <WinUIButton
             variant="standard"
             onClick={loadTasks}
             disabled={loading}
-            className="p-2"
             title={t.common.refresh}
+            aria-label={t.common.refresh}
           >
-            <ArrowClockwise20Regular className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+            <ArrowClockwise20Regular className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
           </WinUIButton>
 
           <WinUIButton
             variant="primary"
             onClick={handleRunAllRecommended}
             disabled={batchRunning || runningTaskId !== null}
-            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white"
+            className="flex items-center gap-1.5 whitespace-nowrap shrink-0 bg-emerald-600 hover:bg-emerald-500 text-white"
           >
-            <Sparkle20Filled className={`w-4 h-4 ${batchRunning ? "animate-spin" : ""}`} />
+            <Sparkle20Filled className={`w-3.5 h-3.5 ${batchRunning ? "animate-spin" : ""}`} />
             <span>{batchRunning ? t.maintenance.runningBatch : t.maintenance.runAllRecommended}</span>
           </WinUIButton>
         </div>
       </div>
 
       {/* 3-Tile Stat Strip with Generous Spacing */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 font-ibm-mono">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 font-ibm-mono">
         <WinUICard className="p-5 flex flex-col justify-between space-y-3">
           <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] font-sans">
-            <span className="font-medium">{t.maintenance.title}</span>
+            <span className="font-medium">{t.maintenance.availableTasks}</span>
             <Wrench20Regular className="w-4 h-4 text-emerald-400 shrink-0" />
           </div>
           <div>
@@ -200,20 +214,22 @@ export const SystemMaintenancePage: React.FC = () => {
             <div className="text-2xl font-bold text-cyan-400 tabular-nums">
               {recommendedCount} / {tasks.length}
             </div>
-            <div className="text-xs text-[var(--text-muted)] mt-1 font-sans">{safeCount} {t.maintenance.riskSafe} (Zero risk)</div>
+            <div className="text-xs text-[var(--text-muted)] mt-1 font-sans">
+              {safeCount} / {tasks.length} {t.maintenance.riskSafe}
+            </div>
           </div>
         </WinUICard>
 
         <WinUICard className="p-5 flex flex-col justify-between space-y-3">
           <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] font-sans">
-            <span className="font-medium">{t.common.success}</span>
+            <span className="font-medium">{t.maintenance.tasksRun}</span>
             <Pulse20Regular className="w-4 h-4 text-purple-400 shrink-0" />
           </div>
           <div>
             <div className="text-2xl font-bold text-purple-400 tabular-nums">
-              {Object.keys(results).length} Executed
+              {executedCount}
             </div>
-            <div className="text-xs text-[var(--text-muted)] mt-1 font-sans">{t.maintenance.allCompleted}</div>
+            <div className="text-xs text-[var(--text-muted)] mt-1 font-sans">{executedSubtitle}</div>
           </div>
         </WinUICard>
       </div>

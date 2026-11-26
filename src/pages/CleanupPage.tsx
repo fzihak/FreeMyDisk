@@ -161,10 +161,13 @@ export const CleanupPage: React.FC = () => {
     setSelectedRuleIds(new Set());
   };
 
-  const filteredSummaries = summaries.filter((r) => {
-    if (activeCategory === "all") return true;
-    return r.category.toLowerCase() === activeCategory.toLowerCase();
-  });
+  // Largest reclaimable size first; rules with nothing to clean (0 B) sink to the bottom.
+  const filteredSummaries = summaries
+    .filter((r) => {
+      if (activeCategory === "all") return true;
+      return r.category.toLowerCase() === activeCategory.toLowerCase();
+    })
+    .sort((a, b) => b.total_bytes - a.total_bytes);
 
   const totalSelectedBytes = summaries
     .filter((r) => selectedRuleIds.has(r.rule_id))
@@ -315,7 +318,10 @@ export const CleanupPage: React.FC = () => {
               {t.cleanup.title}
             </h1>
             <p className="text-xs text-[var(--text-secondary)] mt-0.5">
-              {t.cleanup.subtitle}
+              {t.cleanup.subtitle}{" "}
+              <span className={alwaysTrashOverride ? "" : "text-amber-400"}>
+                {alwaysTrashOverride ? t.cleanup.routeRecycleBinNote : t.cleanup.routePermanentNote}
+              </span>
             </p>
           </div>
         </div>
@@ -336,7 +342,13 @@ export const CleanupPage: React.FC = () => {
               disabled={selectedRuleIds.size === 0 || cleaning || scanning}
               icon={<Delete20Regular className="w-3.5 h-3.5" />}
             >
-              {cleaning ? t.common.cleaning : `${t.cleanup.cleanNow} (${formatBytes(totalSelectedBytes)})`}
+              {cleaning
+                ? t.common.cleaning
+                : selectedRuleIds.size === 0
+                ? t.cleanup.selectToClean
+                : totalSelectedBytes === 0
+                ? t.cleanup.cleanNow
+                : `${t.cleanup.cleanNow} (${formatBytes(totalSelectedBytes)})`}
             </WinUIButton>
           </div>
         )}
@@ -423,7 +435,7 @@ export const CleanupPage: React.FC = () => {
 
       {/* Category Filter Pills & Mode Selection */}
       <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-0.5">
+        <div className="flex items-center gap-1.5 min-w-0 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden py-0.5">
           <Filter20Regular className="w-3.5 h-3.5 text-[var(--text-muted)] mr-1 shrink-0" />
           {categories.map((cat) => (
             <button
@@ -723,7 +735,11 @@ export const CleanupPage: React.FC = () => {
               disabled={cleaning || scanning || selectedRuleIds.size === 0}
               icon={<Delete20Regular className="w-4 h-4" />}
             >
-              {cleaning ? t.common.cleaning : `${t.cleanup.cleanNow} (${formatBytes(totalSelectedBytes)})`}
+              {cleaning
+                ? t.common.cleaning
+                : totalSelectedBytes === 0
+                ? t.cleanup.cleanNow
+                : `${t.cleanup.cleanNow} (${formatBytes(totalSelectedBytes)})`}
             </WinUIButton>
           </div>
         </div>
