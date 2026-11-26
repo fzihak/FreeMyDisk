@@ -1,4 +1,6 @@
-use super::models::{DockerInfo, DockerSpaceCategory};
+use super::models::DockerInfo;
+#[cfg(target_os = "windows")]
+use super::models::DockerSpaceCategory;
 use crate::shared::errors::CoreError;
 
 pub struct DockerManager;
@@ -143,13 +145,15 @@ impl DockerManager {
     /// Executes safe Docker pruning for the requested target
     /// Target types: "build_cache", "images", "containers", "volumes", "all"
     pub fn prune(target: &str) -> Result<u64, CoreError> {
+        #[cfg(not(target_os = "windows"))]
+        let _ = target;
         #[cfg(target_os = "windows")]
         {
             Self::prune_windows(target)
         }
         #[cfg(not(target_os = "windows"))]
         {
-            Err(CoreError::Other(
+            Err(CoreError::Virtualization(
                 "Docker prune only supported on Windows host".to_string(),
             ))
         }
@@ -258,6 +262,8 @@ impl DockerManager {
 }
 
 fn which_exists(cmd: &str) -> bool {
+    #[cfg(not(target_os = "windows"))]
+    let _ = cmd;
     #[cfg(target_os = "windows")]
     {
         use std::os::windows::process::CommandExt;

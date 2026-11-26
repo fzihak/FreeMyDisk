@@ -2,7 +2,9 @@ use super::models::{CompactionResult, WslDistribution};
 use crate::shared::errors::CoreError;
 #[cfg(target_os = "windows")]
 use freemydisk_platform::PlatformElevation;
+#[cfg(target_os = "windows")]
 use std::collections::HashMap;
+#[cfg(target_os = "windows")]
 use std::path::PathBuf;
 
 pub struct WslManager;
@@ -147,6 +149,8 @@ impl WslManager {
     /// 3. Executes diskpart via `ElevatedClient` (UAC elevation) or direct elevated diskpart script.
     /// 4. Re-measures physical VHDX byte size and reports exact storage reclaimed.
     pub fn compact_distribution(distro_name: &str) -> Result<CompactionResult, CoreError> {
+        #[cfg(not(target_os = "windows"))]
+        let _ = distro_name;
         #[cfg(target_os = "windows")]
         {
             Self::compact_distribution_windows(distro_name)

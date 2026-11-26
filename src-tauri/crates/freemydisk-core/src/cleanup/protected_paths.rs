@@ -381,6 +381,8 @@ impl ProtectedPathRegistry {
 
     /// Detects whether a path is a directory junction specifically.
     pub fn is_directory_junction(path: &Path) -> bool {
+        #[cfg(not(target_os = "windows"))]
+        let _ = path;
         #[cfg(target_os = "windows")]
         {
             use std::os::windows::fs::MetadataExt;
@@ -424,6 +426,8 @@ impl ProtectedPathRegistry {
     /// Resolves the true final canonical DOS path of an open handle via `GetFinalPathNameByHandleW`
     /// to mitigate TOCTOU symlink substitution races.
     pub fn get_final_canonical_path(path: &Path) -> Option<PathBuf> {
+        #[cfg(not(target_os = "windows"))]
+        let _ = path;
         #[cfg(target_os = "windows")]
         {
             use std::os::windows::ffi::{OsStrExt, OsStringExt};

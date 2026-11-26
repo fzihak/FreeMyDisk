@@ -419,6 +419,8 @@ impl CrashRecoveryJournal {
 
     /// Verifies that the storage volume holding `target` has at least `required_bytes` plus a 500 MB safe headroom buffer.
     pub fn check_disk_space_guard(target: &Path, required_bytes: u64) -> Result<(), CoreError> {
+        #[cfg(not(target_os = "windows"))]
+        let _ = (target, required_bytes);
         #[cfg(target_os = "windows")]
         {
             use std::os::windows::ffi::OsStrExt;

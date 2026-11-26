@@ -416,6 +416,8 @@ fn generate_staging_path(target: &Path) -> PathBuf {
 }
 
 fn strip_readonly_attribute(path: &Path) {
+    #[cfg(not(target_os = "windows"))]
+    let _ = path;
     #[cfg(target_os = "windows")]
     {
         use std::os::windows::ffi::OsStrExt;

@@ -67,6 +67,7 @@ impl ElevatedClient {
     /// Executes an allowlisted action through the elevated helper.
     /// If the current process is already running as Administrator, invokes the helper via direct stdin pipe.
     /// If unelevated, invokes with UAC prompt (RunAs) passing serialized files with cryptographic session token.
+    #[cfg_attr(not(target_os = "windows"), allow(unreachable_code))]
     pub fn execute_action(operation: &str, payload: &str) -> Result<ElevatedResponse, CoreError> {
         let helper_path = Self::find_helper_executable().ok_or_else(|| {
             CoreError::Platform(freemydisk_platform::traits::PlatformError::OperationFailed(

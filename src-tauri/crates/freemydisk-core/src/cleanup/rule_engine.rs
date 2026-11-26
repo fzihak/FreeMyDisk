@@ -240,6 +240,8 @@ impl RuleEngine {
 
     pub fn is_applicable(rule: &CleanupRuleDefinition) -> bool {
         let platform = rule.rule.platform.to_ascii_lowercase();
+        #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+        let _ = platform;
         #[cfg(target_os = "windows")]
         {
             if platform == "macos" {
