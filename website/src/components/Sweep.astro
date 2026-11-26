@@ -1,0 +1,208 @@
+---
+/**
+ * A scripted replay of one FreeMyDisk deep scan: the rule log streams on the
+ * left, findings fill the table on the right, then every finding is recycled.
+ * Sample data — sizes are typical for a developer laptop.
+ */
+type Line = { tag: string; verb: "scan" | "found" | "skip" | "check" | "write" | "move" | "done"; text: string; find?: number };
+const findings = [
+  { risk: "safe", name: "Windows Temp, older than 24 h", gb: 2.4, end: "recycled" },
+  { risk: "safe", name: "Chrome cache · 3 profiles", gb: 1.8, end: "recycled" },
+  { risk: "safe", name: "Gradle build cache", gb: 6.2, end: "recycled" },
+  { risk: "safe", name: "npm cache", gb: 3.1, end: "recycled" },
+  { risk: "caution", name: "Hugging Face models · 2 unused", gb: 17.6, end: "recycled" },
+  { risk: "safe", name: "Docker build cache", gb: 12.4, end: "pruned" },
+  { risk: "safe", name: "Recycle Bin · 1,204 items", gb: 7.7, end: "emptied" },
+];
+const total = findings.reduce((a, f) => a + f.gb, 0);
+const lines: Line[] = [
+  { tag: "system", verb: "scan", text: "temp folders, crash dumps, shader caches" },
+  { tag: "system", verb: "found", text: "2.4 GB of temp files nobody has opened in a day", find: 0 },
+  { tag: "browsers", verb: "scan", text: "Chrome, Edge, Firefox, Brave profiles" },
+  { tag: "browsers", verb: "skip", text: "Edge is running, its cache is left alone" },
+  { tag: "browsers", verb: "found", text: "1.8 GB Chrome cache across 3 profiles", find: 1 },
+  { tag: "dev", verb: "scan", text: "npm, pnpm, Cargo, Gradle, NuGet stores" },
+  { tag: "dev", verb: "found", text: "6.2 GB Gradle cache, rebuilt on next build", find: 2 },
+  { tag: "dev", verb: "found", text: "3.1 GB npm cache", find: 3 },
+  { tag: "ai", verb: "scan", text: "Hugging Face, Ollama, LM Studio" },
+  { tag: "ai", verb: "found", text: "17.6 GB in 2 models unused for 90 days", find: 4 },
+  { tag: "docker", verb: "scan", text: "build cache, WSL virtual disks" },
+  { tag: "docker", verb: "found", text: "12.4 GB of dangling build cache", find: 5 },
+  { tag: "system", verb: "found", text: "7.7 GB sitting in the Recycle Bin", find: 6 },
+  { tag: "guard", verb: "check", text: "7 targets against protected paths: 0 blocked" },
+  { tag: "journal", verb: "write", text: "intent recorded, fsync ok" },
+  { tag: "trash", verb: "move", text: "7 targets to the Recycle Bin, nothing deleted outright" },
+  { tag: "done", verb: "done", text: `${total.toFixed(1)} GB reclaimed · 0 errors · undo from the Recycle Bin` },
+];
+---
+<div class="sweep backdrop" data-total={total.toFixed(1)}>
+  <div class="controls">
+    <span class="state label"><i></i><span class="state-text">Ready</span></span>
+    <button class="replay label" type="button">▶ Replay</button>
+    <span class="caption">One sweep of a Windows PC: scan, find, recycle, done.</span>
+  </div>
+
+  <div class="win">
+    <div class="term-bar"><i></i><i></i><i></i><span class="title">freemydisk · deep scan · C:\ · {122} rules</span></div>
+    <div class="cols">
+      <div class="log-col">
+        <div class="col-head label"><span>Rules</span><span class="dim">live</span></div>
+        <ol class="log mono">
+          {lines.map((l) => (
+            <li class={`v-${l.verb}`} data-find={l.find ?? ""}>
+              <span class="t">[{l.tag}]</span> <span class="v">{l.verb}</span> <span class="x">{l.text}</span>
+            </li>
+          ))}
+        </ol>
+      </div>
+      <div class="find-col">
+        <div class="col-head label"><span>Findings</span><span class="dim"><span class="n-found">0</span> found · <span class="n-done">0</span> freed</span></div>
+        <table class="findings">
+          <thead class="label"><tr><th>Risk</th><th>Finding</th><th class="r">Size</th><th>State</th></tr></thead>
+          <tbody>
+            {findings.map((f, i) => (
+              <tr data-i={i} data-end={f.end}>
+                <td><span class={`risk risk-${f.risk}`}>{f.risk}</span></td>
+                <td class="name">{f.name}</td>
+                <td class="r mono">{f.gb.toFixed(1)} GB</td>
+                <td class="st mono">found</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <div class="total">
+          <span class="label">Reclaimed</span>
+          <span class="striped big"><span class="count">0.0</span><small>GB</small></span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  for (const root of document.querySelectorAll<HTMLElement>(".sweep")) {
+    const lines = [...root.querySelectorAll<HTMLLIElement>(".log li")];
+    const rows = [...root.querySelectorAll<HTMLTableRowElement>(".findings tbody tr")];
+    const stateText = root.querySelector(".state-text")!;
+    const count = root.querySelector(".count")!;
+    const nFound = root.querySelector(".n-found")!;
+    const nDone = root.querySelector(".n-done")!;
+    const sizes = rows.map((r) => parseFloat(r.querySelector(".r")!.textContent || "0"));
+    const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    let timers: number[] = [];
+    let run = 0;
+
+    const at = (ms: number, fn: () => void) => timers.push(window.setTimeout(fn, ms));
+    const setState = (s: string) => { root.dataset.state = s; stateText.textContent = s; };
+
+    const reset = () => {
+      timers.forEach(clearTimeout); timers = [];
+      lines.forEach((l) => l.classList.remove("on"));
+      rows.forEach((r) => { r.classList.remove("on", "freed"); r.querySelector(".st")!.textContent = "found"; });
+      count.textContent = "0.0"; nFound.textContent = "0"; nDone.textContent = "0";
+    };
+
+    const finish = () => {
+      lines.forEach((l) => l.classList.add("on"));
+      rows.forEach((r) => { r.classList.add("on", "freed"); r.querySelector(".st")!.textContent = "✓ " + r.dataset.end; });
+      nFound.textContent = String(rows.length); nDone.textContent = String(rows.length);
+      count.textContent = root.dataset.total!; setState("Done");
+    };
+
+    const play = () => {
+      reset(); run++;
+      if (reduced) return finish();
+      setState("Playing");
+      let t = 300, found = 0, freed = 0, total = 0;
+      lines.forEach((l, i) => {
+        const isMove = l.classList.contains("v-move");
+        at(t, () => {
+          l.classList.add("on");
+          const f = l.dataset.find;
+          if (f !== "" && f !== undefined) { rows[+f].classList.add("on"); nFound.textContent = String(++found); }
+          if (isMove) {
+            rows.forEach((r, k) => at(160 * k + 120, () => {
+              r.classList.add("freed"); r.querySelector(".st")!.textContent = "✓ " + r.dataset.end;
+              total += sizes[k]; count.textContent = total.toFixed(1); nDone.textContent = String(++freed);
+            }));
+          }
+        });
+        t += isMove ? 160 * rows.length + 500 : l.classList.contains("v-scan") ? 520 : 380;
+        if (i === lines.length - 1) at(t, () => { count.textContent = root.dataset.total!; setState("Done"); });
+      });
+    };
+
+    root.querySelector(".replay")!.addEventListener("click", play);
+    const io = new IntersectionObserver((e) => {
+      if (e[0].isIntersecting && run === 0) { io.disconnect(); play(); }
+    }, { threshold: 0.3 });
+    io.observe(root);
+  }
+</script>
+
+<style>
+  .sweep { padding: clamp(14px, 2.4vw, 32px); }
+  .controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+  .state, .replay {
+    display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 12px;
+    background: rgba(10, 10, 10, 0.75); border: 1px solid var(--line-strong); color: var(--text);
+    font-size: 11px;
+  }
+  .state i { width: 7px; height: 7px; border-radius: 50%; background: var(--text-3); }
+  :global(.sweep[data-state="Playing"]) .state i { background: var(--accent); box-shadow: 0 0 10px var(--accent); animation: pulse 1s ease-in-out infinite; }
+  :global(.sweep[data-state="Done"]) .state i { background: var(--ok); }
+  @keyframes pulse { 50% { opacity: .35; } }
+  .replay { cursor: pointer; color: var(--text-2); transition: color .15s, border-color .15s; }
+  .replay:hover { color: var(--text); border-color: var(--text); }
+  .caption { font-size: 14px; color: var(--text); margin-left: 6px; }
+
+  .win { background: rgba(10, 10, 10, 0.92); border: 1px solid var(--line-strong); box-shadow: 0 40px 100px -30px rgba(0, 0, 0, 0.9); }
+  .cols { display: grid; grid-template-columns: 1fr 1.1fr; min-height: 420px; }
+  .log-col { border-right: 1px solid var(--line); min-width: 0; }
+  .find-col { display: flex; flex-direction: column; min-width: 0; }
+  .col-head { display: flex; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--line); font-size: 11px; }
+
+  .log { list-style: none; margin: 0; padding: 12px 16px; font-size: 12.5px; line-height: 1.75; }
+  .log li { opacity: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transform: translateX(-4px); transition: opacity .25s, transform .25s; }
+  .log li:global(.on) { opacity: 1; transform: none; }
+  .t { color: var(--text-3); }
+  .v { color: var(--text-2); display: inline-block; min-width: 5ch; }
+  .x { color: var(--text-2); }
+  .v-found .v, .v-found .x { color: var(--text); }
+  .v-found .v { color: var(--accent); }
+  .v-skip .v { color: var(--warn); }
+  .v-check .v, .v-write .v { color: #7dd3fc; }
+  .v-move .v { color: var(--accent); }
+  .v-done .v, .v-done .x { color: var(--ok); }
+
+  .findings { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .findings th { text-align: left; font-size: 10.5px; padding: 10px 16px; border-bottom: 1px solid var(--line); color: var(--text-3); font-weight: 500; }
+  .findings td { padding: 9px 16px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  .findings tbody tr { opacity: 0.12; transition: opacity .3s, background .3s; }
+  .findings tbody tr:global(.on) { opacity: 1; }
+  .findings tbody tr:global(.freed) { background: rgba(74, 222, 128, 0.035); }
+  .r { text-align: right; white-space: nowrap; }
+  .name { color: var(--text); }
+  .risk { display: inline-flex; align-items: center; gap: 7px; font: 600 10.5px var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-2); }
+  .risk::before { content: ""; width: 6px; height: 6px; background: currentColor; }
+  .risk-safe { color: var(--text-2); }
+  .risk-caution { color: var(--accent); }
+  .st { font-size: 11.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); white-space: nowrap; }
+  tr:global(.freed) .st { color: var(--ok); }
+
+  .total { margin-top: auto; display: flex; justify-content: space-between; align-items: flex-end; padding: 18px 16px 16px; border-top: 1px solid var(--line); }
+  .big { font-size: clamp(40px, 5vw, 68px); font-variant-numeric: tabular-nums; }
+  .big small { font-size: .42em; margin-left: .12em; }
+
+  @media (max-width: 900px) {
+    .cols { grid-template-columns: 1fr; }
+    .log-col { border-right: 0; border-bottom: 1px solid var(--line); }
+    .log { max-height: 220px; overflow: hidden; }
+    .caption { width: 100%; margin: 4px 0 0; }
+  }
+  @media (max-width: 560px) {
+    .findings th:first-child, .findings td:first-child { display: none; }
+    .findings td, .findings th { padding: 8px 10px; }
+    .findings { font-size: 12px; }
+  }
+</style>

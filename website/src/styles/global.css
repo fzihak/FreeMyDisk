@@ -1,0 +1,255 @@
+@import "@fontsource-variable/archivo";
+@import "@fontsource-variable/host-grotesk";
+@import "@fontsource-variable/geist-mono";
+
+/* ------------------------------------------------------------------ tokens */
+:root {
+  --bg: #0c0c0c;
+  --bg-raised: #111111;
+  --bg-panel: #161616;
+  --bg-hover: #1c1c1c;
+  --term: #0a0a0a;
+  --line: rgba(242, 242, 240, 0.08);
+  --line-strong: rgba(242, 242, 240, 0.16);
+  --line-dash: rgba(255, 105, 31, 0.45);
+
+  --text: #f2f2f0;
+  --text-2: #8a8a86;
+  --text-3: #5c5c59;
+
+  --accent: #ff691f;      /* signal orange: "reclaimable", the same role as in the app */
+  --accent-2: #d35a1a;
+  --junk: #ff691f;
+  --ok: #4ade80;
+  --warn: #fbbf24;
+  --danger: #ff6b6b;
+
+  --font-display: "Archivo Variable", "Arial Narrow", system-ui, sans-serif;
+  --font-ui: "Host Grotesk Variable", "Segoe UI", system-ui, sans-serif;
+  --font-read: "Host Grotesk Variable", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "Geist Mono Variable", "Cascadia Mono", ui-monospace, monospace;
+
+  --radius: 0px;
+  --radius-sm: 0px;
+  --max: 1440px;
+  --gutter: clamp(20px, 4.4vw, 56px);
+  --inset: clamp(20px, 3vw, 40px);
+  --header-h: 64px;
+
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  color-scheme: dark;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; background: var(--bg); }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 16px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow-x: hidden;
+}
+/* film grain over everything, very faint */
+body::after {
+  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 100;
+  background-image: var(--grain); opacity: 0.045; mix-blend-mode: overlay;
+}
+img, svg, video { display: block; max-width: 100%; }
+a { color: inherit; text-decoration: none; }
+::selection { background: rgba(255, 105, 31, 0.35); color: #fff; }
+:focus-visible { outline: 1px solid var(--accent); outline-offset: 3px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}
+
+/* ------------------------------------------------------------------ frame
+   The page sits inside a column with hairline rails on both sides; every
+   section starts with a horizontal rule that meets the rails in a "+" mark. */
+.frame { position: relative; max-width: var(--max); margin: 0 auto; }
+.frame::before, .frame::after {
+  content: ""; position: absolute; top: 0; bottom: 0; width: 1px; background: var(--line); pointer-events: none; z-index: 1;
+}
+.frame::before { left: var(--gutter); }
+.frame::after { right: var(--gutter); }
+.wrap { width: 100%; max-width: var(--max); margin: 0 auto; padding: 0 calc(var(--gutter) + var(--inset)); }
+
+.section { position: relative; padding: clamp(72px, 10vw, 132px) 0; }
+.cross { position: relative; height: 1px; margin: 0 var(--gutter); background: var(--line); }
+.cross::before, .cross::after {
+  content: "+"; position: absolute; top: 50%; transform: translate(-50%, -52%);
+  font: 300 17px/1 var(--font-mono); color: var(--text-3); background: var(--bg); padding: 0 2px;
+}
+.cross::before { left: 0; }
+.cross::after { left: 100%; }
+
+/* diagonal hatch, used for gutters and "freed" space */
+.hatch {
+  background-image: repeating-linear-gradient(135deg, rgba(242, 242, 240, 0.07) 0 1px, transparent 1px 7px);
+}
+
+/* ------------------------------------------------------------------ type */
+.mono { font-family: var(--font-mono); }
+.label {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+/* ■ YOUR DISK · YOUR FILES · YOUR CALL */
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-2);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.eyebrow::before { content: ""; width: 8px; height: 8px; background: var(--accent); flex: none; }
+.eyebrow b { color: var(--accent); font-weight: 500; }
+
+.h-display {
+  font-family: var(--font-display);
+  font-size: clamp(40px, 4.9vw, 72px);
+  line-height: 0.93;
+  letter-spacing: -0.03em;
+  font-weight: 600;
+  text-transform: uppercase;
+  margin: 0;
+  text-wrap: balance;
+}
+.h-section {
+  font-family: var(--font-display);
+  font-size: clamp(34px, 4.2vw, 60px);
+  line-height: 0.94;
+  letter-spacing: -0.03em;
+  font-weight: 600;
+  text-transform: uppercase;
+  margin: 0;
+  text-wrap: balance;
+}
+.h-copy {
+  font-family: var(--font-display);
+  font-size: clamp(24px, 2.4vw, 32px);
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+  font-weight: 560;
+  margin: 0;
+}
+.lede { color: var(--text-2); font-size: clamp(17px, 1.4vw, 20px); line-height: 1.35; max-width: 56ch; margin: 0; }
+.muted { color: var(--text-2); }
+.dim { color: var(--text-3); }
+.accent { color: var(--accent); }
+.junk { color: var(--junk); }
+.ok { color: var(--ok); }
+
+/* Striped numerals: big figures drawn with horizontal scan lines. */
+.striped {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 0.9;
+  color: transparent;
+  background: repeating-linear-gradient(180deg, var(--text) 0 0.055em, transparent 0.055em 0.1em);
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+/* ------------------------------------------------------------------ meta bar
+   ■ 01 // CLEANUP   RULES: 122   RISK: LABELLED */
+.meta-bar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 32px;
+  padding: 14px 0; border-top: 1px dashed var(--line-dash); border-bottom: 1px dashed var(--line-dash);
+  font-family: var(--font-mono); font-size: 12px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--text-3);
+}
+.meta-bar .id { color: var(--accent); display: inline-flex; align-items: center; gap: 10px; }
+.meta-bar .id::before { content: ""; width: 8px; height: 8px; background: var(--accent); }
+.meta-bar b { color: var(--text); font-weight: 600; }
+
+/* ------------------------------------------------------------------ buttons */
+.btn {
+  --h: 50px;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  height: var(--h);
+  padding: 0 22px;
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.18s, color 0.18s, border-color 0.18s;
+}
+.btn:hover { border-color: var(--text); background: rgba(242, 242, 240, 0.04); }
+.btn-primary { background: var(--text); color: #0c0c0c; border-color: var(--text); }
+.btn-primary:hover { background: #fff; border-color: #fff; color: #000; }
+.btn-accent { background: var(--accent); color: #140a04; border-color: var(--accent); }
+.btn-accent:hover { background: #ff7d3b; border-color: #ff7d3b; }
+.btn .win { width: 16px; height: 16px; flex: none; }
+.btn .arrow { width: 14px; height: 14px; flex: none; transition: transform 0.18s; }
+.btn:hover .arrow { transform: translate(2px, -2px); }
+.btn small { font-weight: 500; opacity: 0.55; letter-spacing: 0.04em; }
+
+/* text link with ↗ that underlines on hover */
+.cta-link {
+  display: inline-flex; align-items: center; gap: 10px;
+  font-family: var(--font-display); font-weight: 560; font-size: clamp(20px, 2vw, 28px);
+  letter-spacing: -0.01em; text-transform: uppercase; line-height: 1;
+}
+.cta-link .arrow { width: 0.7em; height: 0.7em; transition: transform 0.18s; }
+.cta-link:hover .arrow { transform: translate(3px, -3px); }
+.cta-link span { background: linear-gradient(currentColor, currentColor) 0 100% / 0 1px no-repeat; transition: background-size 0.25s; padding-bottom: 3px; }
+.cta-link:hover span { background-size: 100% 1px; }
+
+/* ------------------------------------------------------------------ panels */
+.panel { background: var(--bg-raised); border: 1px solid var(--line); }
+.tag {
+  display: inline-flex; align-items: center; height: 24px; padding: 0 8px;
+  border: 1px solid var(--line-strong);
+  font-family: var(--font-mono); font-size: 11px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--text-2);
+}
+
+/* A "window" chrome used by terminals and demo frames */
+.term-bar {
+  display: flex; align-items: center; gap: 7px; padding: 0 14px; height: 38px;
+  border-bottom: 1px solid var(--line); font-family: var(--font-mono); font-size: 12px; color: var(--text-3);
+}
+.term-bar i { width: 9px; height: 9px; border-radius: 50%; background: rgba(242, 242, 240, 0.14); }
+.term-bar .title { flex: 1; min-width: 0; text-align: center; letter-spacing: 0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Backdrop for terminal showcases: dark ember gradient + grain, like a lit horizon. */
+.backdrop {
+  position: relative; overflow: hidden; border: 1px solid var(--line);
+  background:
+    radial-gradient(120% 70% at 50% 120%, rgba(255, 105, 31, 0.32), transparent 60%),
+    radial-gradient(70% 50% at 85% 0%, rgba(242, 242, 240, 0.07), transparent 70%),
+    linear-gradient(180deg, #151515, #0d0d0d 55%, #120c08);
+}
+.backdrop::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background-image: var(--grain); opacity: 0.16; mix-blend-mode: overlay;
+}
+.backdrop > * { position: relative; }
+
+/* reveal on scroll */
+.reveal { opacity: 0; transform: translateY(16px); transition: opacity 0.7s ease, transform 0.7s cubic-bezier(0.2, 0.7, 0.2, 1); }
+.reveal.in { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) { .reveal { opacity: 1; transform: none; } }

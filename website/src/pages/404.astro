@@ -1,0 +1,25 @@
+---
+import Base from "../layouts/Base.astro";
+---
+<Base title="Not found">
+  <section class="nf">
+    <div class="wrap">
+      <p class="label code">ERROR_FILE_NOT_FOUND <span class="dim">(0x00000002)</span></p>
+      <h1 class="h-display">This page was<br /><span class="gone">cleaned up.</span></h1>
+      <p class="lede">Don't worry — it was never in your Recycle Bin. Let's get you somewhere useful.</p>
+      <div class="links">
+        <a class="btn" href="/">Home</a>
+        <a class="btn" href="/blog">Blog</a>
+        <a class="btn" href="/download">Download</a>
+      </div>
+    </div>
+  </section>
+</Base>
+<style>
+  .nf { padding: clamp(96px, 14vw, 180px) 0; }
+  .code { color: var(--junk); font-size: 13px; }
+  .nf h1 { margin-top: 20px; }
+  .gone { color: var(--text-3); text-decoration: line-through; text-decoration-color: var(--junk); text-decoration-thickness: .06em; }
+  .nf .lede { margin-top: 22px; }
+  .links { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 34px; }
+</style>

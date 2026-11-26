@@ -1,0 +1,154 @@
+---
+import Base from "../../layouts/Base.astro";
+import Arrow from "../../components/Arrow.astro";
+import { getCollection } from "astro:content";
+import { SITE, formatDate, readingMinutes } from "../../lib/site";
+
+const posts = (await getCollection("blog", ({ data }) => !data.draft)).sort(
+  (a, b) => b.data.date.getTime() - a.data.date.getTime()
+);
+const featured = posts.find((p) => p.data.featured) ?? posts[0];
+const rest = posts.filter((p) => p !== featured);
+const tags = [...new Set(posts.flatMap((p) => p.data.tags))].sort();
+const totalMinutes = posts.reduce((a, p) => a + readingMinutes(p.body ?? ""), 0);
+---
+<Base title="Blog" description="Long-form guides on freeing disk space, keeping Windows fast and understanding what's really on your drive.">
+  <section class="blog-hero">
+    <div class="wrap">
+      <div class="eyebrow">The FreeMyDisk journal</div>
+      <h1 class="h-display">Know what's on your disk.</h1>
+      <p class="lede">
+        Long, practical guides about storage, caches and keeping Windows fast. Written by the people who build a disk cleaner, with nothing to sell you.
+      </p>
+    </div>
+  </section>
+
+  <div class="cross"></div>
+  <section class="wrap list">
+    <div class="meta-bar">
+      <span class="id">Index</span>
+      <span>Articles: <b>{posts.length}</b></span>
+      <span>Reading time: <b>{totalMinutes} min</b></span>
+      <span>Feed: <b><a href="/rss.xml">RSS</a></b></span>
+    </div>
+
+    {tags.length > 0 && (
+      <div class="filters" role="toolbar" aria-label="Filter by topic">
+        <button class="chip active" data-tag="all" type="button">All <span>{posts.length}</span></button>
+        {tags.map((t) => (
+          <button class="chip" data-tag={t} type="button">
+            {t} <span>{posts.filter((p) => p.data.tags.includes(t)).length}</span>
+          </button>
+        ))}
+      </div>
+    )}
+
+    {featured && (
+      <a class="featured backdrop" href={`/blog/${featured.id}`} data-tags={featured.data.tags.join("|")}>
+        <div class="f-body">
+          <div class="f-meta label">
+            <span class="badge">Featured</span>
+            <span>{formatDate(featured.data.date)}</span>
+            <span>{readingMinutes(featured.body ?? "")} min read</span>
+          </div>
+          <h2 class="f-title">{featured.data.title}</h2>
+          <p class="f-desc">{featured.data.description}</p>
+          <div class="f-foot">
+            <div class="tags">{featured.data.tags.map((t) => <span class="tag">{t}</span>)}</div>
+            <span class="cta-link"><span>Read the guide</span><Arrow /></span>
+          </div>
+        </div>
+        <div class="f-art" aria-hidden="true">
+          {Array.from({ length: 40 }).map((_, i) => <i class={i % 7 === 3 || i % 11 === 5 ? "j" : i % 9 === 0 ? "h" : ""}></i>)}
+        </div>
+      </a>
+    )}
+
+    {rest.length > 0 && (
+      <ol class="index">
+        {rest.map((p, i) => (
+          <li data-tags={p.data.tags.join("|")}>
+            <a href={`/blog/${p.id}`}>
+              <span class="mono accent idx">{String(i + 2).padStart(2, "0")}</span>
+              <span class="i-title">{p.data.title}</span>
+              <span class="i-desc">{p.data.description}</span>
+              <span class="i-meta label">{formatDate(p.data.date)} · {readingMinutes(p.body ?? "")} min</span>
+              <Arrow />
+            </a>
+          </li>
+        ))}
+      </ol>
+    )}
+
+    {posts.length === 0 && <p class="muted">The first articles are on their way.</p>}
+
+    <div class="write">
+      <div>
+        <div class="label accent">Write for the journal</div>
+        <p>Every article is a Markdown file in the repository. Know something useful about storage on Windows? Open a pull request.</p>
+      </div>
+      <a class="btn" href={`${SITE.repo}/tree/main/website/blog`}><span>Browse on GitHub</span><Arrow /></a>
+    </div>
+  </section>
+</Base>
+
+<script>
+  const chips = document.querySelectorAll<HTMLButtonElement>(".chip");
+  const items = document.querySelectorAll<HTMLElement>("[data-tags]");
+  chips.forEach((chip) =>
+    chip.addEventListener("click", () => {
+      chips.forEach((c) => c.classList.toggle("active", c === chip));
+      const tag = chip.dataset.tag;
+      items.forEach((el) => {
+        const show = tag === "all" || (el.dataset.tags || "").split("|").includes(tag!);
+        el.style.display = show ? "" : "none";
+      });
+    })
+  );
+</script>
+
+<style>
+  .blog-hero { padding: clamp(64px, 9vw, 112px) 0 clamp(56px, 7vw, 88px); }
+  .blog-hero h1 { margin-top: 24px; max-width: 16ch; }
+  .blog-hero .lede { margin-top: 26px; }
+
+  .list { padding-top: clamp(40px, 5vw, 64px); padding-bottom: clamp(72px, 9vw, 120px); }
+  .meta-bar a { color: var(--text); }
+  .meta-bar a:hover { color: var(--accent); }
+  .filters { display: flex; flex-wrap: wrap; gap: 6px; margin: 28px 0 32px; }
+  .chip { font: 600 11.5px var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-2); background: transparent; border: 1px solid var(--line-strong); height: 34px; padding: 0 14px; cursor: pointer; transition: all .15s; }
+  .chip span { color: var(--text-3); margin-left: 6px; }
+  .chip:hover { color: var(--text); border-color: var(--text); }
+  .chip.active { background: var(--text); color: #0c0c0c; border-color: var(--text); }
+  .chip.active span { color: #6b6b68; }
+
+  .featured { display: grid; grid-template-columns: 1fr 320px; gap: 40px; align-items: end; padding: clamp(28px, 4vw, 56px); transition: border-color .2s; }
+  .featured:hover { border-color: var(--line-strong); }
+  .f-meta { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; font-size: 11px; }
+  .badge { color: #140a04; background: var(--accent); padding: 4px 8px; font-weight: 600; }
+  .f-title { font: 600 clamp(34px, 4.6vw, 64px)/0.96 var(--font-display); letter-spacing: -0.03em; text-transform: uppercase; margin: 26px 0 0; max-width: 20ch; text-wrap: balance; }
+  .f-desc { color: var(--text-2); font-size: 18px; line-height: 1.4; max-width: 56ch; margin: 20px 0 0; }
+  .f-foot { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; margin-top: 36px; }
+  .tags { display: flex; gap: 6px; flex-wrap: wrap; }
+  .featured .cta-link { font-size: 20px; }
+  /* treemap-like texture: blocks, some marked as junk */
+  .f-art { display: grid; grid-template-columns: repeat(8, 1fr); gap: 3px; align-self: center; }
+  .f-art i { aspect-ratio: 1; background: rgba(242,242,240,0.06); }
+  .f-art i.j { background: var(--accent); }
+  .f-art i.h { background-image: repeating-linear-gradient(135deg, rgba(74,222,128,.45) 0 1px, transparent 1px 4px); }
+  @media (max-width: 860px) { .featured { grid-template-columns: 1fr; } .f-art { display: none; } }
+
+  .index { list-style: none; margin: 40px 0 0; padding: 0; border-top: 1px solid var(--line); }
+  .index li { border-bottom: 1px solid var(--line); }
+  .index a { display: grid; grid-template-columns: 48px 1.1fr 1fr 200px 20px; gap: 24px; align-items: baseline; padding: 26px 0; transition: background .2s, padding .2s; }
+  .index a:hover { background: var(--bg-raised); padding-left: 14px; padding-right: 14px; }
+  .idx { font-size: 12px; }
+  .i-title { font: 560 clamp(20px, 2vw, 26px)/1.12 var(--font-display); letter-spacing: -0.015em; }
+  .i-desc { color: var(--text-2); font-size: 15px; line-height: 1.4; }
+  .i-meta { font-size: 11px; color: var(--text-3); text-align: right; }
+  .index :global(.arrow) { color: var(--text-2); }
+  @media (max-width: 900px) { .index a { grid-template-columns: 36px 1fr; } .i-desc, .i-meta { grid-column: 2; text-align: left; } .index :global(.arrow) { display: none; } }
+
+  .write { margin-top: 64px; padding: 28px; border: 1px dashed var(--line-strong); display: flex; justify-content: space-between; align-items: center; gap: 24px; flex-wrap: wrap; }
+  .write p { margin: 10px 0 0; max-width: 60ch; color: var(--text-2); }
+</style>

@@ -1,0 +1,170 @@
+---
+import "../styles/global.css";
+import { SITE } from "../lib/site";
+import WindowsLogo from "../components/WindowsLogo.astro";
+import Arrow from "../components/Arrow.astro";
+
+interface Props {
+  title?: string;
+  description?: string;
+  image?: string;
+  type?: "website" | "article";
+  jsonLd?: Record<string, unknown>;
+}
+const { title, description = SITE.description, image = SITE.ogImage, type = "website", jsonLd } = Astro.props;
+const fullTitle = title ? `${title} — FreeMyDisk` : `FreeMyDisk — ${SITE.tagline}`;
+const canonical = new URL(Astro.url.pathname, Astro.site);
+const ogImage = new URL(image, Astro.site);
+const path = Astro.url.pathname;
+const nav = [
+  { href: "/#cleanup", label: "Cleanup" },
+  { href: "/#safety", label: "Safety" },
+  { href: "/#speed", label: "Speed" },
+  { href: "/#cli", label: "CLI" },
+  { href: "/blog", label: "Blog" },
+];
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{fullTitle}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="icon" href="/logo.png" type="image/png" />
+    <link rel="alternate" type="application/rss+xml" title="FreeMyDisk Blog" href="/rss.xml" />
+    <meta name="theme-color" content="#0c0c0c" />
+    <meta property="og:type" content={type} />
+    <meta property="og:site_name" content="FreeMyDisk" />
+    <meta property="og:title" content={fullTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={ogImage} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={fullTitle} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={ogImage} />
+    {jsonLd && <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />}
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+    <header class="site-header">
+      <div class="bar">
+        <a href="/" class="brand" aria-label="FreeMyDisk home">
+          <img src="/logo.png" alt="" width="24" height="24" />
+          <span>FreeMyDisk</span>
+        </a>
+        <nav class="links" aria-label="Main">
+          {nav.map((n) => (
+            <a href={n.href} aria-current={path.startsWith(n.href) && n.href !== "/" && !n.href.includes("#") ? "page" : undefined}>{n.label}</a>
+          ))}
+        </nav>
+        <div class="actions">
+          <a href={SITE.repo} class="btn btn-sm gh" rel="noopener">
+            <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.44 9.8 8.2 11.39.6.11.82-.26.82-.58v-2.03c-3.34.73-4.04-1.61-4.04-1.61-.55-1.39-1.33-1.76-1.33-1.76-1.09-.74.08-.73.08-.73 1.2.08 1.84 1.24 1.84 1.24 1.07 1.83 2.81 1.3 3.5.99.11-.78.42-1.3.76-1.6-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.13-.3-.54-1.52.12-3.18 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.29-1.55 3.3-1.23 3.3-1.23.66 1.66.25 2.88.12 3.18.77.84 1.24 1.91 1.24 3.22 0 4.61-2.81 5.62-5.48 5.92.43.37.81 1.1.81 2.22v3.29c0 .32.22.7.83.58A12 12 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
+            <span>GitHub</span>
+          </a>
+          <a class="btn btn-sm btn-primary" href={SITE.download}>
+            <WindowsLogo />
+            <span>Download</span>
+          </a>
+        </div>
+      </div>
+    </header>
+
+    <div class="frame">
+      <main id="main">
+        <slot />
+      </main>
+
+      <footer class="site-footer">
+        <div class="cross"></div>
+        <div class="wrap foot">
+          <div class="foot-brand">
+            <a href="/" class="brand"><img src="/logo.png" alt="" width="22" height="22" /><span>FreeMyDisk</span></a>
+            <p>Free and open source under GPL-3.0.<br />No accounts. No ads. No telemetry.</p>
+            <a class="btn btn-primary" href={SITE.download}><WindowsLogo /><span>Download for Windows</span><Arrow /></a>
+          </div>
+          <div class="foot-cols">
+            <div>
+              <h4>Product</h4>
+              <a href={SITE.download}>Download</a>
+              <a href={SITE.releases}>Releases</a>
+              <a href="/#cleanup">Cleanup rules</a>
+              <a href="/#safety">Safety</a>
+            </div>
+            <div>
+              <h4>Learn</h4>
+              <a href="/blog">Blog</a>
+              <a href="/rss.xml">RSS</a>
+              <a href="/#cli">Command line</a>
+              <a href="/download">Verify an installer</a>
+            </div>
+            <div>
+              <h4>Community</h4>
+              <a href={SITE.repo}>Source code</a>
+              <a href={`${SITE.repo}/blob/main/CONTRIBUTING.md`}>Contribute</a>
+              <a href={`${SITE.repo}/issues/new/choose`}>Report a problem</a>
+              <a href={`${SITE.repo}/security/advisories/new`}>Security</a>
+            </div>
+          </div>
+        </div>
+        <div class="wordmark" aria-hidden="true"><span class="striped">FREEMYDISK</span></div>
+        <div class="cross"></div>
+        <div class="wrap legal">
+          <span>© {new Date().getFullYear()} FreeMyDisk contributors</span>
+          <span>v{SITE.version} · Windows 10 &amp; 11</span>
+          <span>Windows is a trademark of Microsoft. Not affiliated with Microsoft.</span>
+        </div>
+      </footer>
+    </div>
+
+    <script>
+      // Reveal elements as they scroll into view.
+      const io = new IntersectionObserver(
+        (entries) => entries.forEach((e) => e.isIntersecting && (e.target.classList.add("in"), io.unobserve(e.target))),
+        { rootMargin: "0px 0px -8% 0px" }
+      );
+      document.querySelectorAll(".reveal").forEach((el) => io.observe(el));
+    </script>
+  </body>
+</html>
+
+<style>
+  .skip { position: absolute; left: -999px; top: 8px; background: var(--text); color: #000; padding: 8px 12px; z-index: 200; font: 600 12px var(--font-mono); text-transform: uppercase; }
+  .skip:focus { left: 8px; }
+  .site-header {
+    position: sticky; top: 0; z-index: 50;
+    background: rgba(12, 12, 12, 0.82);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--line);
+  }
+  .bar { max-width: var(--max); margin: 0 auto; height: var(--header-h); padding: 0 var(--gutter); display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 24px; }
+  .brand { display: inline-flex; align-items: center; gap: 10px; font: 600 15px var(--font-display); letter-spacing: 0.02em; text-transform: uppercase; }
+  .links { display: flex; align-items: center; gap: 28px; }
+  .links a { font: 600 12px var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-2); transition: color .15s; position: relative; padding: 6px 0; }
+  .links a:hover, .links a[aria-current="page"] { color: var(--text); }
+  .links a[aria-current="page"]::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 1px; background: var(--accent); }
+  .actions { justify-self: end; display: flex; gap: 8px; }
+  .btn-sm { --h: 36px; padding: 0 14px; font-size: 12px; gap: 9px; }
+  .btn-sm :global(.win) { width: 13px; height: 13px; }
+  @media (max-width: 900px) {
+    .bar { grid-template-columns: 1fr auto; }
+    .links { display: none; }
+  }
+  @media (max-width: 480px) { .gh span { display: none; } }
+
+  .site-footer { margin-top: 0; }
+  .foot { display: flex; justify-content: space-between; gap: 48px; flex-wrap: wrap; padding-top: 64px; padding-bottom: 40px; }
+  .foot-brand p { margin: 16px 0 24px; font-size: 15px; line-height: 1.5; color: var(--text-2); }
+  .foot-cols { display: flex; gap: clamp(32px, 6vw, 96px); flex-wrap: wrap; }
+  .foot-cols h4 { margin: 0 0 16px; font: 500 12px var(--font-mono); text-transform: uppercase; letter-spacing: .1em; color: var(--accent); }
+  .foot-cols a { display: block; color: var(--text-2); font-size: 15px; padding: 4px 0; transition: color .15s; }
+  .foot-cols a:hover { color: var(--text); }
+  .wordmark { padding: 0 calc(var(--gutter) + var(--inset)) 24px; overflow: hidden; }
+  .wordmark span { display: block; font-size: min(11.4vw, 164px); text-align: center; white-space: nowrap; opacity: .9; user-select: none; }
+  .legal { display: flex; justify-content: space-between; gap: 12px 24px; flex-wrap: wrap; padding-top: 22px; padding-bottom: 28px; font: 500 11px var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); }
+</style>

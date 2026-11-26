@@ -1,0 +1,80 @@
+---
+import Base from "../layouts/Base.astro";
+import WindowsLogo from "../components/WindowsLogo.astro";
+import Arrow from "../components/Arrow.astro";
+import { SITE } from "../lib/site";
+
+const steps = [
+  ["Download", "The installer is about 7 MB and always the newest version."],
+  ["Run it", "Choose “just for me” or “all users”. Windows may show SmartScreen for new apps: click More info, then Run anyway."],
+  ["Clean", "FreeMyDisk scans in seconds and shows exactly what it found before anything is removed."],
+];
+---
+<Base title="Download" description="Download FreeMyDisk for Windows 10 and 11. Free, open source, signed updates.">
+  <section class="dl">
+    <div class="wrap">
+      <div class="eyebrow">Version {SITE.version} · Windows 10 &amp; 11 · 64-bit</div>
+      <h1 class="h-display">Download FreeMyDisk.</h1>
+      <p class="lede">Free and open source. No account, no ads, no telemetry. It updates itself, after you say yes.</p>
+      <div class="cta">
+        <a class="btn btn-primary big" href={SITE.download}>
+          <WindowsLogo />
+          <span>Download for Windows</span>
+          <small>FreeMyDisk-Setup-x64.exe</small>
+          <Arrow />
+        </a>
+      </div>
+      <p class="label alt">
+        <a href={SITE.releases}>All releases</a> · <a href={SITE.repo}>Source code</a>
+      </p>
+    </div>
+  </section>
+
+  <div class="cross"></div>
+  <section class="section-sm">
+    <div class="wrap">
+      <div class="meta-bar">
+        <span class="id">Install</span>
+        <span>Size: <b>7 MB</b></span>
+        <span>Admin: <b>Optional</b></span>
+        <span>Updates: <b>Signed</b></span>
+      </div>
+      <ol class="steps">
+        {steps.map(([t, d], i) => (
+          <li>
+            <span class="label"><span class="accent">0{i + 1}</span> {t}</span>
+            <span class="muted">{d}</span>
+          </li>
+        ))}
+      </ol>
+
+      <div class="verify">
+        <div>
+          <div class="label accent">Verify your download</div>
+          <p class="muted">Every installer is built by GitHub Actions from the public source and carries a signed build-provenance attestation. Check it with the GitHub CLI:</p>
+        </div>
+        <pre class="mono">gh attestation verify .\FreeMyDisk-Setup-x64.exe --repo fzihak/FreeMyDisk</pre>
+      </div>
+    </div>
+  </section>
+</Base>
+
+<style>
+  .dl { padding: clamp(64px, 9vw, 120px) 0 clamp(56px, 7vw, 88px); }
+  .dl h1 { margin-top: 24px; }
+  .dl .lede { margin-top: 24px; }
+  .cta { margin-top: 36px; }
+  .big { --h: 60px; font-size: 14px; padding: 0 26px; }
+  .big small { font-size: 11px; }
+  .alt { margin-top: 18px; font-size: 11px; }
+  .alt a { color: var(--text-2); }
+  .alt a:hover { color: var(--text); }
+  .section-sm { padding: clamp(40px, 5vw, 64px) 0 clamp(72px, 9vw, 120px); }
+  .steps { list-style: none; padding: 0; margin: 40px 0 0; display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid var(--line); border-left: 1px solid var(--line); }
+  .steps li { padding: 24px; display: flex; flex-direction: column; gap: 14px; font-size: 15px; line-height: 1.45; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+  .steps .label { color: var(--text); }
+  @media (max-width: 800px) { .steps { grid-template-columns: 1fr; } }
+  .verify { margin-top: 40px; padding: 26px; border: 1px dashed var(--line-strong); display: grid; gap: 16px; }
+  .verify p { margin: 10px 0 0; font-size: 15px; }
+  .verify pre { margin: 0; padding: 14px 16px; background: var(--term); border: 1px solid var(--line-strong); font-size: 13px; overflow-x: auto; color: var(--text-2); }
+</style>

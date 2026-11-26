@@ -1,0 +1,247 @@
+---
+import Base from "../../layouts/Base.astro";
+import WindowsLogo from "../../components/WindowsLogo.astro";
+import Arrow from "../../components/Arrow.astro";
+import { getCollection, render } from "astro:content";
+import { SITE, formatDate, readingMinutes } from "../../lib/site";
+
+export async function getStaticPaths() {
+  const posts = (await getCollection("blog", ({ data }) => !data.draft)).sort(
+    (a, b) => b.data.date.getTime() - a.data.date.getTime()
+  );
+  return posts.map((post, i) => ({
+    params: { slug: post.id },
+    props: { post, newer: posts[i - 1], older: posts[i + 1] },
+  }));
+}
+
+const { post, newer, older } = Astro.props;
+const { Content, headings } = await render(post);
+const toc = headings.filter((h) => h.depth === 2 || h.depth === 3);
+const minutes = readingMinutes(post.body ?? "");
+const url = new URL(`/blog/${post.id}`, Astro.site).toString();
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  headline: post.data.title,
+  description: post.data.description,
+  datePublished: post.data.date.toISOString(),
+  dateModified: (post.data.updated ?? post.data.date).toISOString(),
+  author: { "@type": "Organization", name: post.data.author },
+  publisher: { "@type": "Organization", name: "FreeMyDisk" },
+  mainEntityOfPage: url,
+  image: new URL(post.data.cover ?? SITE.ogImage, Astro.site).toString(),
+};
+---
+<Base title={post.data.title} description={post.data.description} image={post.data.cover} type="article" jsonLd={jsonLd}>
+  <div class="progress" aria-hidden="true"><span></span></div>
+
+  <header class="post-head">
+    <div class="wrap">
+      <a href="/blog" class="back label">← Journal</a>
+      <h1 class="title">{post.data.title}</h1>
+      <p class="desc">{post.data.description}</p>
+    </div>
+  </header>
+
+  <div class="cross"></div>
+  <div class="wrap">
+    <div class="meta-bar">
+      <span class="id">{post.data.tags[0] ?? "Article"}</span>
+      <span>By: <b>{post.data.author}</b></span>
+      <span>Published: <b><time datetime={post.data.date.toISOString()}>{formatDate(post.data.date)}</time></b></span>
+      {post.data.updated && <span>Updated: <b>{formatDate(post.data.updated)}</b></span>}
+      <span>Read: <b>{minutes} min</b></span>
+    </div>
+  </div>
+
+  <div class="wrap layout">
+    <aside class="toc" aria-label="On this page">
+      {toc.length > 0 && (
+        <nav>
+          <div class="toc-title label">On this page</div>
+          <ol>
+            {toc.map((h) => (
+              <li class={`d${h.depth}`}><a href={`#${h.slug}`} data-slug={h.slug}>{h.text}</a></li>
+            ))}
+          </ol>
+        </nav>
+      )}
+      <div class="toc-share">
+        <div class="toc-title label">Share</div>
+        <button class="share-btn" type="button" data-copy={url}>Copy link</button>
+        <a class="share-btn" href={`https://x.com/intent/post?text=${encodeURIComponent(post.data.title)}&url=${encodeURIComponent(url)}`} rel="noopener" target="_blank">Post on X</a>
+        <a class="share-btn" href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`} rel="noopener" target="_blank">LinkedIn</a>
+      </div>
+    </aside>
+
+    <article class="prose">
+      <Content />
+
+      <aside class="cta backdrop">
+        <div>
+          <div class="eyebrow">Do it in one click</div>
+          <p>FreeMyDisk finds the caches and leftovers from this guide for you, and moves them to the Recycle Bin instead of deleting them.</p>
+        </div>
+        <a class="btn btn-primary" href={SITE.download}><WindowsLogo /><span>Download for Windows</span><Arrow /></a>
+      </aside>
+
+      <footer class="post-foot">
+        <a class="edit label" href={`${SITE.repo}/blob/main/website/blog/${encodeURIComponent(post.filePath?.split("/").pop() ?? "")}`}>
+          Spotted a mistake? Edit this article on GitHub ↗
+        </a>
+        <nav class="pager" aria-label="More articles">
+          {newer ? (
+            <a href={`/blog/${newer.id}`}><span class="label">← Newer</span><span>{newer.data.title}</span></a>
+          ) : <span></span>}
+          {older && (
+            <a href={`/blog/${older.id}`} class="older"><span class="label">Older →</span><span>{older.data.title}</span></a>
+          )}
+        </nav>
+      </footer>
+    </article>
+  </div>
+</Base>
+
+<script>
+  // Reading progress
+  const bar = document.querySelector<HTMLElement>(".progress span");
+  const article = document.querySelector<HTMLElement>(".prose");
+  const onScroll = () => {
+    if (!bar || !article) return;
+    const r = article.getBoundingClientRect();
+    const p = Math.min(1, Math.max(0, -r.top / (r.height - innerHeight)));
+    bar.style.transform = `scaleX(${p})`;
+  };
+  addEventListener("scroll", onScroll, { passive: true });
+  onScroll();
+
+  // Table of contents: highlight the section being read
+  const links = new Map<string, HTMLAnchorElement>();
+  document.querySelectorAll<HTMLAnchorElement>(".toc a[data-slug]").forEach((a) => links.set(a.dataset.slug!, a));
+  const spy = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((e) => {
+        if (e.isIntersecting) {
+          links.forEach((a) => a.classList.remove("active"));
+          links.get(e.target.id)?.classList.add("active");
+        }
+      });
+    },
+    { rootMargin: "-20% 0px -70% 0px" }
+  );
+  document.querySelectorAll(".prose h2[id], .prose h3[id]").forEach((h) => spy.observe(h));
+
+  // Anchor links on headings
+  document.querySelectorAll<HTMLElement>(".prose h2[id], .prose h3[id]").forEach((h) => {
+    const a = document.createElement("a");
+    a.href = `#${h.id}`;
+    a.className = "anchor";
+    a.setAttribute("aria-label", "Link to this section");
+    a.textContent = "#";
+    h.appendChild(a);
+  });
+
+  // Copy buttons on code blocks
+  document.querySelectorAll<HTMLElement>(".prose pre").forEach((pre) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "copy mono";
+    btn.textContent = "Copy";
+    btn.addEventListener("click", async () => {
+      await navigator.clipboard.writeText(pre.querySelector("code")?.innerText ?? pre.innerText);
+      btn.textContent = "Copied";
+      setTimeout(() => (btn.textContent = "Copy"), 1600);
+    });
+    pre.appendChild(btn);
+  });
+
+  // Copy link
+  document.querySelector<HTMLButtonElement>("[data-copy]")?.addEventListener("click", async (e) => {
+    const b = e.currentTarget as HTMLButtonElement;
+    await navigator.clipboard.writeText(b.dataset.copy!);
+    b.textContent = "Link copied";
+    setTimeout(() => (b.textContent = "Copy link"), 1600);
+  });
+</script>
+
+<style>
+  .progress { position: fixed; top: var(--header-h); left: 0; right: 0; height: 2px; z-index: 49; }
+  .progress span { display: block; height: 100%; background: var(--accent); transform-origin: 0 50%; transform: scaleX(0); }
+
+  .post-head { padding: clamp(56px, 8vw, 104px) 0 clamp(48px, 6vw, 72px); }
+  .back { color: var(--text-3); transition: color .15s; }
+  .back:hover { color: var(--text); }
+  .title { font: 600 clamp(40px, 5.6vw, 84px)/0.94 var(--font-display); letter-spacing: -0.03em; text-transform: uppercase; margin: 28px 0 0; max-width: 18ch; text-wrap: balance; }
+  .desc { font-size: clamp(18px, 1.6vw, 21px); color: var(--text-2); line-height: 1.4; margin: 26px 0 0; max-width: 60ch; text-wrap: pretty; }
+  .meta-bar { margin-top: clamp(32px, 4vw, 48px); }
+
+  .layout { display: grid; grid-template-columns: 250px minmax(0, 720px); gap: clamp(32px, 6vw, 104px); justify-content: start; padding-top: 56px; padding-bottom: clamp(72px, 9vw, 120px); }
+  .toc { position: sticky; top: calc(var(--header-h) + 32px); align-self: start; max-height: calc(100vh - 120px); overflow: auto; font-size: 14px; scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
+  .toc-title { font-size: 11px; color: var(--accent); margin-bottom: 14px; }
+  .toc ol { list-style: none; margin: 0; padding: 0; border-left: 1px solid var(--line); }
+  .toc li a { display: block; padding: 6px 0 6px 14px; margin-left: -1px; border-left: 1px solid transparent; color: var(--text-3); line-height: 1.35; transition: color .15s, border-color .15s; }
+  .toc li.d3 a { padding-left: 28px; font-size: 13px; }
+  .toc li a:hover { color: var(--text); }
+  .toc li a.active { color: var(--text); border-left-color: var(--accent); }
+  .toc-share { display: grid; gap: 6px; margin-top: 32px; padding-top: 22px; border-top: 1px solid var(--line); }
+  .share-btn { font: 600 11px var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-2); background: none; border: 1px solid var(--line-strong); height: 34px; padding: 0 12px; display: flex; align-items: center; text-align: left; cursor: pointer; transition: all .15s; }
+  .share-btn:hover { color: var(--text); border-color: var(--text); }
+  @media (max-width: 1000px) { .layout { grid-template-columns: minmax(0, 720px); } .toc { display: none; } }
+
+  /* ------------------------------------------------ article typography */
+  .prose { font-family: var(--font-read); font-size: 19px; line-height: 1.68; color: #c9c9c5; }
+  .prose :global(> * + *) { margin-top: 1.15em; }
+  .prose :global(> :first-child) { margin-top: 0; }
+  .prose :global(p) { margin: 0; text-wrap: pretty; }
+  .prose :global(p + p) { margin-top: 1.1em; }
+  .prose :global(:is(h2, h3, h4) + *) { margin-top: .8em; }
+  .prose :global(h2) { font: 600 clamp(28px, 3vw, 38px)/1 var(--font-display); letter-spacing: -0.025em; text-transform: uppercase; color: var(--text); margin: 2.4em 0 0; padding-top: 1.1em; border-top: 1px dashed rgba(242,242,240,.22); scroll-margin-top: calc(var(--header-h) + 24px); position: relative; }
+  .prose :global(h2::before) { content: ""; position: absolute; top: -4px; left: 0; width: 8px; height: 8px; background: var(--accent); }
+  .prose :global(h3) { font: 600 22px/1.2 var(--font-display); letter-spacing: -0.015em; color: var(--text); margin: 1.9em 0 0; scroll-margin-top: calc(var(--header-h) + 24px); }
+  .prose :global(h4) { font: 600 12px var(--font-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--accent); margin: 1.8em 0 0; }
+  .prose :global(.anchor) { margin-left: 10px; color: var(--text-3); opacity: 0; font-weight: 400; transition: opacity .15s; text-decoration: none; }
+  .prose :global(h2:hover .anchor), .prose :global(h3:hover .anchor) { opacity: 1; }
+  .prose :global(a) { color: var(--text); text-decoration: underline; text-decoration-color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 4px; transition: color .15s; }
+  .prose :global(a:hover) { color: var(--accent); }
+  .prose :global(strong) { color: var(--text); font-weight: 650; }
+  .prose :global(ul), .prose :global(ol) { padding-left: 1.3em; }
+  .prose :global(ul) { list-style: none; padding-left: 1.2em; }
+  .prose :global(ul > li) { position: relative; }
+  .prose :global(ul > li::before) { content: ""; position: absolute; left: -1.1em; top: .68em; width: 6px; height: 6px; background: var(--accent); }
+  .prose :global(li) { margin-top: .45em; padding-left: .2em; }
+  .prose :global(ol > li::marker) { color: var(--accent); font-family: var(--font-mono); font-size: .78em; }
+  .prose :global(hr) { border: 0; height: 1px; background: var(--line-strong); margin: 3em 0; }
+  .prose :global(img) { border: 1px solid var(--line-strong); margin: 2em auto; }
+
+  .prose :global(blockquote) { margin: 2em 0; padding: 20px 24px; border: 1px solid var(--line); border-left: 2px solid var(--accent); background: var(--bg-raised); font-size: 17px; line-height: 1.6; color: var(--text-2); }
+  .prose :global(blockquote p + p) { margin-top: .6em; }
+  .prose :global(blockquote strong:first-child) { font-family: var(--font-mono); font-size: 11.5px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); display: block; margin-bottom: 6px; }
+
+  .prose :global(:not(pre) > code) { font-family: var(--font-mono); font-size: .8em; background: rgba(242,242,240,0.06); border: 1px solid var(--line); padding: .1em .38em; color: var(--text); }
+  .prose :global(pre) { position: relative; font-family: var(--font-mono); font-size: 13.5px; line-height: 1.7; padding: 20px 22px; border: 1px solid var(--line-strong); background: var(--term) !important; overflow-x: auto; margin: 1.8em 0; }
+  .prose :global(pre code) { font-family: inherit; }
+  .prose :global(.copy) { position: absolute; top: 10px; right: 10px; font: 600 10.5px var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); background: var(--bg-panel); border: 1px solid var(--line-strong); padding: 5px 8px; cursor: pointer; opacity: 0; transition: opacity .15s, color .15s; }
+  .prose :global(pre:hover .copy) { opacity: 1; }
+  .prose :global(.copy:hover) { color: var(--text); }
+
+  .prose :global(table) { width: 100%; border-collapse: collapse; font-family: var(--font-ui); font-size: 15px; margin: 2em 0; display: block; overflow-x: auto; border-top: 1px solid var(--line-strong); }
+  .prose :global(th) { text-align: left; font: 600 11px var(--font-mono); text-transform: uppercase; letter-spacing: .08em; color: var(--text-3); border-bottom: 1px solid var(--line-strong); padding: 12px 16px 12px 0; }
+  .prose :global(td) { border-bottom: 1px solid var(--line); padding: 12px 16px 12px 0; color: var(--text-2); vertical-align: top; line-height: 1.45; }
+  .prose :global(td strong), .prose :global(td code) { color: var(--text); }
+
+  .cta { margin-top: 72px; padding: clamp(24px, 3vw, 36px); display: flex; gap: 24px; align-items: center; justify-content: space-between; flex-wrap: wrap; font-family: var(--font-ui); }
+  .cta p { margin: 12px 0 0 !important; font-size: 16px; color: var(--text-2); max-width: 44ch; line-height: 1.5; }
+  .cta .btn { text-decoration: none; color: #0c0c0c; }
+
+  .post-foot { margin-top: 48px; font-family: var(--font-ui); }
+  .edit { font-size: 11px; color: var(--text-3) !important; text-decoration: none !important; }
+  .edit:hover { color: var(--text) !important; }
+  .pager { display: grid; grid-template-columns: 1fr 1fr; margin-top: 24px; border-top: 1px solid var(--line); border-left: 1px solid var(--line); }
+  .pager > * { border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+  .pager a { display: flex; flex-direction: column; gap: 10px; padding: 22px; text-decoration: none !important; color: var(--text) !important; font: 560 18px/1.2 var(--font-display); letter-spacing: -0.01em; transition: background .15s; }
+  .pager a:hover { background: var(--bg-raised); }
+  .pager a .label { font-size: 11px; color: var(--accent); }
+  .pager .older { text-align: right; align-items: end; grid-column: 2; }
+  @media (max-width: 640px) { .pager { grid-template-columns: 1fr; } .pager .older { grid-column: 1; text-align: left; align-items: start; } .prose { font-size: 17.5px; } }
+</style>
