@@ -527,7 +527,6 @@ export const fr: TranslationSchema = {
   },
   "layout": {
     "physicalRam": "RAM physique",
-    "developedBy": "Par Foysal Zihak",
     "walSafeguard": "Protection de restauration SQLite WAL active",
     "goToDashboard": "Aller au tableau de bord",
     "collapseSidebar": "Réduire la barre latérale",

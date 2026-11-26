@@ -193,9 +193,17 @@ fn test_live_candidates_and_plan() {
             item.size_bytes
         );
     }
+    // The machine's real cache contents vary (CI runners often hold only
+    // empty or freshly created temp entries), so check that the plan is
+    // consistent rather than that this machine has something to clean.
     assert!(
-        plan.total_reclaimable_bytes > 0,
-        "Reclaimable bytes should be > 0"
+        !plan.items.is_empty(),
+        "Plan should keep the scanned candidates"
+    );
+    assert_eq!(
+        plan.total_reclaimable_bytes,
+        plan.items.iter().map(|i| i.size_bytes).sum::<u64>(),
+        "Plan total must equal the sum of its items"
     );
 }
 

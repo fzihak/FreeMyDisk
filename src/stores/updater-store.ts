@@ -98,6 +98,10 @@ export const useUpdaterStore = create<UpdaterState>((set) => ({
   },
 
   restartApp: async () => {
-    await relaunch();
+    try {
+      await relaunch();
+    } catch (e: any) {
+      set({ errorMessage: e?.message || "Failed to restart. Please restart FreeMyDisk manually." });
+    }
   },
 }));

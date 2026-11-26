@@ -69,6 +69,9 @@ fn test_app_processes_are_matched_by_install_folder() {
         name: "x.exe".to_string(),
         exe_path: Some(exe.to_string()),
     };
+    // Compare against the canonical folder: temp paths on CI runners can use
+    // 8.3 short names (RUNNER~1) that canonicalisation expands.
+    let install = dirs[0].clone();
     let inside = install.join("bin").join("editor.exe");
     assert!(runs_from(
         &proc(&inside.to_string_lossy().to_uppercase()),

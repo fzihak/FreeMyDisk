@@ -5,10 +5,10 @@ edition.workspace = true
 rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
+repository.workspace = true
 
 [dependencies]
 blake3 = { version = "1.5", features = ["rayon"] }
-crossbeam = "0.8"
 dunce = "1.0"
 freemydisk-platform = { path = "../freemydisk-platform" }
 log = "0.4"

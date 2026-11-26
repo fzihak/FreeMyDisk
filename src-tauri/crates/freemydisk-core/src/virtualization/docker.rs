@@ -1,4 +1,6 @@
-use super::models::{DockerInfo, DockerSpaceCategory};
+use super::models::DockerInfo;
+#[cfg(target_os = "windows")]
+use super::models::DockerSpaceCategory;
 use crate::shared::errors::CoreError;
 
 pub struct DockerManager;
@@ -143,13 +145,15 @@ impl DockerManager {
     /// Executes safe Docker pruning for the requested target
     /// Target types: "build_cache", "images", "containers", "volumes", "all"
     pub fn prune(target: &str) -> Result<u64, CoreError> {
+        #[cfg(not(target_os = "windows"))]
+        let _ = target;
         #[cfg(target_os = "windows")]
         {
             Self::prune_windows(target)
         }
         #[cfg(not(target_os = "windows"))]
         {
-            Err(CoreError::Other(
+            Err(CoreError::Virtualization(
                 "Docker prune only supported on Windows host".to_string(),
             ))
         }
@@ -200,6 +204,7 @@ impl DockerManager {
         Ok(reclaimed)
     }
 
+    #[cfg(target_os = "windows")]
     fn resolve_docker_binary() -> Option<String> {
         // 1. Check in PATH
         if which_exists("docker.exe") {
@@ -221,6 +226,7 @@ impl DockerManager {
         None
     }
 
+    #[cfg(target_os = "windows")]
     fn parse_size_str(s: &str) -> u64 {
         let clean = s.trim().to_uppercase();
         // E.g. "1.25GB (50%)" -> take first token
@@ -257,19 +263,13 @@ impl DockerManager {
     }
 }
 
+#[cfg(target_os = "windows")]
 fn which_exists(cmd: &str) -> bool {
-    #[cfg(target_os = "windows")]
-    {
-        use std::os::windows::process::CommandExt;
-        const CREATE_NO_WINDOW: u32 = 0x08000000;
-        std::process::Command::new("where.exe")
-            .arg(cmd)
-            .creation_flags(CREATE_NO_WINDOW)
-            .output()
-            .is_ok_and(|o| o.status.success())
-    }
-    #[cfg(not(target_os = "windows"))]
-    {
-        false
-    }
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x08000000;
+    std::process::Command::new("where.exe")
+        .arg(cmd)
+        .creation_flags(CREATE_NO_WINDOW)
+        .output()
+        .is_ok_and(|o| o.status.success())
 }

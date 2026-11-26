@@ -41,7 +41,6 @@ export interface TranslationSchema {
   };
   layout: {
     physicalRam: string;
-    developedBy: string;
     walSafeguard: string;
     goToDashboard: string;
     collapseSidebar: string;

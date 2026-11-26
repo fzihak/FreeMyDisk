@@ -2,7 +2,7 @@ use crate::traits::{
     FileIdentity, PendingRebootDeletion, PlatformElevation, PlatformError, PlatformFilesystem,
     PlatformIoPriority, PlatformRebootQueue,
 };
-use fs4::FileExt;
+use fs4::fs_std::FileExt;
 use std::fs::OpenOptions;
 use std::path::Path;
 
@@ -11,6 +11,19 @@ pub struct FallbackPlatform;
 impl FallbackPlatform {
     pub fn new() -> Self {
         Self
+    }
+
+    pub fn get_system_vitals(&self) -> Result<crate::traits::SystemVitals, PlatformError> {
+        #[cfg(unix)]
+        {
+            Ok(crate::unix::system_vitals("Linux"))
+        }
+        #[cfg(not(unix))]
+        {
+            Err(PlatformError::Unsupported(
+                "System vitals are not available on this platform".to_string(),
+            ))
+        }
     }
 }
 
@@ -83,14 +96,14 @@ impl PlatformFilesystem for FallbackPlatform {
     }
 
     fn list_volumes(&self) -> Result<Vec<crate::traits::StorageVolumeInfo>, PlatformError> {
-        Ok(vec![crate::traits::StorageVolumeInfo {
-            mount_point: "/".to_string(),
-            volume_name: "Root".to_string(),
-            total_bytes: 500_000_000_000,
-            available_bytes: 250_000_000_000,
-            file_system: "ext4".to_string(),
-            is_removable: false,
-        }])
+        #[cfg(unix)]
+        {
+            Ok(vec![crate::unix::volume_info("/", "Root", "")?])
+        }
+        #[cfg(not(unix))]
+        {
+            Ok(Vec::new())
+        }
     }
 }
 
@@ -108,7 +121,7 @@ impl PlatformElevation for FallbackPlatform {
     fn is_elevated(&self) -> bool {
         #[cfg(unix)]
         {
-            unsafe { libc::geteuid() == 0 }
+            crate::unix::is_root()
         }
         #[cfg(not(unix))]
         {

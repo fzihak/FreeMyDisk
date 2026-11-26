@@ -93,4 +93,6 @@ pub fn trigger_background_trim_if_ssd(drive_letter: char) {
                 .spawn();
         }
     }
+    #[cfg(not(target_os = "windows"))]
+    let _ = drive_letter;
 }

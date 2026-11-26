@@ -600,6 +600,7 @@ async fn execute_cleanup_rules(
         let platform = get_platform();
 
         if is_dry_run {
+            #[cfg_attr(not(target_os = "windows"), allow(unused_mut))]
             let mut results: Vec<DisposalItemResult> = candidates
                 .iter()
                 .map(|c| DisposalItemResult {
@@ -745,6 +746,7 @@ async fn execute_cleanup_rules(
     res
 }
 
+#[cfg(target_os = "windows")]
 fn recycle_bin_path() -> PathBuf {
     let drive = std::env::var("SystemDrive").unwrap_or_else(|_| "C:".to_string());
     PathBuf::from(format!(r"{}\$Recycle.Bin", drive.trim_end_matches('\\')))

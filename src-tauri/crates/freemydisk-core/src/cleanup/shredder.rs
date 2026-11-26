@@ -63,6 +63,8 @@ pub fn fill_crypto_random_bytes(buf: &mut [u8]) {
 
 /// Strips NTFS Alternate Data Streams (ADS) such as Zone.Identifier before permanent file deletion.
 pub fn strip_ntfs_alternate_streams(path: &Path) {
+    #[cfg(not(target_os = "windows"))]
+    let _ = path;
     #[cfg(target_os = "windows")]
     {
         use std::os::windows::ffi::OsStrExt;
@@ -103,6 +105,8 @@ fn flush_to_physical_disk(file: &std::fs::File) -> std::io::Result<()> {
 
 /// Checks whether the target volume is an SSD to adjust shredding passes.
 fn is_ssd_media(path: &Path) -> bool {
+    #[cfg(not(target_os = "windows"))]
+    let _ = path;
     #[cfg(target_os = "windows")]
     {
         let drive_char = path.to_string_lossy().chars().next().unwrap_or('C');

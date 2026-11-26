@@ -1,4 +1,6 @@
-use super::models::{LeftoverCandidate, LeftoverConfidence, LeftoverKind};
+use super::models::LeftoverCandidate;
+#[cfg(target_os = "windows")]
+use super::models::{LeftoverConfidence, LeftoverKind};
 
 pub struct RegistryLeftoverScanner;
 
