@@ -5,6 +5,9 @@ pub mod registry_policy;
 pub mod storage_optim;
 pub mod traits;
 
+#[cfg(unix)]
+mod unix_volume;
+
 #[cfg(target_os = "windows")]
 pub mod windows;
 

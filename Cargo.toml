@@ -15,7 +15,6 @@ rust-version = "1.85.0"
 authors = ["Foysal Zihak <fzihak>"]
 license = "GPL-3.0-only"
 repository = "https://github.com/fzihak/FreeMyDisk"
-homepage = "https://freemydisk.app"
 
 [profile.dev.package.freemydisk-core]
 opt-level = 2

@@ -2,7 +2,7 @@ use crate::traits::{
     FileIdentity, PendingRebootDeletion, PlatformElevation, PlatformError, PlatformFilesystem,
     PlatformIoPriority, PlatformRebootQueue,
 };
-use fs4::FileExt;
+use fs4::fs_std::FileExt;
 use std::fs::OpenOptions;
 use std::path::Path;
 
@@ -83,14 +83,14 @@ impl PlatformFilesystem for FallbackPlatform {
     }
 
     fn list_volumes(&self) -> Result<Vec<crate::traits::StorageVolumeInfo>, PlatformError> {
-        Ok(vec![crate::traits::StorageVolumeInfo {
-            mount_point: "/".to_string(),
-            volume_name: "Root".to_string(),
-            total_bytes: 500_000_000_000,
-            available_bytes: 250_000_000_000,
-            file_system: "ext4".to_string(),
-            is_removable: false,
-        }])
+        #[cfg(unix)]
+        {
+            Ok(vec![crate::unix_volume::volume_info("/", "Root", "")?])
+        }
+        #[cfg(not(unix))]
+        {
+            Ok(Vec::new())
+        }
     }
 }
 
@@ -108,7 +108,7 @@ impl PlatformElevation for FallbackPlatform {
     fn is_elevated(&self) -> bool {
         #[cfg(unix)]
         {
-            unsafe { libc::geteuid() == 0 }
+            crate::unix_volume::is_root()
         }
         #[cfg(not(unix))]
         {

@@ -2,15 +2,21 @@ use crate::traits::{
     FileIdentity, PendingRebootDeletion, PlatformElevation, PlatformError, PlatformFilesystem,
     PlatformIoPriority, PlatformRebootQueue,
 };
-use fs4::FileExt;
+use fs4::fs_std::FileExt;
 use std::fs::OpenOptions;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 pub struct MacosPlatform;
 
 impl MacosPlatform {
     pub fn new() -> Self {
         Self
+    }
+}
+
+impl Default for MacosPlatform {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -55,6 +61,7 @@ impl PlatformFilesystem for MacosPlatform {
             .read(true)
             .write(true)
             .create(true)
+            .truncate(false)
             .open(lock_path)?;
 
         match file.try_lock_exclusive() {
@@ -64,14 +71,11 @@ impl PlatformFilesystem for MacosPlatform {
     }
 
     fn list_volumes(&self) -> Result<Vec<crate::traits::StorageVolumeInfo>, PlatformError> {
-        Ok(vec![crate::traits::StorageVolumeInfo {
-            mount_point: "/".to_string(),
-            volume_name: "Macintosh HD".to_string(),
-            total_bytes: 1_000_000_000_000,
-            available_bytes: 500_000_000_000,
-            file_system: "APFS".to_string(),
-            is_removable: false,
-        }])
+        Ok(vec![crate::unix_volume::volume_info(
+            "/",
+            "Macintosh HD",
+            "APFS",
+        )?])
     }
 }
 
@@ -87,7 +91,7 @@ impl PlatformRebootQueue for MacosPlatform {
 
 impl PlatformElevation for MacosPlatform {
     fn is_elevated(&self) -> bool {
-        false
+        crate::unix_volume::is_root()
     }
 }
 
