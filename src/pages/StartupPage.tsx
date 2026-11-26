@@ -157,7 +157,7 @@ export const StartupPage: React.FC = () => {
               <h1 className="text-xl font-semibold tracking-tight text-[var(--text-primary)]">
                 {t.startup.title}
               </h1>
-              <span className="px-2 py-0.5 rounded-[4px] text-[10px] font-ibm-mono uppercase tracking-wider bg-amber-500/10 text-amber-400 border border-amber-500/20">
+              <span className="px-2 py-0.5 rounded-[4px] text-xs font-ibm-mono uppercase tracking-wider bg-amber-500/10 text-amber-400 border border-amber-500/20">
                 {t.startup.filterCritical}
               </span>
             </div>
@@ -213,38 +213,38 @@ export const StartupPage: React.FC = () => {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 font-ibm-mono">
         <WinUICard className="p-3.5">
           <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] mb-1 font-sans">
-            <span className="font-medium text-[11px]">{t.startup.filterAll}</span>
+            <span className="font-medium text-xs">{t.startup.filterAll}</span>
             <Flash20Regular className="w-3.5 h-3.5 text-[#0078d4]" />
           </div>
           <div className="text-xl font-bold text-[var(--text-primary)] tabular-nums">{items.length}</div>
-          <div className="text-[10px] text-[var(--text-muted)] mt-0.5 font-sans">{t.startup.statAllDesc}</div>
+          <div className="text-xs text-[var(--text-muted)] mt-0.5 font-sans">{t.startup.statAllDesc}</div>
         </WinUICard>
 
         <WinUICard className="p-3.5">
           <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] mb-1 font-sans">
-            <span className="font-medium text-[11px]">{t.startup.filterEnabled}</span>
+            <span className="font-medium text-xs">{t.startup.filterEnabled}</span>
             <CheckmarkCircle20Filled className="w-3.5 h-3.5 text-emerald-400" />
           </div>
           <div className="text-xl font-bold text-emerald-400 tabular-nums">{enabledCount}</div>
-          <div className="text-[10px] text-[var(--text-muted)] mt-0.5 font-sans">{t.startup.statEnabledDesc}</div>
+          <div className="text-xs text-[var(--text-muted)] mt-0.5 font-sans">{t.startup.statEnabledDesc}</div>
         </WinUICard>
 
         <WinUICard className="p-3.5">
           <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] mb-1 font-sans">
-            <span className="font-medium text-[11px]">{t.startup.filterHigh}</span>
+            <span className="font-medium text-xs">{t.startup.filterHigh}</span>
             <Flash20Regular className="w-3.5 h-3.5 text-rose-400" />
           </div>
           <div className="text-xl font-bold text-rose-400 tabular-nums">{highImpactCount}</div>
-          <div className="text-[10px] text-[var(--text-muted)] mt-0.5 font-sans">{t.startup.statHighDesc}</div>
+          <div className="text-xs text-[var(--text-muted)] mt-0.5 font-sans">{t.startup.statHighDesc}</div>
         </WinUICard>
 
         <WinUICard className="p-3.5">
           <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] mb-1 font-sans">
-            <span className="font-medium text-[11px]">{t.startup.criticalSystem}</span>
+            <span className="font-medium text-xs">{t.startup.criticalSystem}</span>
             <Shield20Filled className="w-3.5 h-3.5 text-cyan-400" />
           </div>
           <div className="text-xl font-bold text-cyan-400 tabular-nums">{criticalCount}</div>
-          <div className="text-[10px] text-[var(--text-muted)] mt-0.5 font-sans">{t.startup.statCriticalDesc}</div>
+          <div className="text-xs text-[var(--text-muted)] mt-0.5 font-sans">{t.startup.statCriticalDesc}</div>
         </WinUICard>
       </div>
 
@@ -299,7 +299,7 @@ export const StartupPage: React.FC = () => {
           <div className="max-w-xs mx-auto h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
             <div className="h-full bg-amber-500 rounded-full animate-pulse w-3/4" />
           </div>
-          <p className="text-[11px] text-[var(--text-muted)]">
+          <p className="text-xs text-[var(--text-muted)]">
             Querying Windows Run registry entries, Startup folders, and Task Scheduler triggers...
           </p>
         </WinUICard>
@@ -317,12 +317,12 @@ export const StartupPage: React.FC = () => {
                       {item.name}
                     </span>
                     {item.is_critical && (
-                      <span className="flex items-center gap-1 px-1.5 py-0.2 rounded-[3px] text-[10px] font-ibm-mono bg-rose-500/10 text-rose-400 border border-rose-500/20 font-bold">
+                      <span className="flex items-center gap-1 px-1.5 py-0.2 rounded-[3px] text-xs font-ibm-mono bg-rose-500/10 text-rose-400 border border-rose-500/20 font-bold">
                         <Shield20Filled className="w-3 h-3" /> System Critical
                       </span>
                     )}
                     <span
-                      className={`px-1.5 py-0.2 rounded-[3px] text-[10px] font-ibm-mono font-bold uppercase tracking-wider ${
+                      className={`px-1.5 py-0.2 rounded-[3px] text-xs font-ibm-mono font-bold uppercase tracking-wider ${
                         item.impact === "high"
                           ? "bg-rose-500/10 text-rose-400 border border-rose-500/20"
                           : item.impact === "medium"
@@ -332,12 +332,12 @@ export const StartupPage: React.FC = () => {
                     >
                       {item.impact === "high" ? t.startup.impactHigh : item.impact === "medium" ? t.startup.impactMedium : t.startup.impactLow}
                     </span>
-                    <span className="text-[10px] px-1.5 py-0.2 rounded-[3px] bg-black/20 text-[var(--text-muted)] font-ibm-mono">
+                    <span className="text-xs px-1.5 py-0.2 rounded-[3px] bg-black/20 text-[var(--text-muted)] font-ibm-mono">
                       {item.location}
                     </span>
                   </div>
 
-                  <div className="text-[11px] font-ibm-mono text-[var(--text-secondary)] truncate max-w-3xl select-all">
+                  <div className="text-xs font-ibm-mono text-[var(--text-secondary)] truncate max-w-3xl select-all">
                     {item.command}
                   </div>
                 </div>
@@ -398,7 +398,7 @@ export const StartupPage: React.FC = () => {
               </div>
               <div>
                 <h3 className="font-semibold text-[var(--text-primary)] text-sm">{t.startup.confirmDeleteTitle}</h3>
-                <p className="text-[11px] text-[var(--text-secondary)]">
+                <p className="text-xs text-[var(--text-secondary)]">
                   {t.startup.confirmDeleteDesc}
                 </p>
               </div>

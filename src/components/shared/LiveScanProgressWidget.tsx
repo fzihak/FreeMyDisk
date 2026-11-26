@@ -94,7 +94,7 @@ export const LiveScanProgressWidget: React.FC<LiveScanProgressWidgetProps> = ({
               <h3 className="text-base font-semibold text-[var(--text-primary)] tracking-tight">
                 {title || progress.stage || "Disk Engine Active"}
               </h3>
-              <span className="px-2 py-0.5 rounded-[4px] bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 text-[10px] font-bold tracking-wider uppercase font-ibm-mono">
+              <span className="px-2 py-0.5 rounded-[4px] bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 text-xs font-bold tracking-wider uppercase font-ibm-mono">
                 Running
               </span>
             </div>
@@ -123,7 +123,7 @@ export const LiveScanProgressWidget: React.FC<LiveScanProgressWidgetProps> = ({
             style={{ width: `${displayPercent}%` }}
           />
         </div>
-        <div className="flex items-center justify-between text-[11px] text-[var(--text-muted)] font-ibm-mono">
+        <div className="flex items-center justify-between text-xs text-[var(--text-muted)] font-ibm-mono">
           <span>Processing file streams</span>
           <span>{displayPercent} of 100%</span>
         </div>
@@ -133,7 +133,7 @@ export const LiveScanProgressWidget: React.FC<LiveScanProgressWidgetProps> = ({
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 relative z-10">
         {/* Active Path Box */}
         <div className="p-3 bg-black/30 rounded-[4px] border border-[var(--border-subtle)] space-y-1">
-          <div className="flex items-center gap-1.5 text-[11px] text-[var(--text-muted)]">
+          <div className="flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
             <FolderOpen16Regular className="w-3.5 h-3.5 text-[#0078d4]" />
             <span>Current Path</span>
           </div>
@@ -147,7 +147,7 @@ export const LiveScanProgressWidget: React.FC<LiveScanProgressWidgetProps> = ({
 
         {/* Live Metrics Box */}
         <div className="p-3 bg-black/30 rounded-[4px] border border-[var(--border-subtle)] space-y-1">
-          <div className="flex items-center gap-1.5 text-[11px] text-[var(--text-muted)]">
+          <div className="flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
             <Document20Regular className="w-3.5 h-3.5 text-indigo-400" />
             <span>Items Scanned</span>
           </div>
@@ -167,7 +167,7 @@ export const LiveScanProgressWidget: React.FC<LiveScanProgressWidgetProps> = ({
       {/* Footer Actions */}
       {showCancel && (
         <div className="flex items-center justify-between pt-1 border-t border-[var(--border-subtle)] relative z-10">
-          <div className="flex items-center gap-1.5 text-[11px] text-[var(--text-muted)]">
+          <div className="flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
             <Sparkle20Filled className="w-3.5 h-3.5 text-[#0078d4]" />
             <span>High-speed kernel traversal running</span>
           </div>

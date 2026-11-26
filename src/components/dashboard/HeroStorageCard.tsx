@@ -104,7 +104,7 @@ export const HeroStorageCard: React.FC<HeroStorageCardProps> = ({
             <span className="text-3xl font-black text-white tracking-tight font-ibm-mono tabular-nums">
               {usedPercent}%
             </span>
-            <span className="text-[11px] font-medium text-blue-100/90 mt-0.5 font-ibm-mono tabular-nums">
+            <span className="text-xs font-medium text-blue-100/90 mt-0.5 font-ibm-mono tabular-nums">
               {usedGb} of {totalGb} GB
             </span>
           </div>
@@ -113,7 +113,7 @@ export const HeroStorageCard: React.FC<HeroStorageCardProps> = ({
         {/* Legend Dots under the circle */}
         <div className="flex items-center justify-center gap-6 mt-6 w-full text-center">
           <div>
-            <div className="flex items-center justify-center gap-1.5 text-[11px] text-blue-100 font-medium">
+            <div className="flex items-center justify-center gap-1.5 text-xs text-blue-100 font-medium">
               <span className="w-2 h-2 rounded-full bg-cyan-300" />
               <span>Cleanable</span>
             </div>
@@ -121,7 +121,7 @@ export const HeroStorageCard: React.FC<HeroStorageCardProps> = ({
           </div>
 
           <div>
-            <div className="flex items-center justify-center gap-1.5 text-[11px] text-blue-100 font-medium">
+            <div className="flex items-center justify-center gap-1.5 text-xs text-blue-100 font-medium">
               <span className="w-2 h-2 rounded-full bg-white" />
               <span>In Use</span>
             </div>
@@ -129,7 +129,7 @@ export const HeroStorageCard: React.FC<HeroStorageCardProps> = ({
           </div>
 
           <div>
-            <div className="flex items-center justify-center gap-1.5 text-[11px] text-blue-100 font-medium">
+            <div className="flex items-center justify-center gap-1.5 text-xs text-blue-100 font-medium">
               <span className="w-2 h-2 rounded-full bg-amber-300" />
               <span>Critical</span>
             </div>
@@ -160,7 +160,7 @@ export const HeroStorageCard: React.FC<HeroStorageCardProps> = ({
       <div className="flex items-center justify-between pt-6 border-t border-white/15 relative z-10">
         <div>
           <div className="text-xs font-bold text-white">Local Workstation</div>
-          <div className="text-[10px] text-blue-100/80 font-ibm-mono">Windows 11 • NTFS Guard</div>
+          <div className="text-xs text-blue-100/80 font-ibm-mono">Windows 11 • NTFS Guard</div>
         </div>
 
         <div className="flex items-center gap-1 bg-white/10 backdrop-blur-sm px-2 py-1 rounded-xl border border-white/15">

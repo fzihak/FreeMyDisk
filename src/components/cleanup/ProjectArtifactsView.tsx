@@ -346,7 +346,7 @@ export const ProjectArtifactsView: React.FC = () => {
             <CheckmarkCircle20Filled className="w-4 h-4 text-emerald-400 shrink-0" />
             <div>
               <div className="text-xs font-semibold text-emerald-400">{t.projectArtifacts.cleanupCompleteTitle}</div>
-              <div className="text-[11px] text-emerald-400/80 font-ibm-mono tabular-nums">
+              <div className="text-xs text-emerald-400/80 font-ibm-mono tabular-nums">
                 {disposalSummary.successful_items} {t.common.items} • {describeDisposal(disposalSummary, t, formatBytes)}
               </div>
             </div>
@@ -427,17 +427,17 @@ export const ProjectArtifactsView: React.FC = () => {
                         <span className="text-xs font-semibold text-[var(--text-primary)] truncate">
                           {project.project_name}
                         </span>
-                        <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded-[3px] bg-white/[0.08] text-[var(--text-secondary)]">
+                        <span className="text-xs uppercase font-bold tracking-wider px-1.5 py-0.5 rounded-[3px] bg-white/[0.08] text-[var(--text-secondary)]">
                           {typeLabel}
                         </span>
                         {project.last_modified_days_ago > 30 && (
-                          <span className="flex items-center gap-1 text-[10px] text-amber-300 bg-amber-500/10 px-1.5 py-0.5 rounded-[3px]">
+                          <span className="flex items-center gap-1 text-xs text-amber-300 bg-amber-500/10 px-1.5 py-0.5 rounded-[3px]">
                             <Clock20Regular className="w-3 h-3" />
                             {project.last_modified_days_ago} {t.projectArtifacts.daysAgo} ({t.projectArtifacts.dormantBadge})
                           </span>
                         )}
                       </div>
-                      <div className="text-[11px] text-[var(--text-secondary)] font-ibm-mono truncate mt-0.5 opacity-80">
+                      <div className="text-xs text-[var(--text-secondary)] font-ibm-mono truncate mt-0.5 opacity-80">
                         {project.project_root}
                       </div>
                     </div>
@@ -480,12 +480,12 @@ export const ProjectArtifactsView: React.FC = () => {
                               <span className="font-ibm-mono font-semibold text-[var(--text-primary)]">
                                 {art.relative_path}
                               </span>
-                              <span className="text-[10px] px-1 py-0.2 rounded-[2px] bg-white/[0.05] text-[var(--text-secondary)] capitalize">
+                              <span className="text-xs px-1 py-0.2 rounded-[2px] bg-white/[0.05] text-[var(--text-secondary)] capitalize">
                                 {art.category}
                               </span>
                               {art.rebuild_command && (
                                 <span
-                                  className="flex items-center gap-1 text-[10px] text-blue-300 font-ibm-mono bg-blue-500/10 px-1 py-0.2 rounded-[2px]"
+                                  className="flex items-center gap-1 text-xs text-blue-300 font-ibm-mono bg-blue-500/10 px-1 py-0.2 rounded-[2px]"
                                   title={t.projectArtifacts.rebuildCommand}
                                 >
                                   <Wrench20Regular className="w-2.5 h-2.5" />
@@ -493,7 +493,7 @@ export const ProjectArtifactsView: React.FC = () => {
                                 </span>
                               )}
                             </div>
-                            <div className="text-[10px] text-[var(--text-secondary)] font-ibm-mono truncate mt-0.5">
+                            <div className="text-xs text-[var(--text-secondary)] font-ibm-mono truncate mt-0.5">
                               {art.item_count} {t.common.files} • {art.staleness_days} {t.projectArtifacts.daysAgo}
                             </div>
                           </div>

@@ -420,7 +420,7 @@ export const DuplicatesPage: React.FC = () => {
               <h1 className="text-xl font-semibold tracking-tight text-[var(--text-primary)]">
                 {t.duplicates.title}
               </h1>
-              <span className="px-2 py-0.5 rounded-[4px] text-[10px] font-ibm-mono uppercase tracking-wider bg-[#0078d4]/10 text-[#0078d4] border border-[#0078d4]/20">
+              <span className="px-2 py-0.5 rounded-[4px] text-xs font-ibm-mono uppercase tracking-wider bg-[#0078d4]/10 text-[#0078d4] border border-[#0078d4]/20">
                 {t.duplicates.exactMatchBadge}
               </span>
             </div>
@@ -433,7 +433,7 @@ export const DuplicatesPage: React.FC = () => {
         {/* Quick scan controls */}
         <div className="flex flex-wrap items-center gap-2.5">
           <div className="flex items-center gap-2 bg-black/20 px-2.5 py-1 rounded-[4px] border border-[var(--border-card)]">
-            <span className="text-[11px] text-[var(--text-secondary)] font-medium">{t.duplicates.minSize}</span>
+            <span className="text-xs text-[var(--text-secondary)] font-medium">{t.duplicates.minSize}</span>
             <select
               value={minSizeKb}
               disabled={scanning || trashing}
@@ -507,7 +507,7 @@ export const DuplicatesPage: React.FC = () => {
               <HardDrive20Regular className="w-3.5 h-3.5" />
               <span className="font-semibold">{t.common.allDrives}</span>
               <span
-                className={`text-[10px] px-1.5 py-0.5 rounded-[3px] font-ibm-mono tabular-nums ${
+                className={`text-xs px-1.5 py-0.5 rounded-[3px] font-ibm-mono tabular-nums ${
                   selectedDrive === "ALL" ? "bg-white/20 text-white" : "bg-black/30 text-[var(--text-secondary)]"
                 }`}
               >
@@ -537,9 +537,9 @@ export const DuplicatesPage: React.FC = () => {
                   }`}
                 >
                   <span className="font-ibm-mono font-bold">{vol.mount_point}</span>
-                  <span className="text-[11px] opacity-80">{vol.volume_name || t.common.drive}</span>
+                  <span className="text-xs opacity-80">{vol.volume_name || t.common.drive}</span>
                   <span
-                    className={`text-[10px] px-1.5 py-0.5 rounded-[3px] font-ibm-mono tabular-nums ${
+                    className={`text-xs px-1.5 py-0.5 rounded-[3px] font-ibm-mono tabular-nums ${
                       isSelected ? "bg-white/20 text-white" : "bg-black/30 text-[var(--text-secondary)]"
                     }`}
                   >
@@ -578,7 +578,7 @@ export const DuplicatesPage: React.FC = () => {
               <div className="text-xs font-semibold text-emerald-400">
                 {t.cleanup.cleanComplete}
               </div>
-              <div className="text-[11px] text-emerald-400/80 font-ibm-mono tabular-nums">
+              <div className="text-xs text-emerald-400/80 font-ibm-mono tabular-nums">
                 {disposalSummary.successful_items} {t.common.files} • {describeDisposal(disposalSummary, t, formatBytes)}
               </div>
             </div>
@@ -596,52 +596,52 @@ export const DuplicatesPage: React.FC = () => {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <WinUICard className="p-3.5">
           <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] mb-1">
-            <span className="font-medium text-[11px]">{t.duplicates.statSets}</span>
+            <span className="font-medium text-xs">{t.duplicates.statSets}</span>
             <Layer20Regular className="w-3.5 h-3.5 text-[#0078d4]" />
           </div>
           <div className="text-xl font-bold text-[var(--text-primary)] font-ibm-mono tabular-nums">
             {scanResult ? scanResult.total_groups.toLocaleString() : "—"}
           </div>
-          <div className="text-[10px] text-[var(--text-muted)] font-ibm-mono tabular-nums mt-1">
+          <div className="text-xs text-[var(--text-muted)] font-ibm-mono tabular-nums mt-1">
             {scanResult ? `${filteredGroups.length} ${t.duplicates.setsShown}` : t.common.notScannedYet}
           </div>
         </WinUICard>
 
         <WinUICard className="p-3.5">
           <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] mb-1">
-            <span className="font-medium text-[11px]">{t.duplicates.statFiles}</span>
+            <span className="font-medium text-xs">{t.duplicates.statFiles}</span>
             <DocumentCopy24Filled className="w-3.5 h-3.5 text-indigo-400" />
           </div>
           <div className="text-xl font-bold text-indigo-400 font-ibm-mono tabular-nums">
             {scanResult ? scanResult.total_duplicate_files.toLocaleString() : "—"}
           </div>
-          <div className="text-[10px] text-[var(--text-muted)] font-ibm-mono tabular-nums mt-1">
+          <div className="text-xs text-[var(--text-muted)] font-ibm-mono tabular-nums mt-1">
             {scanResult ? `${totalSelectedCount} ${t.duplicates.filesSelected}` : t.common.notScannedYet}
           </div>
         </WinUICard>
 
         <WinUICard className="p-3.5">
           <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] mb-1">
-            <span className="font-medium text-[11px]">{t.duplicates.potentialSavings}</span>
+            <span className="font-medium text-xs">{t.duplicates.potentialSavings}</span>
             <HardDrive20Regular className="w-3.5 h-3.5 text-emerald-400" />
           </div>
           <div className="text-xl font-bold text-emerald-400 font-ibm-mono tabular-nums">
             {scanResult ? formatBytes(scanResult.total_potential_savings) : "—"}
           </div>
-          <div className="text-[10px] text-[var(--text-muted)] font-ibm-mono truncate mt-1" title={scanTargetLabel}>
+          <div className="text-xs text-[var(--text-muted)] font-ibm-mono truncate mt-1" title={scanTargetLabel}>
             {scanTargetLabel}
           </div>
         </WinUICard>
 
         <WinUICard className="p-3.5">
           <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] mb-1">
-            <span className="font-medium text-[11px]">{t.duplicates.hideHardlinks}</span>
+            <span className="font-medium text-xs">{t.duplicates.hideHardlinks}</span>
             <Link20Regular className="w-3.5 h-3.5 text-amber-400" />
           </div>
           <div className="text-xl font-bold text-amber-400 font-ibm-mono tabular-nums">
             {totalHardlinkGroups}
           </div>
-          <div className="text-[10px] text-amber-400/80 font-ibm-mono mt-1">
+          <div className="text-xs text-amber-400/80 font-ibm-mono mt-1">
             0 B (NTFS)
           </div>
         </WinUICard>
@@ -702,7 +702,7 @@ export const DuplicatesPage: React.FC = () => {
 
         {/* Heuristic Presets */}
         <div className="flex flex-wrap items-center gap-1.5 w-full lg:w-auto">
-          <span className="text-[11px] font-medium text-[var(--text-secondary)]">{t.duplicates.autoSelectRules}</span>
+          <span className="text-xs font-medium text-[var(--text-secondary)]">{t.duplicates.autoSelectRules}</span>
           <button
             onClick={() => applyHeuristic("oldest")}
             className="px-2.5 py-1 bg-black/20 hover:bg-white/[0.05] text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-[4px] text-xs font-medium transition-all cursor-pointer border border-[var(--border-card)]"
@@ -848,7 +848,7 @@ export const DuplicatesPage: React.FC = () => {
                           <div className="font-ibm-mono text-xs text-[var(--text-primary)] truncate font-semibold">
                             {dir.path}
                           </div>
-                          <div className="text-[10px] text-[var(--text-muted)] font-ibm-mono">
+                          <div className="text-xs text-[var(--text-muted)] font-ibm-mono">
                             {dir.file_count} {t.common.files} • {formatBytes(dir.total_size_bytes)} {dIdx === 0 ? "• (Original)" : "• (Duplicate)"}
                           </div>
                         </div>
@@ -864,7 +864,7 @@ export const DuplicatesPage: React.FC = () => {
                         </button>
                         <button
                           onClick={() => handleTrashFolders([dir.path])}
-                          className="px-2 py-0.5 rounded-[3px] bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 text-[11px] font-medium transition-colors cursor-pointer"
+                          className="px-2 py-0.5 rounded-[3px] bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 text-xs font-medium transition-colors cursor-pointer"
                         >
                           {t.duplicateFolders.recycleFolder}
                         </button>
@@ -906,31 +906,31 @@ export const DuplicatesPage: React.FC = () => {
                       {isExpanded ? <ChevronUp16Regular className="w-4 h-4" /> : <ChevronDown16Regular className="w-4 h-4" />}
                     </button>
                     <div className="font-ibm-mono text-xs text-[var(--text-primary)] flex items-center gap-1.5 truncate">
-                      <span className="text-[var(--text-muted)] uppercase text-[10px]">Hash:</span>
+                      <span className="text-[var(--text-muted)] uppercase text-xs">Hash:</span>
                       <span className="text-[#0078d4] font-bold tracking-wider">{group.hash.substring(0, 16)}…</span>
                     </div>
-                    <span className="text-[11px] px-1.5 py-0.2 rounded-[3px] bg-black/30 border border-[var(--border-card)] text-[var(--text-primary)] font-ibm-mono font-medium tabular-nums">
+                    <span className="text-xs px-1.5 py-0.2 rounded-[3px] bg-black/30 border border-[var(--border-card)] text-[var(--text-primary)] font-ibm-mono font-medium tabular-nums">
                       {formatBytes(group.file_size)} / copy
                     </span>
-                    <span className="text-[11px] px-1.5 py-0.2 rounded-[3px] bg-black/20 text-[var(--text-secondary)] font-ibm-mono">
+                    <span className="text-xs px-1.5 py-0.2 rounded-[3px] bg-black/20 text-[var(--text-secondary)] font-ibm-mono">
                       {group.files.length} copies
                     </span>
                   </div>
 
                   <div className="flex items-center gap-2 shrink-0 text-xs">
                     {isHardlink ? (
-                      <span className="flex items-center gap-1 px-2 py-0.5 rounded-[3px] bg-amber-500/10 text-amber-300 border border-amber-500/20 text-[11px] font-ibm-mono font-medium">
+                      <span className="flex items-center gap-1 px-2 py-0.5 rounded-[3px] bg-amber-500/10 text-amber-300 border border-amber-500/20 text-xs font-ibm-mono font-medium">
                         <Link20Regular className="w-3 h-3 text-amber-400" />
                         {t.duplicates.hardlinkNotice}
                       </span>
                     ) : (
-                      <span className="flex items-center gap-1 px-2 py-0.5 rounded-[3px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[11px] font-ibm-mono font-semibold tabular-nums">
+                      <span className="flex items-center gap-1 px-2 py-0.5 rounded-[3px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-ibm-mono font-semibold tabular-nums">
                         {t.duplicates.potentialSavings}: {formatBytes(group.potential_savings_bytes)}
                       </span>
                     )}
 
                     {selectedCount > 0 && (
-                      <span className="px-2 py-0.5 rounded-[3px] bg-rose-500/10 text-rose-400 border border-rose-500/20 text-[11px] font-ibm-mono font-bold">
+                      <span className="px-2 py-0.5 rounded-[3px] bg-rose-500/10 text-rose-400 border border-rose-500/20 text-xs font-ibm-mono font-bold">
                         {selectedCount} {t.cleanup.itemsSelected}
                       </span>
                     )}
@@ -963,7 +963,7 @@ export const DuplicatesPage: React.FC = () => {
                             <div className="font-ibm-mono text-xs text-[var(--text-primary)] truncate select-all">
                               {file.path}
                             </div>
-                            <div className="flex items-center gap-2.5 text-[10px] font-ibm-mono text-[var(--text-secondary)] mt-0.5 tabular-nums">
+                            <div className="flex items-center gap-2.5 text-xs font-ibm-mono text-[var(--text-secondary)] mt-0.5 tabular-nums">
                               <span>{t.common.date}: {new Date(file.modified_at * 1000).toLocaleString()}</span>
                               {file.is_hardlink_or_clone && (
                                 <span className="text-amber-400 font-semibold">

@@ -287,12 +287,12 @@ export const VirtualizationView: React.FC = () => {
                           {distro.name}
                         </h3>
                         {distro.is_default && (
-                          <span className="text-[10px] font-ibm-mono px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 font-medium">
+                          <span className="text-xs font-ibm-mono px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 font-medium">
                             {t.virtualization.defaultBadge}
                           </span>
                         )}
                         <span
-                          className={`text-[10px] font-ibm-mono px-2 py-0.5 rounded border font-medium ${
+                          className={`text-xs font-ibm-mono px-2 py-0.5 rounded border font-medium ${
                             distro.state.toLowerCase() === "running"
                               ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
                               : "bg-slate-500/10 text-slate-400 border-slate-500/20"
@@ -302,7 +302,7 @@ export const VirtualizationView: React.FC = () => {
                             ? t.virtualization.stateRunning
                             : t.virtualization.stateStopped}
                         </span>
-                        <span className="text-[10px] font-ibm-mono text-[var(--text-muted)]">
+                        <span className="text-xs font-ibm-mono text-[var(--text-muted)]">
                           WSL v{distro.version}
                         </span>
                       </div>
@@ -321,7 +321,7 @@ export const VirtualizationView: React.FC = () => {
 
                       {/* Visual Size Bar */}
                       <div className="space-y-1 pt-1 max-w-lg">
-                        <div className="flex items-center justify-between text-[11px] text-[var(--text-muted)]">
+                        <div className="flex items-center justify-between text-xs text-[var(--text-muted)]">
                           <span>
                             {t.virtualization.totalSize}:{" "}
                             <strong className="text-[var(--text-primary)] font-ibm-mono">
@@ -450,12 +450,12 @@ export const VirtualizationView: React.FC = () => {
                   </span>
                 </span>
                 {overview.docker.storage_driver && (
-                  <span className="font-ibm-mono text-[11px] text-[var(--text-muted)]">
+                  <span className="font-ibm-mono text-xs text-[var(--text-muted)]">
                     Driver: {overview.docker.storage_driver}
                   </span>
                 )}
               </div>
-              <div className="font-ibm-mono text-[11px] text-[var(--text-muted)]">
+              <div className="font-ibm-mono text-xs text-[var(--text-muted)]">
                 {t.virtualization.statTotalReclaimable}:{" "}
                 <span className="text-emerald-400 font-bold">
                   {formatBytes(overview.docker.total_reclaimable_bytes)}
@@ -486,7 +486,7 @@ export const VirtualizationView: React.FC = () => {
                       <span className="font-semibold text-sm text-[var(--text-primary)]">
                         {cat.category}
                       </span>
-                      <span className="text-[11px] font-ibm-mono px-2 py-0.5 rounded bg-white/[0.06] text-[var(--text-secondary)]">
+                      <span className="text-xs font-ibm-mono px-2 py-0.5 rounded bg-white/[0.06] text-[var(--text-secondary)]">
                         {cat.total_count} {t.virtualization.dockerItems} ({cat.active_count} {t.virtualization.dockerActive})
                       </span>
                     </div>
@@ -541,7 +541,7 @@ export const VirtualizationView: React.FC = () => {
               {t.virtualization.vmTitle}
             </h2>
           </div>
-          <span className="text-[11px] text-[var(--text-muted)] font-ibm-mono">
+          <span className="text-xs text-[var(--text-muted)] font-ibm-mono">
             {overview?.hyperv_disks.length || 0} {t.common.files}
           </span>
         </div>
@@ -558,7 +558,7 @@ export const VirtualizationView: React.FC = () => {
                     <span className="font-semibold text-sm text-[var(--text-primary)]">
                       {disk.vm_name}
                     </span>
-                    <span className="text-[10px] font-ibm-mono px-2 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20 font-medium">
+                    <span className="text-xs font-ibm-mono px-2 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20 font-medium">
                       {disk.format}
                     </span>
                   </div>

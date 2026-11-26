@@ -21,27 +21,27 @@ export const WinUIButton: React.FC<WinUIButtonProps> = ({
   ...props
 }) => {
   const sizeClasses = {
-    sm: "h-7 px-2.5 text-[11px] gap-1.5",
-    md: "h-8 px-3.5 text-xs gap-2",
-    lg: "h-9 px-4 text-xs gap-2",
+    sm: "h-7 px-2.5 text-xs gap-1.5",
+    md: "h-8 px-3 text-sm gap-2",
+    lg: "h-9 px-4 text-sm gap-2",
   }[size];
 
   const variantClasses = {
     primary:
-      "bg-[#0067c0] hover:bg-[#187bd1] active:bg-[#005fb8] text-white border-transparent shadow-sm font-medium",
+      "bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white border-transparent font-medium",
     standard:
-      "bg-white/[0.06] hover:bg-white/[0.1] active:bg-white/[0.04] text-[var(--text-primary)] border-white/10 hover:border-white/20 shadow-sm",
+      "bg-[var(--fill-subtle)] hover:bg-[var(--fill-subtle-hover)] text-[var(--text-primary)] border-[var(--border-card)]",
     subtle:
-      "bg-transparent hover:bg-white/[0.06] active:bg-white/[0.03] text-[var(--text-primary)] border-transparent",
+      "bg-transparent hover:bg-[var(--fill-subtle)] text-[var(--text-primary)] border-transparent",
     danger:
-      "bg-[#c42b1c] hover:bg-[#b32719] active:bg-[#a22316] text-white border-transparent shadow-sm font-medium",
+      "bg-[var(--danger-fill)] hover:brightness-110 text-white border-transparent font-medium",
   }[variant];
 
   return (
     <button
       disabled={disabled}
-      className={`inline-flex items-center justify-center whitespace-nowrap rounded-[4px] border font-normal transition-all duration-100 select-none cursor-pointer active:scale-[0.98] ${sizeClasses} ${variantClasses} ${
-        disabled ? "opacity-40 cursor-not-allowed pointer-events-none" : ""
+      className={`inline-flex items-center justify-center whitespace-nowrap rounded-md border transition-colors duration-100 select-none cursor-pointer active:opacity-80 ${sizeClasses} ${variantClasses} ${
+        disabled ? "opacity-50 cursor-not-allowed pointer-events-none" : ""
       } ${className}`}
       {...props}
     >

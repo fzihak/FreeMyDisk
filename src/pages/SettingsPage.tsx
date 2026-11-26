@@ -75,7 +75,7 @@ export const SettingsPage: React.FC = () => {
             <h1 className="text-xl font-semibold text-[var(--text-primary)] tracking-tight">
               {t.settings.title}
             </h1>
-            <span className="px-1.5 py-0.2 rounded-[4px] text-[10px] font-ibm-mono bg-white/[0.06] text-[var(--text-secondary)] border border-[var(--border-subtle)]">
+            <span className="px-1.5 py-0.2 rounded-[4px] text-xs font-ibm-mono bg-white/[0.06] text-[var(--text-secondary)] border border-[var(--border-subtle)]">
               v{APP_VERSION}
             </span>
           </div>
@@ -116,7 +116,7 @@ export const SettingsPage: React.FC = () => {
                 </div>
                 <div className="text-left">
                   <div className="text-xs font-semibold text-[var(--text-primary)]">{t.settings.themeDark}</div>
-                  <div className="text-[10px] text-[var(--text-muted)]">Dark Slate</div>
+                  <div className="text-xs text-[var(--text-muted)]">Dark Slate</div>
                 </div>
               </button>
 
@@ -133,7 +133,7 @@ export const SettingsPage: React.FC = () => {
                 </div>
                 <div className="text-left">
                   <div className="text-xs font-semibold text-[var(--text-primary)]">{t.settings.themeNight}</div>
-                  <div className="text-[10px] text-[var(--text-muted)]">{t.settings.themeNightDesc}</div>
+                  <div className="text-xs text-[var(--text-muted)]">{t.settings.themeNightDesc}</div>
                 </div>
               </button>
 
@@ -150,7 +150,7 @@ export const SettingsPage: React.FC = () => {
                 </div>
                 <div className="text-left">
                   <div className="text-xs font-semibold text-[var(--text-primary)]">{t.settings.themeLight}</div>
-                  <div className="text-[10px] text-[var(--text-muted)]">Light Mode</div>
+                  <div className="text-xs text-[var(--text-muted)]">Light Mode</div>
                 </div>
               </button>
             </div>
@@ -178,7 +178,7 @@ export const SettingsPage: React.FC = () => {
                 >
                   <span className="text-lg">{lang.flag}</span>
                   <span className="text-xs">{lang.nativeName}</span>
-                  <span className="text-[9px] text-[var(--text-muted)] font-ibm-mono uppercase">{lang.code}</span>
+                  <span className="text-xs text-[var(--text-muted)] font-ibm-mono uppercase">{lang.code}</span>
                 </button>
               ))}
             </div>
@@ -289,14 +289,14 @@ export const SettingsPage: React.FC = () => {
               <div>
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-semibold text-[var(--text-primary)]">FreeMyDisk Desktop</span>
-                  <span className="px-1.5 py-0.5 font-ibm-mono text-[10px] font-semibold rounded bg-[#0078d4]/15 text-[#0078d4] border border-[#0078d4]/30">
+                  <span className="px-1.5 py-0.5 font-ibm-mono text-xs font-semibold rounded bg-[#0078d4]/15 text-[#0078d4] border border-[#0078d4]/30">
                     v1.0.0
                   </span>
                 </div>
                 <div className="text-xs text-[var(--text-secondary)] mt-0.5">
                   {t.settings.aboutDesc}
                 </div>
-                <div className="text-[11px] text-[var(--text-muted)] mt-0.5">
+                <div className="text-xs text-[var(--text-muted)] mt-0.5">
                   Built with Tauri v2, Rust core, and React WinUI 3 Fluent 2.
                 </div>
               </div>
@@ -338,9 +338,9 @@ export const SettingsPage: React.FC = () => {
                 <div>
                   <div className="text-xs font-semibold text-[var(--text-primary)] flex items-center gap-1.5">
                     <span>FreeMyDisk</span>
-                    <span className="font-ibm-mono text-[10px] font-normal text-[var(--text-secondary)]">v{APP_VERSION}</span>
+                    <span className="font-ibm-mono text-xs font-normal text-[var(--text-secondary)]">v{APP_VERSION}</span>
                   </div>
-                  <div className="text-[11px] text-[var(--text-muted)]">
+                  <div className="text-xs text-[var(--text-muted)]">
                     Official Open-Source Project • Public Repository on GitHub
                   </div>
                 </div>
@@ -357,7 +357,7 @@ export const SettingsPage: React.FC = () => {
               </button>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-[var(--border-divider)] text-[11px] text-[var(--text-secondary)] font-ibm-mono">
+            <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-[var(--border-divider)] text-xs text-[var(--text-secondary)] font-ibm-mono">
               <span className="px-2 py-0.5 rounded bg-white/[0.04] border border-[var(--border-subtle)]">
                 🛡️ Safety Invariants Active
               </span>

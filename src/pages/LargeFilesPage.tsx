@@ -446,7 +446,7 @@ export const LargeFilesPage: React.FC = () => {
               <h1 className="text-xl font-semibold tracking-tight text-[var(--text-primary)]">
                 {t.largeFiles.title}
               </h1>
-              <span className="px-2 py-0.5 rounded-[4px] text-[10px] font-ibm-mono uppercase tracking-wider bg-[#0078d4]/10 text-[#0078d4] border border-[#0078d4]/20">
+              <span className="px-2 py-0.5 rounded-[4px] text-xs font-ibm-mono uppercase tracking-wider bg-[#0078d4]/10 text-[#0078d4] border border-[#0078d4]/20">
                 {t.largeFiles.scannerBadge}
               </span>
             </div>
@@ -459,7 +459,7 @@ export const LargeFilesPage: React.FC = () => {
         {/* Quick Controls */}
         <div className="flex flex-wrap items-center gap-2.5">
           <div className="flex items-center gap-2 bg-black/20 px-2.5 py-1 rounded-[4px] border border-[var(--border-card)]">
-            <span className="text-[11px] text-[var(--text-secondary)] font-medium">{t.largeFiles.minSize}</span>
+            <span className="text-xs text-[var(--text-secondary)] font-medium">{t.largeFiles.minSize}</span>
             <select
               value={minSizeMb}
               disabled={scanning || batchTrashing || Boolean(trashingPath)}
@@ -516,7 +516,7 @@ export const LargeFilesPage: React.FC = () => {
               <HardDrive20Regular className="w-3.5 h-3.5" />
               <span className="font-semibold">{t.common.allDrives}</span>
               <span
-                className={`text-[10px] px-1.5 py-0.5 rounded-[3px] font-ibm-mono tabular-nums ${
+                className={`text-xs px-1.5 py-0.5 rounded-[3px] font-ibm-mono tabular-nums ${
                   selectedDrive === "ALL" ? "bg-white/20 text-white" : "bg-black/30 text-[var(--text-secondary)]"
                 }`}
               >
@@ -546,9 +546,9 @@ export const LargeFilesPage: React.FC = () => {
                   }`}
                 >
                   <span className="font-ibm-mono font-bold">{vol.mount_point}</span>
-                  <span className="text-[11px] opacity-80">{vol.volume_name || t.common.drive}</span>
+                  <span className="text-xs opacity-80">{vol.volume_name || t.common.drive}</span>
                   <span
-                    className={`text-[10px] px-1.5 py-0.5 rounded-[3px] font-ibm-mono tabular-nums ${
+                    className={`text-xs px-1.5 py-0.5 rounded-[3px] font-ibm-mono tabular-nums ${
                       isSelected ? "bg-white/20 text-white" : "bg-black/30 text-[var(--text-secondary)]"
                     }`}
                   >
@@ -598,52 +598,52 @@ export const LargeFilesPage: React.FC = () => {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <WinUICard className="p-3.5">
           <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] mb-1">
-            <span className="font-medium text-[11px]">{t.largeFiles.statFiles}</span>
+            <span className="font-medium text-xs">{t.largeFiles.statFiles}</span>
             <DocumentFolder24Filled className="w-3.5 h-3.5 text-[#0078d4]" />
           </div>
           <div className="text-xl font-bold text-[var(--text-primary)] font-ibm-mono tabular-nums">
             {scanResult ? scanResult.total_files.toLocaleString() : "—"}
           </div>
-          <div className="text-[10px] text-[var(--text-muted)] font-ibm-mono mt-1">
+          <div className="text-xs text-[var(--text-muted)] font-ibm-mono mt-1">
             {scanResult ? `≥ ${minSizeMb} MB` : t.common.notScannedYet}
           </div>
         </WinUICard>
 
         <WinUICard className="p-3.5">
           <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] mb-1">
-            <span className="font-medium text-[11px]">{t.largeFiles.totalSpace}</span>
+            <span className="font-medium text-xs">{t.largeFiles.totalSpace}</span>
             <HardDrive20Regular className="w-3.5 h-3.5 text-indigo-400" />
           </div>
           <div className="text-xl font-bold text-indigo-400 font-ibm-mono tabular-nums">
             {scanResult ? formatBytes(scanResult.total_bytes) : "—"}
           </div>
-          <div className="text-[10px] text-[var(--text-muted)] font-ibm-mono truncate mt-1" title={scanTargetLabel}>
+          <div className="text-xs text-[var(--text-muted)] font-ibm-mono truncate mt-1" title={scanTargetLabel}>
             {scanTargetLabel}
           </div>
         </WinUICard>
 
         <WinUICard className="p-3.5">
           <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] mb-1">
-            <span className="font-medium text-[11px]">{t.largeFiles.categoryMedia}</span>
+            <span className="font-medium text-xs">{t.largeFiles.categoryMedia}</span>
             <MoviesAndTv20Regular className="w-3.5 h-3.5 text-purple-400" />
           </div>
           <div className="text-xl font-bold text-purple-400 font-ibm-mono tabular-nums">
             {categoryStats["Media"] ? formatBytes(categoryStats["Media"].bytes) : "0 B"}
           </div>
-          <div className="text-[10px] text-[var(--text-muted)] font-ibm-mono tabular-nums mt-1">
+          <div className="text-xs text-[var(--text-muted)] font-ibm-mono tabular-nums mt-1">
             {categoryStats["Media"]?.count || 0} {t.common.files}
           </div>
         </WinUICard>
 
         <WinUICard className="p-3.5">
           <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] mb-1">
-            <span className="font-medium text-[11px]">{t.largeFiles.categoryArchives}</span>
+            <span className="font-medium text-xs">{t.largeFiles.categoryArchives}</span>
             <Archive20Regular className="w-3.5 h-3.5 text-amber-400" />
           </div>
           <div className="text-xl font-bold text-amber-400 font-ibm-mono tabular-nums">
             {categoryStats["Archives"] ? formatBytes(categoryStats["Archives"].bytes) : "0 B"}
           </div>
-          <div className="text-[10px] text-[var(--text-muted)] font-ibm-mono tabular-nums mt-1">
+          <div className="text-xs text-[var(--text-muted)] font-ibm-mono tabular-nums mt-1">
             {categoryStats["Archives"]?.count || 0} {t.common.files}
           </div>
         </WinUICard>
@@ -669,7 +669,7 @@ export const LargeFilesPage: React.FC = () => {
                 }`}
               >
                 <span>{getCategoryLabel(cat)}</span>
-                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-ibm-mono tabular-nums ${isActive ? "bg-white/20 text-white" : "bg-black/30 text-[var(--text-muted)]"}`}>
+                <span className={`text-xs px-1.5 py-0.2 rounded-full font-ibm-mono tabular-nums ${isActive ? "bg-white/20 text-white" : "bg-black/30 text-[var(--text-muted)]"}`}>
                   {count} • {formatBytes(bytes)}
                 </span>
               </button>
@@ -748,46 +748,46 @@ export const LargeFilesPage: React.FC = () => {
           {/* Quick Batch Selection Preset Toolbar */}
           <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 bg-black/15 border-b border-[var(--border-divider)] text-xs">
             <div className="flex flex-wrap items-center gap-1.5">
-              <span className="text-[11px] text-[var(--text-muted)] font-medium mr-1">Select:</span>
+              <span className="text-xs text-[var(--text-muted)] font-medium mr-1">Select:</span>
               <button
                 onClick={handleSelectAllFiltered}
-                className="px-2 py-0.5 rounded-[3px] text-[11px] font-medium bg-black/20 hover:bg-white/[0.06] text-[var(--text-secondary)] hover:text-white border border-[var(--border-card)] cursor-pointer transition-colors"
+                className="px-2 py-0.5 rounded-[3px] text-xs font-medium bg-black/20 hover:bg-white/[0.06] text-[var(--text-secondary)] hover:text-white border border-[var(--border-card)] cursor-pointer transition-colors"
               >
                 {t.common.selectAll}
               </button>
               <button
                 onClick={handleDeselectAll}
-                className="px-2 py-0.5 rounded-[3px] text-[11px] font-medium bg-black/20 hover:bg-white/[0.06] text-[var(--text-secondary)] hover:text-white border border-[var(--border-card)] cursor-pointer transition-colors"
+                className="px-2 py-0.5 rounded-[3px] text-xs font-medium bg-black/20 hover:bg-white/[0.06] text-[var(--text-secondary)] hover:text-white border border-[var(--border-card)] cursor-pointer transition-colors"
               >
                 {t.common.deselectAll}
               </button>
               <button
                 onClick={handleInvertFiltered}
-                className="px-2 py-0.5 rounded-[3px] text-[11px] font-medium bg-black/20 hover:bg-white/[0.06] text-[var(--text-secondary)] hover:text-white border border-[var(--border-card)] cursor-pointer transition-colors"
+                className="px-2 py-0.5 rounded-[3px] text-xs font-medium bg-black/20 hover:bg-white/[0.06] text-[var(--text-secondary)] hover:text-white border border-[var(--border-card)] cursor-pointer transition-colors"
               >
                 Invert
               </button>
               <span className="text-[var(--border-subtle)] mx-0.5">|</span>
               <button
                 onClick={() => handleSelectGreaterThan(1024 * 1024 * 1024)}
-                className="px-2 py-0.5 rounded-[3px] text-[11px] font-medium bg-black/20 hover:bg-white/[0.06] text-[var(--text-secondary)] hover:text-white border border-[var(--border-card)] cursor-pointer transition-colors"
+                className="px-2 py-0.5 rounded-[3px] text-xs font-medium bg-black/20 hover:bg-white/[0.06] text-[var(--text-secondary)] hover:text-white border border-[var(--border-card)] cursor-pointer transition-colors"
               >
                 &gt; 1 GB
               </button>
               <button
                 onClick={() => handleSelectGreaterThan(500 * 1024 * 1024)}
-                className="px-2 py-0.5 rounded-[3px] text-[11px] font-medium bg-black/20 hover:bg-white/[0.06] text-[var(--text-secondary)] hover:text-white border border-[var(--border-card)] cursor-pointer transition-colors"
+                className="px-2 py-0.5 rounded-[3px] text-xs font-medium bg-black/20 hover:bg-white/[0.06] text-[var(--text-secondary)] hover:text-white border border-[var(--border-card)] cursor-pointer transition-colors"
               >
                 &gt; 500 MB
               </button>
               <button
                 onClick={() => handleSelectOlderThanDays(30)}
-                className="px-2 py-0.5 rounded-[3px] text-[11px] font-medium bg-black/20 hover:bg-white/[0.06] text-[var(--text-secondary)] hover:text-white border border-[var(--border-card)] cursor-pointer transition-colors"
+                className="px-2 py-0.5 rounded-[3px] text-xs font-medium bg-black/20 hover:bg-white/[0.06] text-[var(--text-secondary)] hover:text-white border border-[var(--border-card)] cursor-pointer transition-colors"
               >
                 &gt; 30 Days Old
               </button>
             </div>
-            <div className="text-[11px] font-ibm-mono text-[var(--text-muted)]">
+            <div className="text-xs font-ibm-mono text-[var(--text-muted)]">
               {selectedPaths.size > 0 ? (
                 <span className="text-[#0078d4] font-semibold">
                   {selectedPaths.size} selected ({formatBytes(totalSelectedBytes)})
@@ -799,7 +799,7 @@ export const LargeFilesPage: React.FC = () => {
           </div>
 
           {/* Table Header with Master Checkbox */}
-          <div className="px-4 py-2.5 bg-black/25 border-b border-[var(--border-divider)] flex items-center justify-between text-[11px] font-semibold text-[var(--text-secondary)] uppercase tracking-wider font-ibm-mono">
+          <div className="px-4 py-2.5 bg-black/25 border-b border-[var(--border-divider)] flex items-center justify-between text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider font-ibm-mono">
             <div className="flex items-center gap-3">
               <button
                 onClick={handleToggleMasterCheckbox}
@@ -859,16 +859,16 @@ export const LargeFilesPage: React.FC = () => {
                         <span className="font-semibold text-[var(--text-primary)] text-xs font-ibm-mono truncate select-all">
                           {file.name}
                         </span>
-                        <span className="text-[10px] font-ibm-mono uppercase px-1.5 py-0.2 rounded-[3px] bg-[#0078d4]/10 text-[#0078d4] border border-[#0078d4]/20">
+                        <span className="text-xs font-ibm-mono uppercase px-1.5 py-0.2 rounded-[3px] bg-[#0078d4]/10 text-[#0078d4] border border-[#0078d4]/20">
                           {file.extension || file.category}
                         </span>
                       </div>
 
-                      <div className="text-[11px] font-ibm-mono text-[var(--text-secondary)] truncate mt-0.5 select-all">
+                      <div className="text-xs font-ibm-mono text-[var(--text-secondary)] truncate mt-0.5 select-all">
                         {file.path}
                       </div>
 
-                      <div className="text-[10px] font-ibm-mono text-[var(--text-muted)] mt-0.5 tabular-nums">
+                      <div className="text-xs font-ibm-mono text-[var(--text-muted)] mt-0.5 tabular-nums">
                         {t.common.date}: {new Date(file.modified_at * 1000).toLocaleString()}
                       </div>
                     </div>
@@ -954,7 +954,7 @@ export const LargeFilesPage: React.FC = () => {
                   ({formatBytes(totalSelectedBytes)})
                 </span>
               </div>
-              <div className="text-[11px] text-[var(--text-secondary)] font-ibm-mono">
+              <div className="text-xs text-[var(--text-secondary)] font-ibm-mono">
                 Ready to safely recycle to Windows Recycle Bin
               </div>
             </div>
@@ -1020,15 +1020,15 @@ export const LargeFilesPage: React.FC = () => {
                 <div key={f.path} className="flex items-center justify-between text-xs py-1 px-2 hover:bg-white/[0.03] rounded-[3px]">
                   <div className="flex items-center gap-2 min-w-0 flex-1">
                     {getCategoryIcon(f.category)}
-                    <span className="truncate font-ibm-mono text-[var(--text-primary)] text-[11px]">{f.name}</span>
+                    <span className="truncate font-ibm-mono text-[var(--text-primary)] text-xs">{f.name}</span>
                   </div>
-                  <span className="font-ibm-mono font-semibold text-[var(--text-secondary)] text-[11px] shrink-0 ml-2">
+                  <span className="font-ibm-mono font-semibold text-[var(--text-secondary)] text-xs shrink-0 ml-2">
                     {formatBytes(f.size_bytes)}
                   </span>
                 </div>
               ))}
               {selectedFilesList.length > 10 && (
-                <div className="text-[11px] text-[var(--text-muted)] text-center py-1 font-ibm-mono">
+                <div className="text-xs text-[var(--text-muted)] text-center py-1 font-ibm-mono">
                   + {selectedFilesList.length - 10} more files
                 </div>
               )}

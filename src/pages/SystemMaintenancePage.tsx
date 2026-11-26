@@ -159,7 +159,7 @@ export const SystemMaintenancePage: React.FC = () => {
               <h1 className="text-xl font-semibold tracking-tight text-[var(--text-primary)]">
                 {t.maintenance.title}
               </h1>
-              <span className="px-2 py-0.5 rounded-[4px] text-[10px] font-ibm-mono uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+              <span className="px-2 py-0.5 rounded-[4px] text-xs font-ibm-mono uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                 Windows Tools
               </span>
             </div>
@@ -260,7 +260,7 @@ export const SystemMaintenancePage: React.FC = () => {
                         {task.title}
                       </h3>
                       <span
-                        className={`text-[10px] font-ibm-mono px-2 py-0.5 rounded font-medium uppercase tracking-wider ${
+                        className={`text-xs font-ibm-mono px-2 py-0.5 rounded font-medium uppercase tracking-wider ${
                           task.risk_level === "Safe"
                             ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
                             : "bg-amber-500/10 text-amber-400 border border-amber-500/20"
@@ -269,7 +269,7 @@ export const SystemMaintenancePage: React.FC = () => {
                         {task.risk_level === "Safe" ? t.maintenance.riskSafe : t.maintenance.riskCaution}
                       </span>
                       {task.recommended && (
-                        <span className="text-[10px] font-ibm-mono px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 uppercase font-medium">
+                        <span className="text-xs font-ibm-mono px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 uppercase font-medium">
                           {t.maintenance.recommendedBadge}
                         </span>
                       )}

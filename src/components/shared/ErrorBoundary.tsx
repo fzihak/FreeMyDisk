@@ -66,7 +66,7 @@ export class ErrorBoundary extends Component<Props, State> {
                   <h2 className="text-lg font-bold text-white tracking-tight">
                     Subsystem Anomaly Detected
                   </h2>
-                  <span className="px-2 py-0.5 rounded bg-rose-500/10 border border-rose-500/30 text-[10px] font-ibm-mono text-rose-300">
+                  <span className="px-2 py-0.5 rounded bg-rose-500/10 border border-rose-500/30 text-xs font-ibm-mono text-rose-300">
                     CRASH_GUARD_ACTIVE
                   </span>
                 </div>
@@ -80,13 +80,13 @@ export class ErrorBoundary extends Component<Props, State> {
             <div className="bg-slate-950/80 border border-white/[0.08] rounded-xl p-4 mb-6 font-ibm-mono text-xs">
               <div className="flex items-center gap-2 text-slate-400 mb-2 border-b border-white/[0.06] pb-2 font-sans">
                 <DocumentText20Regular className="w-3.5 h-3.5 text-cyan-400" />
-                <span className="text-[11px]">Exception Traceback</span>
+                <span className="text-xs">Exception Traceback</span>
               </div>
               <p className="text-rose-400 font-semibold break-words">
                 {this.state.error?.name}: {this.state.error?.message || "Unknown error"}
               </p>
               {this.state.errorInfo?.componentStack && (
-                <pre className="mt-2 text-[10px] text-slate-500 max-h-36 overflow-y-auto leading-relaxed scrollbar-thin">
+                <pre className="mt-2 text-xs text-slate-500 max-h-36 overflow-y-auto leading-relaxed scrollbar-thin">
                   {this.state.errorInfo.componentStack}
                 </pre>
               )}

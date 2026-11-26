@@ -240,7 +240,7 @@ export const PrivacyPage: React.FC = () => {
               <h1 className="text-xl font-semibold tracking-tight text-[var(--text-primary)]">
                 {t.privacy.title}
               </h1>
-              <span className="px-2 py-0.5 rounded-[4px] text-[10px] font-ibm-mono uppercase tracking-wider bg-purple-500/10 text-purple-400 border border-purple-500/20">
+              <span className="px-2 py-0.5 rounded-[4px] text-xs font-ibm-mono uppercase tracking-wider bg-purple-500/10 text-purple-400 border border-purple-500/20">
                 Data Protection
               </span>
             </div>
@@ -459,22 +459,22 @@ export const PrivacyPage: React.FC = () => {
                         <span className="font-semibold text-[var(--text-primary)] text-xs truncate">
                           {item.title}
                         </span>
-                        <span className="text-[10px] font-ibm-mono uppercase px-1.5 py-0.2 rounded-[3px] bg-black/20 text-[var(--text-secondary)]">
+                        <span className="text-xs font-ibm-mono uppercase px-1.5 py-0.2 rounded-[3px] bg-black/20 text-[var(--text-secondary)]">
                           {item.browser_name}
                         </span>
                         {item.profile_name && item.profile_name !== "Default" && (
-                          <span className="text-[10px] font-ibm-mono px-1.5 py-0.2 rounded-[3px] bg-black/30 text-[var(--text-muted)]">
+                          <span className="text-xs font-ibm-mono px-1.5 py-0.2 rounded-[3px] bg-black/30 text-[var(--text-muted)]">
                             {item.profile_name}
                           </span>
                         )}
                         {item.is_locked && (
-                          <span className="flex items-center gap-1 text-[10px] font-ibm-mono px-1.5 py-0.2 rounded-[3px] bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                          <span className="flex items-center gap-1 text-xs font-ibm-mono px-1.5 py-0.2 rounded-[3px] bg-amber-500/10 text-amber-400 border border-amber-500/20">
                             <LockClosed20Regular className="w-3 h-3" /> {t.privacy.lockedNotice}
                           </span>
                         )}
                       </div>
 
-                      <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">{item.description}</p>
+                      <p className="text-xs text-[var(--text-secondary)] mt-0.5">{item.description}</p>
                     </div>
                   </div>
 
@@ -507,7 +507,7 @@ export const PrivacyPage: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="font-semibold text-[var(--text-primary)] text-sm">{t.privacy.whitelistTitle}</h3>
-                  <p className="text-[11px] text-[var(--text-secondary)]">
+                  <p className="text-xs text-[var(--text-secondary)]">
                     {t.privacy.whitelistDesc}
                   </p>
                 </div>

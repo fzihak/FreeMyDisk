@@ -527,29 +527,29 @@ export const ApplicationsPage: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 font-ibm-mono">
             <WinUICard className="p-3.5">
               <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] mb-1 font-sans">
-                <span className="font-medium text-[11px]">{t.applications.totalInstalled}</span>
+                <span className="font-medium text-xs">{t.applications.totalInstalled}</span>
                 <Apps20Regular className="w-3.5 h-3.5 text-[#0078d4]" />
               </div>
               <div className="text-xl font-bold text-[var(--text-primary)] tabular-nums">{apps.length}</div>
-              <div className="text-[10px] text-[var(--text-muted)] mt-0.5 font-sans">{t.applications.discoveredRegistry}</div>
+              <div className="text-xs text-[var(--text-muted)] mt-0.5 font-sans">{t.applications.discoveredRegistry}</div>
             </WinUICard>
 
             <WinUICard className="p-3.5">
               <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] mb-1 font-sans">
-                <span className="font-medium text-[11px]">{t.applications.estimatedUsage}</span>
+                <span className="font-medium text-xs">{t.applications.estimatedUsage}</span>
                 <HardDrive20Regular className="w-3.5 h-3.5 text-cyan-400" />
               </div>
               <div className="text-xl font-bold text-cyan-400 tabular-nums">{formatBytes(totalAppSize)}</div>
-              <div className="text-[10px] text-[var(--text-muted)] mt-0.5 font-sans">{t.applications.declaredInstallers}</div>
+              <div className="text-xs text-[var(--text-muted)] mt-0.5 font-sans">{t.applications.declaredInstallers}</div>
             </WinUICard>
 
             <WinUICard className="p-3.5">
               <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] mb-1 font-sans">
-                <span className="font-medium text-[11px]">{t.applications.runningBadge}</span>
+                <span className="font-medium text-xs">{t.applications.runningBadge}</span>
                 <Pulse20Regular className="w-3.5 h-3.5 text-emerald-400" />
               </div>
               <div className="text-xl font-bold text-emerald-400 tabular-nums">{runningAppsCount}</div>
-              <div className="text-[10px] text-[var(--text-muted)] mt-0.5 font-sans">{t.applications.activeProcesses}</div>
+              <div className="text-xs text-[var(--text-muted)] mt-0.5 font-sans">{t.applications.activeProcesses}</div>
             </WinUICard>
           </div>
 
@@ -627,13 +627,13 @@ export const ApplicationsPage: React.FC = () => {
                             {app.name}
                           </span>
                           {app.display_version && (
-                            <span className="text-[10px] px-1.5 py-0.2 rounded-[3px] bg-black/20 text-[var(--text-muted)] font-ibm-mono">
+                            <span className="text-xs px-1.5 py-0.2 rounded-[3px] bg-black/20 text-[var(--text-muted)] font-ibm-mono">
                               v{app.display_version}
                             </span>
                           )}
                           {app.is_running && (
                             <div className="flex items-center gap-1.5">
-                              <span className="flex items-center gap-1 text-[10px] px-1.5 py-0.2 rounded-[3px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-ibm-mono">
+                              <span className="flex items-center gap-1 text-xs px-1.5 py-0.2 rounded-[3px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-ibm-mono">
                                 <Pulse20Regular className="w-3 h-3 text-emerald-400 animate-pulse" /> {t.applications.runningBadge}
                               </span>
                               <WinUIButton
@@ -641,7 +641,7 @@ export const ApplicationsPage: React.FC = () => {
                                 size="sm"
                                 onClick={() => handleCloseApp(app)}
                                 disabled={closingAppId === app.id}
-                                className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 h-6 px-1.5 text-[10px]"
+                                className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 h-6 px-1.5 text-xs"
                                 title={t.applications.closeApp}
                               >
                                 <DismissCircle20Filled className="w-3 h-3 text-rose-400" />
@@ -651,10 +651,10 @@ export const ApplicationsPage: React.FC = () => {
                           )}
                         </div>
 
-                        <div className="text-[11px] text-[var(--text-secondary)] flex items-center gap-3 truncate">
+                        <div className="text-xs text-[var(--text-secondary)] flex items-center gap-3 truncate">
                           {app.publisher && <span>{app.publisher}</span>}
                           {app.install_location && (
-                            <span className="text-[var(--text-muted)] truncate max-w-md font-ibm-mono text-[10px]">
+                            <span className="text-[var(--text-muted)] truncate max-w-md font-ibm-mono text-xs">
                               {app.install_location}
                             </span>
                           )}
@@ -718,29 +718,29 @@ export const ApplicationsPage: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 font-ibm-mono">
             <WinUICard className="p-3.5">
               <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] mb-1 font-sans">
-                <span className="font-medium text-[11px]">{t.applications.storePackagesFound}</span>
+                <span className="font-medium text-xs">{t.applications.storePackagesFound}</span>
                 <Apps20Regular className="w-3.5 h-3.5 text-purple-400" />
               </div>
               <div className="text-xl font-bold text-[var(--text-primary)] tabular-nums">{uwpApps.length}</div>
-              <div className="text-[10px] text-[var(--text-muted)] mt-0.5 font-sans">{t.applications.removableUwp}</div>
+              <div className="text-xs text-[var(--text-muted)] mt-0.5 font-sans">{t.applications.removableUwp}</div>
             </WinUICard>
 
             <WinUICard className="p-3.5">
               <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] mb-1 font-sans">
-                <span className="font-medium text-[11px]">{t.applications.estimatedFootprint}</span>
+                <span className="font-medium text-xs">{t.applications.estimatedFootprint}</span>
                 <HardDrive20Regular className="w-3.5 h-3.5 text-purple-400" />
               </div>
               <div className="text-xl font-bold text-purple-400 tabular-nums">{formatBytes(totalUwpSize)}</div>
-              <div className="text-[10px] text-[var(--text-muted)] mt-0.5 font-sans">{t.applications.windowsAppsDirs}</div>
+              <div className="text-xs text-[var(--text-muted)] mt-0.5 font-sans">{t.applications.windowsAppsDirs}</div>
             </WinUICard>
 
             <WinUICard className="p-3.5">
               <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] mb-1 font-sans">
-                <span className="font-medium text-[11px]">{t.applications.safeUninstallNotice}</span>
+                <span className="font-medium text-xs">{t.applications.safeUninstallNotice}</span>
                 <Layer20Regular className="w-3.5 h-3.5 text-emerald-400" />
               </div>
               <div className="text-xl font-bold text-emerald-400 font-sans">{t.applications.allUsers}</div>
-              <div className="text-[10px] text-[var(--text-muted)] mt-0.5 font-sans">{t.applications.powerShellElevation}</div>
+              <div className="text-xs text-[var(--text-muted)] mt-0.5 font-sans">{t.applications.powerShellElevation}</div>
             </WinUICard>
           </div>
 
@@ -801,18 +801,18 @@ export const ApplicationsPage: React.FC = () => {
                             {pkg.display_name}
                           </span>
                           {pkg.version && (
-                            <span className="text-[10px] px-1.5 py-0.2 rounded-[3px] bg-black/20 text-[var(--text-muted)] font-ibm-mono">
+                            <span className="text-xs px-1.5 py-0.2 rounded-[3px] bg-black/20 text-[var(--text-muted)] font-ibm-mono">
                               v{pkg.version}
                             </span>
                           )}
-                          <span className="text-[10px] px-1.5 py-0.2 rounded-[3px] bg-purple-500/10 text-purple-400 border border-purple-500/20 font-ibm-mono">
+                          <span className="text-xs px-1.5 py-0.2 rounded-[3px] bg-purple-500/10 text-purple-400 border border-purple-500/20 font-ibm-mono">
                             UWP
                           </span>
                         </div>
                         <div className="flex items-center gap-3 text-xs text-[var(--text-secondary)] flex-wrap">
                           {pkg.publisher && <span>{pkg.publisher}</span>}
                           {pkg.install_location && (
-                            <span className="font-ibm-mono text-[10px] text-[var(--text-muted)] truncate max-w-xs">
+                            <span className="font-ibm-mono text-xs text-[var(--text-muted)] truncate max-w-xs">
                               {pkg.install_location}
                             </span>
                           )}
@@ -859,38 +859,38 @@ export const ApplicationsPage: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 font-ibm-mono">
             <WinUICard className="p-3.5">
               <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] mb-1 font-sans">
-                <span className="font-medium text-[11px]">{t.applications.tabLeftovers}</span>
+                <span className="font-medium text-xs">{t.applications.tabLeftovers}</span>
                 <FolderDismiss20Regular className="w-3.5 h-3.5 text-amber-400" />
               </div>
               <div className="text-xl font-bold text-amber-400 tabular-nums">{deepGroups.length}</div>
-              <div className="text-[10px] text-[var(--text-muted)] mt-0.5 font-sans">{t.applications.leftoverCount}</div>
+              <div className="text-xs text-[var(--text-muted)] mt-0.5 font-sans">{t.applications.leftoverCount}</div>
             </WinUICard>
 
             <WinUICard className="p-3.5">
               <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] mb-1 font-sans">
-                <span className="font-medium text-[11px]">{t.applications.filesystemRemnants}</span>
+                <span className="font-medium text-xs">{t.applications.filesystemRemnants}</span>
                 <Folder20Regular className="w-3.5 h-3.5 text-blue-400" />
               </div>
               <div className="text-xl font-bold text-blue-400 tabular-nums">{formatBytes(totalFsBytes)}</div>
-              <div className="text-[10px] text-[var(--text-muted)] mt-0.5 font-sans">AppData & ProgramData</div>
+              <div className="text-xs text-[var(--text-muted)] mt-0.5 font-sans">AppData & ProgramData</div>
             </WinUICard>
 
             <WinUICard className="p-3.5">
               <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] mb-1 font-sans">
-                <span className="font-medium text-[11px]">{t.applications.registryHives}</span>
+                <span className="font-medium text-xs">{t.applications.registryHives}</span>
                 <DocumentBulletList20Regular className="w-3.5 h-3.5 text-purple-400" />
               </div>
               <div className="text-xl font-bold text-purple-400 tabular-nums">{totalRegItems}</div>
-              <div className="text-[10px] text-[var(--text-muted)] mt-0.5 font-sans">HKCU & HKLM Software</div>
+              <div className="text-xs text-[var(--text-muted)] mt-0.5 font-sans">HKCU & HKLM Software</div>
             </WinUICard>
 
             <WinUICard className="p-3.5">
               <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] mb-1 font-sans">
-                <span className="font-medium text-[11px]">{t.applications.leftoverSize}</span>
+                <span className="font-medium text-xs">{t.applications.leftoverSize}</span>
                 <Sparkle20Filled className="w-3.5 h-3.5 text-emerald-400" />
               </div>
               <div className="text-xl font-bold text-emerald-400 tabular-nums">{formatBytes(totalLeftoverBytes)}</div>
-              <div className="text-[10px] text-[var(--text-muted)] mt-0.5 font-sans">{t.virtualization.reclaimable}</div>
+              <div className="text-xs text-[var(--text-muted)] mt-0.5 font-sans">{t.virtualization.reclaimable}</div>
             </WinUICard>
           </div>
 
@@ -956,7 +956,7 @@ export const ApplicationsPage: React.FC = () => {
                 >
                   {selectedLeftoverPaths.size === totalLeftoverItemCount ? t.cleanup.clear : t.cleanup.selectAll}
                 </button>
-                <span className="text-[var(--text-muted)] text-[11px] tabular-nums">
+                <span className="text-[var(--text-muted)] text-xs tabular-nums">
                   {selectedLeftoverPaths.size} / {totalLeftoverItemCount} {t.cleanup.itemsSelected} ({formatBytes(selectedLeftoverBytes)})
                 </span>
               </div>
@@ -990,7 +990,7 @@ export const ApplicationsPage: React.FC = () => {
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-semibold text-sm text-[var(--text-primary)]">{group.app_name}</span>
                             <span
-                              className={`text-[10px] font-ibm-mono px-2 py-0.5 rounded border font-medium ${
+                              className={`text-xs font-ibm-mono px-2 py-0.5 rounded border font-medium ${
                                 group.overall_confidence.toLowerCase() === "high"
                                   ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
                                   : group.overall_confidence.toLowerCase() === "medium"
@@ -1041,17 +1041,17 @@ export const ApplicationsPage: React.FC = () => {
                                 )}
 
                                 <div className="space-y-0.5 flex-1 min-w-0">
-                                  <div className="text-[11px] text-[var(--text-secondary)] truncate select-all">
+                                  <div className="text-xs text-[var(--text-secondary)] truncate select-all">
                                     {item.path_or_key}
                                   </div>
-                                  <div className="text-[10px] text-[var(--text-muted)] font-sans">
+                                  <div className="text-xs text-[var(--text-muted)] font-sans">
                                     {item.description} ({item.item_count} {t.applications.itemsCount})
                                   </div>
                                 </div>
                               </div>
 
                               <div className="flex items-center gap-2 shrink-0">
-                                <span className="text-[11px] font-bold text-[var(--text-primary)] tabular-nums">
+                                <span className="text-xs font-bold text-[var(--text-primary)] tabular-nums">
                                   {formatBytes(item.size_bytes)}
                                 </span>
                                 {item.kind === "filesystem" && (
@@ -1096,7 +1096,7 @@ export const ApplicationsPage: React.FC = () => {
 
             <div className="p-2.5 bg-black/30 rounded-[4px] border border-[var(--border-card)] font-ibm-mono text-xs space-y-0.5">
               <div className="text-[var(--text-primary)] font-semibold">{confirmUwpTarget.display_name}</div>
-              <div className="text-[var(--text-muted)] text-[10px] truncate select-all">{confirmUwpTarget.package_full_name}</div>
+              <div className="text-[var(--text-muted)] text-xs truncate select-all">{confirmUwpTarget.package_full_name}</div>
             </div>
 
             <div className="flex items-center justify-end gap-2 pt-2">

@@ -331,12 +331,12 @@ export const TreemapCanvas: React.FC<TreemapCanvasProps> = ({
       {/* Top Items Legend Strip */}
       {topLegendItems.length > 0 && (
         <div className="flex flex-wrap items-center gap-2 pt-1 px-1 text-xs">
-          <span className="text-[11px] text-[var(--text-muted)] font-medium">Top Items:</span>
+          <span className="text-xs text-[var(--text-muted)] font-medium">Top Items:</span>
           {topLegendItems.map((item) => (
             <button
               key={item.path}
               onClick={() => onSelectNode(item)}
-              className="flex items-center gap-1.5 px-2 py-0.5 rounded-[3px] bg-black/20 hover:bg-white/[0.05] border border-[var(--border-card)] transition-colors cursor-pointer text-[11px]"
+              className="flex items-center gap-1.5 px-2 py-0.5 rounded-[3px] bg-black/20 hover:bg-white/[0.05] border border-[var(--border-card)] transition-colors cursor-pointer text-xs"
             >
               <span
                 className="w-2 h-2 rounded-xs shrink-0"
@@ -369,7 +369,7 @@ export const TreemapCanvas: React.FC<TreemapCanvasProps> = ({
             />
             <span className="truncate">{hoveredNode.data.name}</span>
             {hoveredNode.data.is_system_protected && (
-              <span className="px-1.5 py-0.2 rounded-[3px] text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 shrink-0">
+              <span className="px-1.5 py-0.2 rounded-[3px] text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 shrink-0">
                 Protected
               </span>
             )}
@@ -384,17 +384,17 @@ export const TreemapCanvas: React.FC<TreemapCanvasProps> = ({
             )}
           </div>
 
-          <div className="text-[11px] text-[var(--text-secondary)] font-ibm-mono">
+          <div className="text-xs text-[var(--text-secondary)] font-ibm-mono">
             {hoveredNode.data.is_dir ? "📁 Directory" : "📄 File"}
             {hoveredNode.data.is_dir && (
               <span> • {hoveredNode.data.file_count.toLocaleString()} files</span>
             )}
           </div>
 
-          <div className="font-ibm-mono text-[10px] text-[var(--text-muted)] truncate pt-0.5 border-t border-[var(--border-divider)] mt-1">
+          <div className="font-ibm-mono text-xs text-[var(--text-muted)] truncate pt-0.5 border-t border-[var(--border-divider)] mt-1">
             {hoveredNode.data.path}
           </div>
-          <div className="text-[9px] text-[#0078d4] pt-0.5">
+          <div className="text-xs text-[#0078d4] pt-0.5">
             Click to drill in • Right-click to open in Explorer
           </div>
         </div>

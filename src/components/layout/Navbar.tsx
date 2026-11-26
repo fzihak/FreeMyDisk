@@ -46,11 +46,11 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, onSelectTab }) => {
         <div>
           <div className="flex items-center gap-1.5">
             <span className="text-base font-bold text-text-primary tracking-tight">FreeMyDisk</span>
-            <span className="px-1.5 py-0.5 text-[9px] font-semibold rounded bg-accent/15 text-accent border border-accent/20 font-ibm-mono">
+            <span className="px-1.5 py-0.5 text-xs font-semibold rounded bg-accent/15 text-accent border border-accent/20 font-ibm-mono">
               AI
             </span>
           </div>
-          <p className="text-[10px] text-text-secondary font-medium -mt-0.5">
+          <p className="text-xs text-text-secondary font-medium -mt-0.5">
             AI-Powered Storage Intelligence
           </p>
         </div>

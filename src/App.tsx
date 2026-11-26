@@ -75,7 +75,7 @@ export const App: React.FC = () => {
 
   return (
     <ErrorBoundary onReset={() => setCurrentTab("dashboard")}>
-      <div className="flex flex-col h-screen bg-[var(--bg-page)] text-[var(--text-primary)] font-sans overflow-hidden select-none transition-colors duration-200">
+      <div className="flex flex-col h-screen bg-[var(--bg-shell)] text-[var(--text-primary)] font-sans overflow-hidden select-none transition-colors duration-200">
         {/* Native-style custom titlebar with drag region and window controls */}
         <TitleBar title="FreeMyDisk" />
 
@@ -90,7 +90,7 @@ export const App: React.FC = () => {
           />
 
           {/* Main Content Column */}
-          <div className="flex-1 flex flex-col min-w-0">
+          <div className="flex-1 flex flex-col min-w-0 bg-[var(--bg-page)] rounded-tl-lg border-l border-t border-[var(--border-divider)] overflow-hidden">
             <UpdateBanner />
             <RecoveryAlert onNavigateToHistory={() => setCurrentTab("history")} />
 

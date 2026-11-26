@@ -289,7 +289,7 @@ export const AiAndToolchainsView: React.FC = () => {
           <div className="text-lg font-bold text-[var(--text-primary)] mt-1">
             {formatBytes(totalAiBytes)}
           </div>
-          <div className="text-[11px] text-[var(--text-muted)] mt-0.5">
+          <div className="text-xs text-[var(--text-muted)] mt-0.5">
             {models.length} {t.common.items}
           </div>
         </WinUICard>
@@ -304,7 +304,7 @@ export const AiAndToolchainsView: React.FC = () => {
           <div className="text-lg font-bold text-[var(--text-primary)] mt-1">
             {formatBytes(totalRustBytes)}
           </div>
-          <div className="text-[11px] text-[var(--text-muted)] mt-0.5">
+          <div className="text-xs text-[var(--text-muted)] mt-0.5">
             {rustData?.toolchains.length || 0} toolchain(s)
           </div>
         </WinUICard>
@@ -319,7 +319,7 @@ export const AiAndToolchainsView: React.FC = () => {
           <div className="text-lg font-bold text-[var(--text-primary)] mt-1">
             {formatBytes(totalCondaBytes)}
           </div>
-          <div className="text-[11px] text-[var(--text-muted)] mt-0.5">
+          <div className="text-xs text-[var(--text-muted)] mt-0.5">
             {condaData?.package_count || 0} archives
           </div>
         </WinUICard>
@@ -340,7 +340,7 @@ export const AiAndToolchainsView: React.FC = () => {
               <div className="max-w-xs mx-auto h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
                 <div className="h-full bg-blue-500 rounded-full animate-pulse w-3/4" />
               </div>
-              <p className="text-[11px] text-[var(--text-muted)]">
+              <p className="text-xs text-[var(--text-muted)]">
                 Inspecting Ollama, HuggingFace, LM Studio, and GPT4All cache directories...
               </p>
             </WinUICard>
@@ -369,22 +369,22 @@ export const AiAndToolchainsView: React.FC = () => {
                         {model.name}
                       </span>
                       <span
-                        className={`text-[10px] px-2 py-0.5 rounded-full border font-medium ${badge.bg}`}
+                        className={`text-xs px-2 py-0.5 rounded-full border font-medium ${badge.bg}`}
                       >
                         {badge.label}
                       </span>
                       {model.is_directory && (
-                        <span className="text-[10px] px-1.5 py-0.2 bg-white/[0.04] text-[var(--text-muted)] rounded border border-[var(--border-subtle)]">
+                        <span className="text-xs px-1.5 py-0.2 bg-white/[0.04] text-[var(--text-muted)] rounded border border-[var(--border-subtle)]">
                           Directory
                         </span>
                       )}
                     </div>
                     {model.description && (
-                      <p className="text-[11px] text-[var(--text-muted)] line-clamp-1">
+                      <p className="text-xs text-[var(--text-muted)] line-clamp-1">
                         {model.description}
                       </p>
                     )}
-                    <p className="text-[10px] text-[var(--text-muted)] truncate font-mono">
+                    <p className="text-xs text-[var(--text-muted)] truncate font-mono">
                       {model.path}
                     </p>
                   </div>
@@ -443,7 +443,7 @@ export const AiAndToolchainsView: React.FC = () => {
               <div className="max-w-xs mx-auto h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
                 <div className="h-full bg-amber-500 rounded-full animate-pulse w-3/4" />
               </div>
-              <p className="text-[11px] text-[var(--text-muted)]">
+              <p className="text-xs text-[var(--text-muted)]">
                 Inspecting Rustup installed toolchains and multi-gigabyte build targets...
               </p>
             </WinUICard>
@@ -475,15 +475,15 @@ export const AiAndToolchainsView: React.FC = () => {
                         {tc.name}
                       </span>
                       {tc.is_active && (
-                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-medium">
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-medium">
                           ✓ {t.aiAndToolchains.activeDefault}
                         </span>
                       )}
-                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/[0.04] text-[var(--text-secondary)] border border-[var(--border-subtle)] font-medium capitalize">
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-white/[0.04] text-[var(--text-secondary)] border border-[var(--border-subtle)] font-medium capitalize">
                         {tc.channel}
                       </span>
                     </div>
-                    <p className="text-[10px] text-[var(--text-muted)] truncate font-mono">
+                    <p className="text-xs text-[var(--text-muted)] truncate font-mono">
                       {tc.path}
                     </p>
                   </div>
@@ -545,7 +545,7 @@ export const AiAndToolchainsView: React.FC = () => {
               <div className="max-w-xs mx-auto h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
                 <div className="h-full bg-emerald-500 rounded-full animate-pulse w-3/4" />
               </div>
-              <p className="text-[11px] text-[var(--text-muted)]">
+              <p className="text-xs text-[var(--text-muted)]">
                 Inspecting Conda and Miniconda package tarball caches...
               </p>
             </WinUICard>
@@ -596,13 +596,13 @@ export const AiAndToolchainsView: React.FC = () => {
 
               {condaData.cache_dirs.length > 0 && (
                 <div className="bg-black/20 p-3 rounded border border-[var(--border-subtle)] space-y-1.5">
-                  <div className="text-[11px] font-semibold text-[var(--text-secondary)]">
+                  <div className="text-xs font-semibold text-[var(--text-secondary)]">
                     Scanned Package Repositories:
                   </div>
                   {condaData.cache_dirs.map((dir) => (
                     <div
                       key={dir}
-                      className="text-[10px] text-[var(--text-muted)] font-mono flex items-center justify-between"
+                      className="text-xs text-[var(--text-muted)] font-mono flex items-center justify-between"
                     >
                       <span>{dir}</span>
                       <button

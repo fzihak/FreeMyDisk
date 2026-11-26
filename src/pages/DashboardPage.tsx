@@ -513,7 +513,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
                   )
                 )}
               </div>
-              <p className="text-[11px] text-[var(--text-muted)]">
+              <p className="text-xs text-[var(--text-muted)]">
                 {scanCompleted && !scanning
                   ? fill(t.dashboard.categoriesInspected, { count: inspectedCount })
                   : t.dashboard.categoriesHint}
@@ -525,12 +525,12 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
                 )}
               </p>
               {scanCompleted && !scanning && quickClean.adminBytes > 0 && (
-                <p className="text-[11px] text-amber-400/90">
+                <p className="text-xs text-amber-400/90">
                   {fill(t.dashboard.moreNeedsAdmin, { size: formatBytes(quickClean.adminBytes) })}
                 </p>
               )}
               {scanCompleted && !scanning && quickClean.lockedBytes > 0 && (
-                <p className="text-[11px] text-amber-400/90">
+                <p className="text-xs text-amber-400/90">
                   {fill(t.dashboard.moreNeedsAppsClosed, {
                     size: formatBytes(quickClean.lockedBytes),
                     apps: quickClean.lockedApps.join(", ") || "apps",
@@ -591,7 +591,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
                       {emptyingBin ? "Emptying..." : "Empty"}
                     </button>
                   </div>
-                  <p className="text-[11px] text-[var(--text-muted)]">
+                  <p className="text-xs text-[var(--text-muted)]">
                     {recycleBin.item_count} items across drives
                   </p>
                 </div>
@@ -662,7 +662,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
               />
             </div>
             {cleanupProgress.currentPath && (
-              <div className="text-[10px] text-[var(--text-muted)] font-ibm-mono truncate">
+              <div className="text-xs text-[var(--text-muted)] font-ibm-mono truncate">
                 Active rule: {cleanupProgress.currentPath}
               </div>
             )}
@@ -706,7 +706,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
                 {cleanIssues.map(([reason, count]) => (
                   <span
                     key={reason}
-                    className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-[4px] bg-amber-500/10 border border-amber-500/20 text-amber-300 text-[11px]"
+                    className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-[4px] bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs"
                   >
                     <Warning16Filled className="w-3 h-3" />
                     {reason} · {count}
@@ -733,7 +733,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
                     : t.dashboard.driveSpaceTitle}
                 </h2>
                 {currentVolume && (
-                  <span className="text-[10px] font-ibm-mono px-1.5 py-0.5 rounded-[4px] bg-white/[0.06] text-[var(--text-secondary)]">
+                  <span className="text-xs font-ibm-mono px-1.5 py-0.5 rounded-[4px] bg-white/[0.06] text-[var(--text-secondary)]">
                     {currentVolume.file_system}
                   </span>
                 )}
@@ -792,7 +792,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
         </div>
 
         {/* Legend Row */}
-        <div className="flex flex-wrap items-center gap-5 text-[11px] text-[var(--text-secondary)] pt-1">
+        <div className="flex flex-wrap items-center gap-5 text-xs text-[var(--text-secondary)] pt-1">
           <div className="flex items-center gap-1.5">
             <span className="w-2.5 h-2.5 rounded-[2px] bg-[#0078d4]" />
             <span>{t.dashboard.usedSpaceCategory}</span>
@@ -822,7 +822,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
             action={
               <div className="flex items-center gap-2">
                 {totalCleanableBytes > 0 && (
-                  <span className="text-[11px] font-ibm-mono font-medium px-2 py-0.5 rounded-[4px] bg-[#0078d4]/10 text-[#4cc2ff] border border-[#0078d4]/20">
+                  <span className="text-xs font-ibm-mono font-medium px-2 py-0.5 rounded-[4px] bg-[#0078d4]/10 text-[#4cc2ff] border border-[#0078d4]/20">
                     {formatBytes(totalCleanableBytes)}
                   </span>
                 )}
@@ -865,7 +865,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
             title={t.dashboard.emergencyBannerTitle}
             subtitle={t.dashboard.emergencyBannerDesc}
             badge={
-              <span className={`text-[10px] font-ibm-mono px-2 py-0.2 rounded-[4px] font-semibold uppercase ${
+              <span className={`text-xs font-ibm-mono px-2 py-0.2 rounded-[4px] font-semibold uppercase ${
                 isDiskCritical
                   ? "bg-rose-600 text-white"
                   : "bg-rose-500/10 text-rose-400 border border-rose-500/20"
@@ -908,7 +908,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
             subtitle={t.dashboard.startupDesc}
             badge={
               highImpactStartups > 0 ? (
-                <span className="text-[10px] font-ibm-mono font-semibold px-2 py-0.2 rounded-[4px] bg-amber-500/15 text-amber-300 border border-amber-500/20">
+                <span className="text-xs font-ibm-mono font-semibold px-2 py-0.2 rounded-[4px] bg-amber-500/15 text-amber-300 border border-amber-500/20">
                   {highImpactStartups} High Impact
                 </span>
               ) : undefined
@@ -998,7 +998,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
                     className="h-full bg-rose-500 rounded-full transition-all duration-300"
                   />
                 </div>
-                <div className="flex items-center justify-between gap-3 text-[11px] text-[var(--text-muted)]">
+                <div className="flex items-center justify-between gap-3 text-xs text-[var(--text-muted)]">
                   <span className="truncate font-ibm-mono">{rescueProgress.currentPath}</span>
                   <span className="shrink-0 font-ibm-mono">
                     {fill(t.dashboard.rescueFreedSoFar, { size: formatBytes(rescueProgress.bytesFound) })}
@@ -1013,7 +1013,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
                   <ErrorCircle24Filled className="w-4 h-4" />
                   <span>{t.dashboard.rescueStopped}</span>
                 </div>
-                <div className="text-[11px] text-[var(--text-secondary)] break-words">{rescueError}</div>
+                <div className="text-xs text-[var(--text-secondary)] break-words">{rescueError}</div>
               </div>
             )}
 
@@ -1030,7 +1030,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
                 <div className="space-y-1 text-xs text-[var(--text-secondary)]">
                   {rescueResult.steps && rescueResult.steps.length > 0
                     ? rescueResult.steps.map((s) => (
-                        <div key={s.step} className="flex items-start gap-1.5 text-[11px]">
+                        <div key={s.step} className="flex items-start gap-1.5 text-xs">
                           {s.status === "done" ? (
                             <Checkmark16Filled className="w-3 h-3 mt-0.5 text-emerald-400 shrink-0" />
                           ) : s.status === "skipped" ? (
@@ -1052,7 +1052,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
                         </div>
                       ))
                     : rescueResult.actions_performed.map((act, idx) => (
-                        <div key={idx} className="flex items-center gap-1.5 font-ibm-mono text-[11px]">
+                        <div key={idx} className="flex items-center gap-1.5 font-ibm-mono text-xs">
                           <Checkmark16Filled className="w-3 h-3 text-emerald-400 shrink-0" />
                           <span>{act}</span>
                         </div>

@@ -485,31 +485,31 @@ export const CleanupPage: React.FC = () => {
               <CheckmarkCircle24Filled className="w-4 h-4 text-emerald-400" />
               <span>{t.cleanup.cleanComplete}</span>
             </div>
-            <div className="text-[11px] text-[var(--text-muted)] font-ibm-mono">
+            <div className="text-xs text-[var(--text-muted)] font-ibm-mono">
               Session: {lastDisposal.session_id.substring(0, 8)}...
             </div>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 font-ibm-mono">
             <div className="p-2.5 bg-black/20 rounded-[4px] border border-[var(--border-subtle)]">
-              <div className="text-[11px] text-[var(--text-muted)] font-sans">{t.cleanup.reclaimedSpace}</div>
+              <div className="text-xs text-[var(--text-muted)] font-sans">{t.cleanup.reclaimedSpace}</div>
               <div className="text-lg font-bold text-emerald-400 mt-0.5 tabular-nums">
                 {formatBytes(lastDisposal.total_freed_bytes)}
               </div>
             </div>
             <div className="p-2.5 bg-black/20 rounded-[4px] border border-[var(--border-subtle)]">
-              <div className="text-[11px] text-[var(--text-muted)] font-sans">{t.cleanup.movedToRecycleBin}</div>
+              <div className="text-xs text-[var(--text-muted)] font-sans">{t.cleanup.movedToRecycleBin}</div>
               <div className="text-lg font-bold text-[var(--text-primary)] mt-0.5 tabular-nums">
                 {formatBytes(lastDisposal.recycled_bytes ?? 0)}
               </div>
             </div>
             <div className="p-2.5 bg-black/20 rounded-[4px] border border-[var(--border-subtle)]">
-              <div className="text-[11px] text-[var(--text-muted)] font-sans">{t.cleanup.filesCleaned}</div>
+              <div className="text-xs text-[var(--text-muted)] font-sans">{t.cleanup.filesCleaned}</div>
               <div className="text-lg font-bold text-[var(--text-primary)] mt-0.5 tabular-nums">
                 {lastDisposal.successful_items} / {lastDisposal.total_requested_items}
               </div>
             </div>
             <div className="p-2.5 bg-black/20 rounded-[4px] border border-[var(--border-subtle)]">
-              <div className="text-[11px] text-[var(--text-muted)] font-sans">{t.cleanup.failedTrash}</div>
+              <div className="text-xs text-[var(--text-muted)] font-sans">{t.cleanup.failedTrash}</div>
               <div
                 className={`text-lg font-bold mt-0.5 tabular-nums ${
                   lastDisposal.failed_items > 0 ? "text-amber-400" : "text-emerald-400"
@@ -580,11 +580,11 @@ export const CleanupPage: React.FC = () => {
                         <span className="font-semibold text-[var(--text-primary)] text-[13px] tracking-tight truncate">
                           {rule.rule_name}
                         </span>
-                        <span className="px-1.5 py-0.2 rounded-[4px] text-[10px] font-medium border bg-white/[0.04] border-[var(--border-subtle)] text-[var(--text-secondary)]">
+                        <span className="px-1.5 py-0.2 rounded-[4px] text-xs font-medium border bg-white/[0.04] border-[var(--border-subtle)] text-[var(--text-secondary)]">
                           {getCategoryLabel(rule.category)}
                         </span>
                         <span
-                          className={`px-1.5 py-0.2 rounded-[4px] text-[9px] font-semibold ${
+                          className={`px-1.5 py-0.2 rounded-[4px] text-xs font-semibold ${
                             rule.risk === "safe"
                               ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
                               : rule.risk === "low"
@@ -595,7 +595,7 @@ export const CleanupPage: React.FC = () => {
                           {rule.risk === "safe" ? t.cleanup.safeToClean : rule.risk === "low" ? t.cleanup.lowRisk : t.cleanup.devBuildCache}
                         </span>
                         {rule.is_locked_by_process && (
-                          <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-[4px] text-[9px] font-semibold bg-amber-500/15 text-amber-400 border border-amber-500/30">
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-[4px] text-xs font-semibold bg-amber-500/15 text-amber-400 border border-amber-500/30">
                             <DismissCircle20Regular className="w-2.5 h-2.5 text-amber-400 inline" />
                             App Active ({rule.locking_process_name})
                           </span>
@@ -606,14 +606,14 @@ export const CleanupPage: React.FC = () => {
                               e.stopPropagation();
                               handleCloseProcess(rule.locking_process_name!);
                             }}
-                            className="px-2 py-0.5 text-[9px] font-semibold rounded-[4px] bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 cursor-pointer transition-colors"
+                            className="px-2 py-0.5 text-xs font-semibold rounded-[4px] bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 cursor-pointer transition-colors"
                             title={`Close ${rule.locking_process_name} to unlock cache`}
                           >
                             Close App & Unlock
                           </button>
                         )}
                       </div>
-                      <p className="text-[11px] text-[var(--text-muted)] truncate mt-0.5">
+                      <p className="text-xs text-[var(--text-muted)] truncate mt-0.5">
                         {rule.default_action === "trash" ? t.cleanup.routesRecycleBin : t.cleanup.safeCleanupAction}
                       </p>
                     </div>
@@ -625,7 +625,7 @@ export const CleanupPage: React.FC = () => {
                       <div className="text-xs font-semibold text-[var(--text-primary)]">
                         {formatBytes(rule.total_bytes)}
                       </div>
-                      <div className="text-[10px] text-[var(--text-muted)]">
+                      <div className="text-xs text-[var(--text-muted)]">
                         {rule.total_items} {t.common.items}
                       </div>
                     </div>
@@ -635,7 +635,7 @@ export const CleanupPage: React.FC = () => {
                 {/* Candidate Sub-list if expanded */}
                 {isExpanded && (
                   <div className="border-t border-[var(--border-divider)] bg-black/20 p-3 space-y-1.5 max-h-60 overflow-y-auto scrollbar-thin">
-                    <div className="flex items-center justify-between text-[10px] font-ibm-mono text-[var(--text-muted)] uppercase mb-1">
+                    <div className="flex items-center justify-between text-xs font-ibm-mono text-[var(--text-muted)] uppercase mb-1">
                       <span>{t.cleanup.matchingFiles} ({rule.candidates.length > 0 ? rule.candidates.length : rule.total_items})</span>
                       {rule.total_items > rule.candidates.length && rule.candidates.length > 0 && (
                         <span className="text-[#0078d4] normal-case font-ibm-mono">
@@ -647,7 +647,7 @@ export const CleanupPage: React.FC = () => {
                       <div className="flex items-center justify-between text-xs py-1.5 px-2.5 rounded-[4px] bg-white/[0.02] border border-[var(--border-subtle)] font-ibm-mono">
                         <div className="flex items-center gap-2 truncate text-[var(--text-secondary)]">
                           <Folder20Regular className="w-3.5 h-3.5 text-[#0078d4] shrink-0" />
-                          <span className="truncate text-[11px]">
+                          <span className="truncate text-xs">
                             {rule.rule_id === "windows_recycle_bin"
                               ? `Windows Recycle Bin items (${rule.total_items} items)`
                               : `${rule.rule_name} system cache files (${rule.total_items} items)`}
@@ -669,7 +669,7 @@ export const CleanupPage: React.FC = () => {
                             ) : (
                               <Document20Regular className="w-3.5 h-3.5 text-[var(--text-muted)] shrink-0" />
                             )}
-                            <span className="truncate text-[11px] select-all">{cand.path}</span>
+                            <span className="truncate text-xs select-all">{cand.path}</span>
                           </div>
                           <div className="flex items-center gap-2 shrink-0 ml-4">
                             <span className="text-[var(--text-primary)] font-medium tabular-nums">
@@ -708,7 +708,7 @@ export const CleanupPage: React.FC = () => {
               <div className="text-xs font-semibold text-[var(--text-primary)]">
                 {selectedRuleIds.size} {t.cleanup.itemsSelected} (<strong className="font-ibm-mono tabular-nums">{totalSelectedItems}</strong> {t.common.files})
               </div>
-              <div className="text-[11px] text-[var(--text-muted)] font-ibm-mono">
+              <div className="text-xs text-[var(--text-muted)] font-ibm-mono">
                 {t.cleanup.estimatedSpace}: <strong className="text-emerald-400 tabular-nums">{formatBytes(totalSelectedBytes)}</strong>
               </div>
             </div>

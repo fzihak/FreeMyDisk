@@ -41,7 +41,7 @@ export const ToastContainer: React.FC = () => {
           <div className="flex-1 min-w-0 pr-1">
             <h4 className="text-xs font-semibold tracking-wide leading-tight">{t.title}</h4>
             {t.message && (
-              <p className="text-[11px] opacity-80 mt-1 leading-snug break-words font-ibm-mono">
+              <p className="text-xs opacity-80 mt-1 leading-snug break-words font-ibm-mono">
                 {t.message}
               </p>
             )}

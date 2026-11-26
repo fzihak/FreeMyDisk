@@ -2,80 +2,126 @@
 
 @theme {
   --font-sans: "Segoe UI Variable Text", "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
-  --font-mono: "IBM Plex Mono", "Cascadia Code", "Consolas", monospace;
-  --font-ibm-mono: "IBM Plex Mono", "Cascadia Code", "Consolas", monospace;
+  /* Numbers use the UI font with fixed-width digits; a code font is kept only for paths and hashes. */
+  --font-mono: "Segoe UI Variable Text", "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+  --font-code: "Cascadia Mono", "Cascadia Code", "Consolas", monospace;
 }
 
 @utility font-ibm-mono {
-  font-family: "IBM Plex Mono", "Cascadia Code", "Consolas", monospace;
+  font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums;
+}
+
+@utility font-code {
+  font-family: var(--font-code);
 }
 
 @layer base {
+  /* Design tokens. Layers follow Windows 11: the shell (title bar and sidebar)
+     sits on the base layer, pages sit on a raised layer, cards on top. */
   :root,
   [data-theme="dark"] {
-    --bg-page: #202020;
-    --bg-sidebar: #181818;
-    --bg-card: #2b2b2b;
-    --bg-card-hover: #323232;
-    --border-card: rgba(255, 255, 255, 0.08);
-    --border-divider: rgba(255, 255, 255, 0.06);
-    --border-subtle: rgba(255, 255, 255, 0.04);
-    --border-highlight: rgba(0, 120, 212, 0.5);
+    --bg-shell: #1c1c1c;
+    --bg-sidebar: #1c1c1c;
+    --bg-page: #262626;
+    --bg-card: #2d2d2d;
+    --bg-card-hover: #333333;
+    --bg-input: #1f1f1f;
+    --fill-subtle: rgba(255, 255, 255, 0.06);
+    --fill-subtle-hover: rgba(255, 255, 255, 0.09);
+    --border-card: rgba(255, 255, 255, 0.07);
+    --border-divider: rgba(255, 255, 255, 0.07);
+    --border-subtle: rgba(255, 255, 255, 0.05);
+    --border-highlight: rgba(96, 205, 255, 0.45);
+    --accent: #0078d4;
+    --accent-hover: #1a86d9;
+    --accent-text: #60cdff;
+    --success: #6ccb5f;
+    --warning: #fce100;
+    --danger: #ff99a4;
+    --danger-fill: #c42b1c;
     --brand-blue: #0078d4;
-    --brand-cyan: #06b6d4;
-    --brand-emerald: #10b981;
-    --brand-amber: #f59e0b;
-    --brand-rose: #f43f5e;
+    --brand-cyan: #60cdff;
+    --brand-emerald: #6ccb5f;
+    --brand-amber: #f7b500;
+    --brand-rose: #ff99a4;
     --text-primary: #ffffff;
-    --text-secondary: #d1d5db;
-    --text-muted: #9ca3af;
+    --text-secondary: #d1d1d1;
+    --text-muted: #9e9e9e;
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3);
     color-scheme: dark;
   }
 
   [data-theme="night"] {
-    --bg-page: #0c0c0c;
-    --bg-sidebar: #060606;
-    --bg-card: #161616;
-    --bg-card-hover: #1e1e1e;
-    --border-card: rgba(255, 255, 255, 0.1);
+    --bg-shell: #000000;
+    --bg-sidebar: #000000;
+    --bg-page: #0b0b0b;
+    --bg-card: #151515;
+    --bg-card-hover: #1c1c1c;
+    --bg-input: #0b0b0b;
+    --fill-subtle: rgba(255, 255, 255, 0.06);
+    --fill-subtle-hover: rgba(255, 255, 255, 0.1);
+    --border-card: rgba(255, 255, 255, 0.08);
     --border-divider: rgba(255, 255, 255, 0.08);
     --border-subtle: rgba(255, 255, 255, 0.05);
-    --border-highlight: rgba(0, 120, 212, 0.6);
-    --brand-blue: #4cc2ff;
-    --brand-cyan: #22d3ee;
-    --brand-emerald: #34d399;
-    --brand-amber: #fbbf24;
-    --brand-rose: #fb7185;
+    --border-highlight: rgba(96, 205, 255, 0.5);
+    --accent: #0078d4;
+    --accent-hover: #1a86d9;
+    --accent-text: #60cdff;
+    --success: #6ccb5f;
+    --warning: #fce100;
+    --danger: #ff99a4;
+    --danger-fill: #c42b1c;
+    --brand-blue: #0078d4;
+    --brand-cyan: #60cdff;
+    --brand-emerald: #6ccb5f;
+    --brand-amber: #f7b500;
+    --brand-rose: #ff99a4;
     --text-primary: #ffffff;
-    --text-secondary: #d4d4d8;
-    --text-muted: #a1a1aa;
+    --text-secondary: #d4d4d4;
+    --text-muted: #a0a0a0;
+    --shadow-card: none;
     color-scheme: dark;
   }
 
   [data-theme="light"] {
-    --bg-page: #f3f3f3;
-    --bg-sidebar: #eaeaea;
+    --bg-shell: #eeeeee;
+    --bg-sidebar: #eeeeee;
+    --bg-page: #f7f7f7;
     --bg-card: #ffffff;
-    --bg-card-hover: #f9f9f9;
-    --border-card: rgba(0, 0, 0, 0.06);
-    --border-divider: rgba(0, 0, 0, 0.06);
-    --border-subtle: rgba(0, 0, 0, 0.03);
-    --border-highlight: rgba(0, 103, 192, 0.4);
-    --brand-blue: #0067c0;
-    --brand-cyan: #0284c7;
-    --brand-emerald: #059669;
-    --brand-amber: #d97706;
-    --brand-rose: #e11d48;
-    --text-primary: #1f1f1f;
-    --text-secondary: #5d5d5d;
+    --bg-card-hover: #fbfbfb;
+    --bg-input: #ffffff;
+    --fill-subtle: rgba(0, 0, 0, 0.04);
+    --fill-subtle-hover: rgba(0, 0, 0, 0.07);
+    --border-card: rgba(0, 0, 0, 0.07);
+    --border-divider: rgba(0, 0, 0, 0.08);
+    --border-subtle: rgba(0, 0, 0, 0.05);
+    --border-highlight: rgba(0, 95, 184, 0.45);
+    --accent: #005fb8;
+    --accent-hover: #196ebf;
+    --accent-text: #005fb8;
+    --success: #0f7b0f;
+    --warning: #9d5d00;
+    --danger: #c42b1c;
+    --danger-fill: #c42b1c;
+    --brand-blue: #005fb8;
+    --brand-cyan: #005fb8;
+    --brand-emerald: #0f7b0f;
+    --brand-amber: #9d5d00;
+    --brand-rose: #c42b1c;
+    --text-primary: #1a1a1a;
+    --text-secondary: #5c5c5c;
     --text-muted: #8a8a8a;
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.05);
     color-scheme: light;
   }
 
   body {
     background-color: var(--bg-page);
     color: var(--text-primary);
-    font-family: "Segoe UI Variable Text", "Segoe UI", "Inter", -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+    font-family: var(--font-sans);
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
     user-select: none;
     overflow: hidden;
     transition: background-color 0.25s ease, color 0.25s ease;
@@ -108,11 +154,6 @@
    Microsoft Fluent 2 & IBM Precision Design Tokens
    ========================================================= */
 
-.font-ibm-mono {
-  font-family: "IBM Plex Mono", "Cascadia Code", "Consolas", monospace;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: -0.02em;
-}
 
 /* Windows 11 Mica Layer */
 .fluent-mica {
@@ -282,15 +323,6 @@
 }
 
 /* Light theme overrides for rich contrast */
-[data-theme="light"] {
-  --bg-page: #f8fafc;
-  --bg-card: #ffffff;
-}
-
-[data-theme="light"] body {
-  background-color: #f8fafc;
-  color: #0f172a;
-}
 
 [data-theme="light"] .enterprise-card,
 [data-theme="light"] .enterprise-glass,

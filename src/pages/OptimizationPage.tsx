@@ -367,7 +367,7 @@ export const OptimizationPage: React.FC = () => {
                 {activeTab === "system" ? t.optimization.title : t.virtualization.title}
               </h1>
               <span
-                className={`px-2 py-0.5 rounded-[4px] text-[10px] font-ibm-mono uppercase tracking-wider border ${
+                className={`px-2 py-0.5 rounded-[4px] text-xs font-ibm-mono uppercase tracking-wider border ${
                   activeTab === "system"
                     ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
                     : "bg-blue-500/10 text-blue-400 border-blue-500/20"
@@ -532,7 +532,7 @@ export const OptimizationPage: React.FC = () => {
                   <h3 className="font-semibold text-[var(--text-primary)] text-sm">
                     {t.optimization.hibernationTitle}
                   </h3>
-                  <span className="text-[10px] font-ibm-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 font-medium">
+                  <span className="text-xs font-ibm-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 font-medium">
                     {t.optimization.adminNotice}
                   </span>
                   <span className="text-xs text-[var(--text-muted)] font-ibm-mono">
@@ -542,7 +542,7 @@ export const OptimizationPage: React.FC = () => {
                 <p className="text-xs text-[var(--text-secondary)] leading-relaxed max-w-2xl">
                   {t.optimization.hibernationDesc}
                 </p>
-                <div className="text-[11px] text-[var(--text-muted)] flex items-center gap-1.5 pt-1">
+                <div className="text-xs text-[var(--text-muted)] flex items-center gap-1.5 pt-1">
                   <Info20Regular className="w-3.5 h-3.5 text-amber-400 shrink-0" />
                   <span>{t.optimization.hibernationFootnote}</span>
                 </div>
@@ -579,14 +579,14 @@ export const OptimizationPage: React.FC = () => {
                   <h3 className="font-semibold text-[var(--text-primary)] text-sm">
                     {t.optimization.storageSenseTitle}
                   </h3>
-                  <span className="text-[10px] font-ibm-mono px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-medium">
+                  <span className="text-xs font-ibm-mono px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-medium">
                     Windows
                   </span>
                 </div>
                 <p className="text-xs text-[var(--text-secondary)] leading-relaxed max-w-2xl">
                   {t.optimization.storageSenseDesc}
                 </p>
-                <div className="text-[11px] text-[var(--text-muted)] flex items-center gap-1.5 pt-1">
+                <div className="text-xs text-[var(--text-muted)] flex items-center gap-1.5 pt-1">
                   <Info20Regular className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
                   <span>{t.optimization.storageSenseFootnote}</span>
                 </div>
@@ -623,14 +623,14 @@ export const OptimizationPage: React.FC = () => {
                   <h3 className="font-semibold text-[var(--text-primary)] text-sm">
                     {t.optimization.deliveryTitle}
                   </h3>
-                  <span className="text-[10px] font-ibm-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 font-medium">
+                  <span className="text-xs font-ibm-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 font-medium">
                     {t.optimization.adminNotice}
                   </span>
                 </div>
                 <p className="text-xs text-[var(--text-secondary)] leading-relaxed max-w-2xl">
                   {t.optimization.deliveryDesc}
                 </p>
-                <div className="text-[11px] text-[var(--text-muted)] font-ibm-mono truncate pt-1">
+                <div className="text-xs text-[var(--text-muted)] font-ibm-mono truncate pt-1">
                   SoftwareDistribution\DeliveryOptimization
                 </div>
               </div>
@@ -675,7 +675,7 @@ export const OptimizationPage: React.FC = () => {
                 <p className="text-xs text-[var(--text-secondary)] leading-relaxed max-w-2xl">
                   {t.optimization.pagefileDesc}
                 </p>
-                <div className="text-[11px] text-[var(--text-muted)] font-ibm-mono pt-1">
+                <div className="text-xs text-[var(--text-muted)] font-ibm-mono pt-1">
                   {t.optimization.pagefileLocations} {overview?.paging_files.join(", ") || "C:\\pagefile.sys"}
                 </div>
               </div>
@@ -707,7 +707,7 @@ export const OptimizationPage: React.FC = () => {
               {t.optimization.explorerTweaksTitle}
             </h2>
           </div>
-          <span className="text-[11px] text-[var(--text-muted)] font-ibm-mono">
+          <span className="text-xs text-[var(--text-muted)] font-ibm-mono">
             {t.optimization.registryTuning}
           </span>
         </div>
@@ -730,7 +730,7 @@ export const OptimizationPage: React.FC = () => {
                       <h3 className="font-semibold text-[var(--text-primary)] text-sm">
                         {item.title}
                       </h3>
-                      <span className="text-[10px] font-ibm-mono px-2 py-0.5 rounded bg-white/[0.06] text-[var(--text-secondary)] border border-[var(--border-subtle)] font-medium">
+                      <span className="text-xs font-ibm-mono px-2 py-0.5 rounded bg-white/[0.06] text-[var(--text-secondary)] border border-[var(--border-subtle)] font-medium">
                         {item.badge}
                       </span>
                       <span className="text-xs text-[var(--text-muted)] font-ibm-mono">
@@ -740,7 +740,7 @@ export const OptimizationPage: React.FC = () => {
                     <p className="text-xs text-[var(--text-secondary)] leading-relaxed max-w-2xl">
                       {item.desc}
                     </p>
-                    <div className="text-[11px] text-[var(--text-muted)] flex items-center gap-1.5 pt-1">
+                    <div className="text-xs text-[var(--text-muted)] flex items-center gap-1.5 pt-1">
                       <Info20Regular className="w-3.5 h-3.5 text-blue-400 shrink-0" />
                       <span>{item.footnote}</span>
                     </div>

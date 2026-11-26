@@ -88,17 +88,17 @@ const HeavyFolderItem: React.FC<{
             <div className="flex items-center gap-2 flex-wrap">
               <span className="font-semibold text-[var(--text-primary)] text-xs font-ibm-mono truncate">{node.name}</span>
               {node.is_system_protected && (
-                <span className="px-1.5 py-0.2 rounded-[3px] text-[9px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/25">
+                <span className="px-1.5 py-0.2 rounded-[3px] text-xs font-bold bg-amber-500/15 text-amber-300 border border-amber-500/25">
                   {t.storage.systemProtected}
                 </span>
               )}
               {hasChildren && (
-                <span className="px-1.5 py-0.2 rounded-[3px] text-[9px] font-medium bg-black/30 text-[var(--text-secondary)] border border-[var(--border-card)] font-ibm-mono">
+                <span className="px-1.5 py-0.2 rounded-[3px] text-xs font-medium bg-black/30 text-[var(--text-secondary)] border border-[var(--border-card)] font-ibm-mono">
                   {node.children.length} {t.storage.subHeavyCount}
                 </span>
               )}
             </div>
-            <p className="text-[11px] text-[var(--text-secondary)] font-ibm-mono truncate mt-0.5 select-all">{node.path}</p>
+            <p className="text-xs text-[var(--text-secondary)] font-ibm-mono truncate mt-0.5 select-all">{node.path}</p>
           </div>
         </div>
 
@@ -111,7 +111,7 @@ const HeavyFolderItem: React.FC<{
           </div>
           <div className="text-right w-24 sm:w-28">
             <div className="text-xs font-bold text-amber-400 tabular-nums">{formatBytes(node.size_bytes)}</div>
-            <div className="text-[10px] text-[var(--text-muted)] tabular-nums">
+            <div className="text-xs text-[var(--text-muted)] tabular-nums">
               {node.file_count.toLocaleString()} {t.common.files}
             </div>
           </div>
@@ -350,7 +350,7 @@ export const StoragePage: React.FC = () => {
               <h1 className="text-xl font-semibold tracking-tight text-[var(--text-primary)]">
                 {t.storage.title}
               </h1>
-              <span className="px-2 py-0.5 rounded-[4px] bg-[#0078d4]/10 border border-[#0078d4]/25 text-[#0078d4] text-[10px] font-bold uppercase font-ibm-mono">
+              <span className="px-2 py-0.5 rounded-[4px] bg-[#0078d4]/10 border border-[#0078d4]/25 text-[#0078d4] text-xs font-bold uppercase font-ibm-mono">
                 {t.nav.storage}
               </span>
             </div>
@@ -390,7 +390,7 @@ export const StoragePage: React.FC = () => {
                   setMaxDepth(d);
                   handleScan(undefined, d);
                 }}
-                className={`px-2 py-0.5 rounded-[3px] text-[11px] font-bold cursor-pointer transition-all ${
+                className={`px-2 py-0.5 rounded-[3px] text-xs font-bold cursor-pointer transition-all ${
                   maxDepth === d
                     ? "bg-[#0078d4] text-white"
                     : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
@@ -447,12 +447,12 @@ export const StoragePage: React.FC = () => {
             >
               <div className="flex items-center justify-between mb-2">
                 <span className="font-semibold text-xs text-[var(--text-primary)] flex items-center gap-2">
-                  <span className="px-1.5 py-0.2 rounded-[3px] bg-[#0078d4]/20 text-[#0078d4] font-ibm-mono text-[11px] font-bold border border-[#0078d4]/30">
+                  <span className="px-1.5 py-0.2 rounded-[3px] bg-[#0078d4]/20 text-[#0078d4] font-ibm-mono text-xs font-bold border border-[#0078d4]/30">
                     {v.mount_point}
                   </span>
                   {v.volume_name || t.common.drive}
                 </span>
-                <span className="text-[10px] px-1.5 py-0.2 rounded-[3px] bg-black/20 text-[var(--text-secondary)] font-ibm-mono border border-[var(--border-card)]">
+                <span className="text-xs px-1.5 py-0.2 rounded-[3px] bg-black/20 text-[var(--text-secondary)] font-ibm-mono border border-[var(--border-card)]">
                   {v.file_system}
                 </span>
               </div>
@@ -464,7 +464,7 @@ export const StoragePage: React.FC = () => {
                 />
               </div>
 
-              <div className="flex flex-wrap justify-between gap-x-3 gap-y-0.5 text-[11px] font-ibm-mono text-[var(--text-secondary)] tabular-nums">
+              <div className="flex flex-wrap justify-between gap-x-3 gap-y-0.5 text-xs font-ibm-mono text-[var(--text-secondary)] tabular-nums">
                 <span className="whitespace-nowrap">{t.common.usedSpace}: <strong className="text-[var(--text-primary)] whitespace-nowrap">{formatBytes(usedBytes)}</strong></span>
                 <span className="whitespace-nowrap">{t.common.freeSpace}: <strong className="text-emerald-400 whitespace-nowrap">{formatBytes(v.available_bytes)}</strong></span>
               </div>
@@ -507,7 +507,7 @@ export const StoragePage: React.FC = () => {
 
         {activeTab === "heavy" && (
           <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-[11px] text-[var(--text-secondary)] font-ibm-mono">{t.storage.thresholdPreset}</span>
+            <span className="text-xs text-[var(--text-secondary)] font-ibm-mono">{t.storage.thresholdPreset}</span>
             {[
               { label: "500 MB", bytes: 500 * 1024 * 1024 },
               { label: "1 GB", bytes: 1024 * 1024 * 1024 },
@@ -570,7 +570,7 @@ export const StoragePage: React.FC = () => {
               <div className="h-56 flex flex-col items-center justify-center space-y-2 bg-black/20 rounded-[4px] border border-[var(--border-card)] text-center p-6">
                 <Folder20Regular className="w-6 h-6 text-[var(--text-muted)]" />
                 <p className="text-xs text-[var(--text-primary)] font-semibold">{t.storage.noHeavyFound}</p>
-                <p className="text-[11px] text-[var(--text-secondary)]">
+                <p className="text-xs text-[var(--text-secondary)]">
                   {t.storage.noHeavyDesc}
                 </p>
               </div>
@@ -606,7 +606,7 @@ export const StoragePage: React.FC = () => {
                   </span>
                 )}
               </div>
-              <span className="text-[11px] text-[var(--text-muted)] font-ibm-mono">
+              <span className="text-xs text-[var(--text-muted)] font-ibm-mono">
                 {t.storage.treemapTip}
               </span>
             </div>
@@ -632,7 +632,7 @@ export const StoragePage: React.FC = () => {
               <div className="h-64 flex flex-col items-center justify-center space-y-2 bg-black/20 rounded-[4px] border border-[var(--border-card)] text-center p-6">
                 <HardDrive20Regular className="w-6 h-6 text-[var(--text-muted)]" />
                 <p className="text-xs text-[var(--text-primary)] font-semibold">{t.storage.readyTitle}</p>
-                <p className="text-[11px] text-[var(--text-secondary)]">{t.storage.readyDesc}</p>
+                <p className="text-xs text-[var(--text-secondary)]">{t.storage.readyDesc}</p>
               </div>
             )}
           </WinUICard>
@@ -737,7 +737,7 @@ export const StoragePage: React.FC = () => {
                         )}
                         <span className="font-ibm-mono text-[var(--text-primary)] truncate">{child.name}</span>
                         {child.is_system_protected && (
-                          <span className="px-1.5 py-0.2 rounded-[3px] text-[9px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/25 font-ibm-mono shrink-0">
+                          <span className="px-1.5 py-0.2 rounded-[3px] text-xs font-bold bg-amber-500/15 text-amber-300 border border-amber-500/25 font-ibm-mono shrink-0">
                             Protected
                           </span>
                         )}

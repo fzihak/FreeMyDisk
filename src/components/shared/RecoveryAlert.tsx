@@ -65,7 +65,7 @@ export const RecoveryAlert: React.FC<RecoveryAlertProps> = ({ onNavigateToHistor
           </span>
           <button
             onClick={handleRestoreNow}
-            className="bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-500/30 px-2 py-0.5 rounded text-[11px] cursor-pointer ml-1 transition-colors"
+            className="bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-500/30 px-2 py-0.5 rounded text-xs cursor-pointer ml-1 transition-colors"
           >
             Review & Restore
           </button>
