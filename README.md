@@ -8,7 +8,7 @@
 
 <br />
 
-<a href="https://github.com/fzihak/FreeMyDisk/releases/latest"><img src="docs/media/buttons/download-windows.svg" alt="Download FreeMyDisk for Windows" height="84" /></a>
+<a href="https://github.com/fzihak/FreeMyDisk/releases/latest/download/FreeMyDisk-Setup-x64.exe"><img src="docs/media/buttons/download-windows.svg" alt="Download FreeMyDisk for Windows" height="84" /></a>
 
 <a href="#-see-it-in-action"><img src="docs/media/buttons/watch-demo.svg" alt="Watch the demo" height="52" /></a>
 <a href="#-safe-by-design-not-by-promise"><img src="docs/media/buttons/why-safe.svg" alt="Why it's safe" height="52" /></a>
@@ -123,7 +123,7 @@ Most cleaners ask you to trust them. FreeMyDisk is built so that a bug, a crash 
 
 ## ⬇️ Install
 
-1. Download **`FreeMyDisk_<version>_x64-setup.exe`** from the [latest release](https://github.com/fzihak/FreeMyDisk/releases/latest).
+1. **[Download FreeMyDisk-Setup-x64.exe](https://github.com/fzihak/FreeMyDisk/releases/latest/download/FreeMyDisk-Setup-x64.exe)** — always the newest version. (Older versions and release notes: [all releases](https://github.com/fzihak/FreeMyDisk/releases).)
 2. Run it. Install for just you, or for all users.
 3. That's it — FreeMyDisk tells you when a new version is out and updates itself after you say yes.
 

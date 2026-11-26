@@ -72,7 +72,20 @@ jobs:
           includeUpdaterJson: true
           args: --config src-tauri/tauri.bundle.conf.json
 
+      # A copy with a fixed name gives a permanent "download the newest version"
+      # link: /releases/latest/download/FreeMyDisk-Setup-x64.exe
+      - name: Upload fixed-name installer
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          src=$(ls target/release/bundle/nsis/*-setup.exe | head -1)
+          cp "$src" FreeMyDisk-Setup-x64.exe
+          gh release upload "${{ github.ref_name }}" FreeMyDisk-Setup-x64.exe --clobber --repo "${{ github.repository }}"
+
       - name: Attest build provenance
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
         with:
-          subject-path: target/release/bundle/nsis/*-setup.exe
+          subject-path: |
+            target/release/bundle/nsis/*-setup.exe
+            FreeMyDisk-Setup-x64.exe
