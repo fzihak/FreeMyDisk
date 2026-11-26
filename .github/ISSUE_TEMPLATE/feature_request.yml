@@ -1,0 +1,43 @@
+name: Feature request or feedback
+description: Suggest an improvement, or tell us what was confusing or slow
+labels: [enhancement, needs-triage]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for helping shape FreeMyDisk! Describe the problem first — the best solution often comes out of the discussion.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem are you trying to solve?
+      placeholder: "When I clean my Downloads folder I can't tell which files are installers I already used…"
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like to happen?
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Anything you tried or considered instead?
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Dashboard / Clean Now
+        - Deep Cleanup / rules
+        - Large Files / Duplicates
+        - Space Visualizer
+        - Privacy Cleaner
+        - Apps / Startup
+        - Maintenance / Optimizer
+        - Settings / updates
+        - CLI
+        - Other
+  - type: checkboxes
+    id: help
+    attributes:
+      label: Contributing
+      options:
+        - label: I'd like to help build this
