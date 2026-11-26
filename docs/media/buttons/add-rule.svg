@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="156" height="52" viewBox="0 0 156 52" role="img" aria-label="Add a rule">
+  <defs>
+    <linearGradient id="b" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1d2433"/>
+      <stop offset="1" stop-color="#141a26"/>
+    </linearGradient>
+  </defs>
+  <rect x="1" y="1" width="154" height="50" rx="14" fill="url(#b)"/>
+  <rect x="1.5" y="1.5" width="153" height="49" rx="13.5" fill="none" stroke="#60cdff" stroke-opacity="0.35"/>
+  <g transform="translate(18 14)"><path d="M10 3h4v3a2 2 0 104 0V3h3v7h-3a2 2 0 100 4h3v7h-7v-3a2 2 0 10-4 0v3H3v-7h3a2 2 0 100-4H3V3h7z" fill="none" stroke="#60cdff" stroke-width="1.8" stroke-linejoin="round"/></g>
+  <text x="52" y="32" font-family="Segoe UI Variable Display, Segoe UI, -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="16" font-weight="600" fill="#e8f2ff">Add a rule</text>
+</svg>

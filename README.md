@@ -4,19 +4,20 @@
 
 <br />
 
-<a href="https://github.com/fzihak/FreeMyDisk/releases/latest"><img src="https://img.shields.io/github/v/release/fzihak/FreeMyDisk?style=for-the-badge&label=Download&logo=windows&color=0078d4" alt="Download the latest release" /></a>
-<a href="https://github.com/fzihak/FreeMyDisk/releases"><img src="https://img.shields.io/github/downloads/fzihak/FreeMyDisk/total?style=for-the-badge&color=2ea043" alt="Total downloads" /></a>
-<a href="https://github.com/fzihak/FreeMyDisk/stargazers"><img src="https://img.shields.io/github/stars/fzihak/FreeMyDisk?style=for-the-badge&color=f7b500" alt="GitHub stars" /></a>
+### Your drive is full of things you don't need.<br />FreeMyDisk finds them, explains them, and frees the space — without ever risking the things you do need.
 
-<a href="https://github.com/fzihak/FreeMyDisk/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/fzihak/FreeMyDisk/ci.yml?branch=main&style=flat-square&label=CI" alt="CI status" /></a>
-<a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0-blue?style=flat-square" alt="License: GPL-3.0" /></a>
-<img src="https://img.shields.io/badge/Rust-Tauri%202-orange?style=flat-square&logo=rust" alt="Rust and Tauri 2" />
-<img src="https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=white" alt="React 19" />
-<img src="https://img.shields.io/badge/telemetry-none-2ea043?style=flat-square" alt="No telemetry" />
+<br />
 
-### Your drive is full of things you don't need. FreeMyDisk finds them, explains them, and frees the space — without ever risking the things you do need.
+<a href="https://github.com/fzihak/FreeMyDisk/releases/latest"><img src="docs/media/buttons/download-windows.svg" alt="Download FreeMyDisk for Windows" height="84" /></a>
 
-**[⬇️ Download for Windows](https://github.com/fzihak/FreeMyDisk/releases/latest)** · **[See it in action](#-see-it-in-action)** · **[Why it's safe](#-safe-by-design-not-by-promise)** · **[CLI](#-power-users-the-cli)** · **[Add a rule](#-add-a-cleanup-rule-in-20-lines)**
+<a href="#-see-it-in-action"><img src="docs/media/buttons/watch-demo.svg" alt="Watch the demo" height="52" /></a>
+<a href="#-safe-by-design-not-by-promise"><img src="docs/media/buttons/why-safe.svg" alt="Why it's safe" height="52" /></a>
+<a href="#-power-users-the-cli"><img src="docs/media/buttons/cli.svg" alt="Command line" height="52" /></a>
+<a href="#-add-a-cleanup-rule-in-20-lines"><img src="docs/media/buttons/add-rule.svg" alt="Add a rule" height="52" /></a>
+
+<br />
+
+<img src="docs/media/buttons/tech.svg" alt="Rust · Tauri 2 · React 19 · Windows 10 / 11 · GPL-3.0 · No telemetry" height="40" />
 
 </div>
 
@@ -244,7 +245,9 @@ Needs Rust (stable), Node.js 20+, pnpm 9+ and the Visual Studio C++ build tools.
 
 Bug reports, rules and translations are all very welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md), or [open an issue](https://github.com/fzihak/FreeMyDisk/issues/new).
 
-If FreeMyDisk freed some space for you, **a ⭐ helps other people find it.**
+If FreeMyDisk freed some space for you, a star helps other people find it:
+
+<a href="https://github.com/fzihak/FreeMyDisk/stargazers"><img src="docs/media/buttons/star.svg" alt="Star FreeMyDisk on GitHub" height="52" /></a>
 
 <a href="https://star-history.com/#fzihak/FreeMyDisk&Date">
   <img src="https://api.star-history.com/svg?repos=fzihak/FreeMyDisk&type=Date" alt="Star history" width="600" />
