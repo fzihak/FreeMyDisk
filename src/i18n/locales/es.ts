@@ -68,7 +68,11 @@ export const es: TranslationSchema = {
     "keepFile": "Conservar archivo",
     "permanentDelete": "Eliminar definitivamente",
     "items": "elementos",
-    "files": "archivos"
+    "files": "archivos",
+    "allDrives": "Todas las unidades",
+    "freeOf": "libres de",
+    "notScannedYet": "Aún no analizado",
+    "protectedSystemFile": "Archivo de sistema de Windows protegido (no se puede eliminar)"
   },
   "dashboard": {
     "title": "Salud y estado del disco",
@@ -121,11 +125,47 @@ export const es: TranslationSchema = {
     "systemReservedCategory": "Archivos del sistema y reservados",
     "tempFilesCategory": "Archivos temporales y cachés",
     "usedSpaceCategory": "En uso",
-    "freeSpaceCategory": "Espacio libre"
+    "freeSpaceCategory": "Espacio libre",
+    "scanningHeadline": "Scanning…",
+    "categoriesInspected": "{count} categories inspected",
+    "categoriesHint": "Temporary files, cache & logs",
+    "reclaimable": "reclaimable",
+    "nothingToClean": "Nothing to clean right now",
+    "moreNeedsAdmin": "{size} more needs administrator rights",
+    "moreNeedsAppsClosed": "{size} more needs {apps} closed",
+    "lastCleanTitle": "Last clean",
+    "lastCleanFreed": "{size} freed",
+    "lastCleanRecycled": "{size} moved to Recycle Bin",
+    "lastCleanItems": "{count} items cleaned",
+    "lastCleanSkipped": "{count} skipped",
+    "lastCleanFailed": "{count} failed",
+    "reasonNeedsAdmin": "needs administrator",
+    "reasonInUse": "in use",
+    "reasonTrashUnavailable": "Recycle Bin unavailable",
+    "reasonProtected": "protected",
+    "refreshingResults": "Updating results…",
+    "duplicatesEngineDesc": "Byte-identical duplicate detection (BLAKE3) with hard-link protection",
+    "rescueWillDoTitle": "Emergency Rescue will:",
+    "rescueBinPermanent": "Permanently delete everything in the Recycle Bin ({items} items, {size}). This cannot be undone.",
+    "rescueBinEmpty": "Empty the Recycle Bin (it is empty now)",
+    "rescueTempSafe": "Remove temporary files, crash dumps, error reports and shader caches older than 24 hours. Files in use are kept.",
+    "rescueHiberAdmin": "Turn off hibernation and remove hiberfil.sys (needs administrator; skipped otherwise)",
+    "rescueWslNote": "Shut down WSL if it is running",
+    "rescueStepCounter": "Step {current} of {total}",
+    "rescueStepRecycleBin": "Emptying the Recycle Bin",
+    "rescueStepTemp": "Removing old temporary files",
+    "rescueStepHibernation": "Turning off hibernation",
+    "rescueStepWsl": "Shutting down WSL",
+    "rescueFreedSoFar": "{size} freed so far",
+    "rescueFinished": "Emergency Rescue finished: {size} freed",
+    "rescueStopped": "Emergency Rescue stopped before it finished",
+    "rescueStatusDone": "Done",
+    "rescueStatusSkipped": "Skipped",
+    "rescueStatusFailed": "Failed"
   },
   "cleanup": {
     "title": "Limpieza profunda de sistema y cachés",
-    "subtitle": "Elimina archivos temporales, cachés de shaders, bases de datos de navegación y compilaciones. Por seguridad van a la papelera por defecto.",
+    "subtitle": "Elimina archivos temporales, cachés de shaders, bases de datos de navegación y compilaciones.",
     "safeBadge": "LIMPIEZA SEGURA",
     "rescan": "Reescanear reglas",
     "scanningFiles": "Escaneando el sistema en busca de archivos limpiables...",
@@ -169,7 +209,10 @@ export const es: TranslationSchema = {
     "closeToUnlock": "Cerrar para desbloquear directorios",
     "appsClosedSuccess": "Aplicaciones cerradas para desbloquear directorios de caché.",
     "retryFailed": "Error al reintentar",
-    "permanentDeleteFailed": "Error al eliminar permanentemente"
+    "permanentDeleteFailed": "Error al eliminar permanentemente",
+    "routeRecycleBinNote": "Los archivos van a la Papelera de reciclaje y se pueden restaurar.",
+    "routePermanentNote": "El envío a la Papelera está desactivado en Ajustes: los archivos se eliminan definitivamente.",
+    "selectToClean": "Selecciona elementos para limpiar"
   },
   "storage": {
     "title": "Visualizador de almacenamiento y carpetas pesadas",
@@ -229,7 +272,8 @@ export const es: TranslationSchema = {
     "trashSelected": "Mover a la Papelera",
     "trashConfirm": "¿Estás seguro de que deseas mover este archivo a la Papelera de reciclaje?",
     "noFilesFound": "No se encontraron archivos grandes",
-    "noFilesDesc": "No hay archivos que coincidan con el umbral de tamaño y los filtros seleccionados."
+    "noFilesDesc": "No hay archivos que coincidan con el umbral de tamaño y los filtros seleccionados.",
+    "statFiles": "Archivos grandes"
   },
   "duplicates": {
     "title": "Buscador de archivos duplicados",
@@ -260,7 +304,11 @@ export const es: TranslationSchema = {
     "potentialSavings": "Espacio potencial a recuperar",
     "hardlinkNotice": "Enlace duro (comparte bloques físicos, 0 bytes liberables)",
     "noDuplicatesFound": "No se encontraron duplicados",
-    "noDuplicatesDesc": "Todos los archivos en esta ubicación parecen ser únicos."
+    "noDuplicatesDesc": "Todos los archivos en esta ubicación parecen ser únicos.",
+    "statSets": "Grupos duplicados",
+    "statFiles": "Archivos duplicados",
+    "setsShown": "mostrados con los filtros actuales",
+    "filesSelected": "seleccionados para eliminar"
   },
   "applications": {
     "title": "Gestor de software y bloatware",
@@ -339,7 +387,11 @@ export const es: TranslationSchema = {
     "confirmDeleteTitle": "Confirmar eliminación de entrada",
     "confirmDeleteDesc": "¿Estás seguro de que deseas eliminar permanentemente esta entrada del registro?",
     "noItemsFound": "No se encontraron elementos de inicio",
-    "noItemsDesc": "Ninguna aplicación coincide con tus filtros actuales."
+    "noItemsDesc": "Ninguna aplicación coincide con tus filtros actuales.",
+    "statAllDesc": "Registro, carpeta Inicio y tareas programadas",
+    "statEnabledDesc": "Se inician automáticamente al iniciar sesión",
+    "statHighDesc": "Entradas activas que ralentizan el arranque",
+    "statCriticalDesc": "Requeridas por Windows, no se pueden desactivar"
   },
   "privacy": {
     "title": "Limpiador de privacidad y navegadores",
@@ -362,7 +414,9 @@ export const es: TranslationSchema = {
     "addDomain": "Añadir dominio",
     "domainPlaceholder": "ej. github.com",
     "noItemsFound": "Cero elementos de privacidad",
-    "noItemsDesc": "No se encontraron rastros que coincidan con tu búsqueda."
+    "noItemsDesc": "No se encontraron rastros que coincidan con tu búsqueda.",
+    "runningBrowsers": "En ejecución",
+    "allTypes": "Todos los tipos"
   },
   "maintenance": {
     "title": "Mantenimiento y salud del sistema",
@@ -378,7 +432,12 @@ export const es: TranslationSchema = {
     "taskSuccess": "Tarea de mantenimiento completada con éxito.",
     "taskFailed": "Fallo al ejecutar la tarea.",
     "allCompleted": "Todas las tareas recomendadas se ejecutaron correctamente.",
-    "noTasksFound": "No hay tareas de mantenimiento disponibles."
+    "noTasksFound": "No hay tareas de mantenimiento disponibles.",
+    "availableTasks": "Tareas disponibles",
+    "tasksRun": "Tareas ejecutadas",
+    "noTasksRunYet": "Aún no se han ejecutado tareas en esta sesión",
+    "tasksSucceeded": "completadas",
+    "tasksFailed": "fallidas"
   },
   "optimization": {
     "title": "Optimizador del sistema Windows",
@@ -523,7 +582,10 @@ export const es: TranslationSchema = {
     "versionLabel": "Versión",
     "releaseStatus": "Versión de producción",
     "checkForUpdates": "Buscar actualizaciones",
-    "repoLink": "Repositorio en GitHub"
+    "repoLink": "Repositorio en GitHub",
+    "themeNight": "Noche OLED",
+    "themeNightDesc": "Negro puro para pantallas OLED",
+    "autoUpdateDesc": "Buscar en GitHub una versión más reciente de FreeMyDisk cada vez que se inicia la app."
   },
   "layout": {
     "physicalRam": "RAM física",

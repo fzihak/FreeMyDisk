@@ -132,8 +132,8 @@ export const SettingsPage: React.FC = () => {
                   <Sparkle20Filled className="w-4 h-4" />
                 </div>
                 <div className="text-left">
-                  <div className="text-xs font-semibold text-[var(--text-primary)]">{t.settings.themeSystem}</div>
-                  <div className="text-[10px] text-[var(--text-muted)]">OLED Night</div>
+                  <div className="text-xs font-semibold text-[var(--text-primary)]">{t.settings.themeNight}</div>
+                  <div className="text-[10px] text-[var(--text-muted)]">{t.settings.themeNightDesc}</div>
                 </div>
               </button>
 
@@ -189,7 +189,7 @@ export const SettingsPage: React.FC = () => {
         <WinUICard>
           <WinUISettingRow
             title={t.settings.checkForUpdates}
-            subtitle={t.settings.generalDesc}
+            subtitle={t.settings.autoUpdateDesc}
             action={
               <WinUIToggle
                 checked={autoCheckUpdates}

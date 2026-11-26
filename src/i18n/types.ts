@@ -95,6 +95,10 @@ export interface TranslationSchema {
     permanentDelete: string;
     items: string;
     files: string;
+    allDrives: string;
+    freeOf: string;
+    notScannedYet: string;
+    protectedSystemFile: string;
   };
   dashboard: {
     title: string;
@@ -148,6 +152,42 @@ export interface TranslationSchema {
     tempFilesCategory: string;
     usedSpaceCategory: string;
     freeSpaceCategory: string;
+    scanningHeadline: string;
+    categoriesInspected: string;
+    categoriesHint: string;
+    reclaimable: string;
+    nothingToClean: string;
+    moreNeedsAdmin: string;
+    moreNeedsAppsClosed: string;
+    lastCleanTitle: string;
+    lastCleanFreed: string;
+    lastCleanRecycled: string;
+    lastCleanItems: string;
+    lastCleanSkipped: string;
+    lastCleanFailed: string;
+    reasonNeedsAdmin: string;
+    reasonInUse: string;
+    reasonTrashUnavailable: string;
+    reasonProtected: string;
+    refreshingResults: string;
+    duplicatesEngineDesc: string;
+    rescueWillDoTitle: string;
+    rescueBinPermanent: string;
+    rescueBinEmpty: string;
+    rescueTempSafe: string;
+    rescueHiberAdmin: string;
+    rescueWslNote: string;
+    rescueStepCounter: string;
+    rescueStepRecycleBin: string;
+    rescueStepTemp: string;
+    rescueStepHibernation: string;
+    rescueStepWsl: string;
+    rescueFreedSoFar: string;
+    rescueFinished: string;
+    rescueStopped: string;
+    rescueStatusDone: string;
+    rescueStatusSkipped: string;
+    rescueStatusFailed: string;
   };
   cleanup: {
     title: string;
@@ -196,6 +236,9 @@ export interface TranslationSchema {
     appsClosedSuccess: string;
     retryFailed: string;
     permanentDeleteFailed: string;
+    routeRecycleBinNote: string;
+    routePermanentNote: string;
+    selectToClean: string;
   };
   projectArtifacts: {
     title: string;
@@ -304,6 +347,7 @@ export interface TranslationSchema {
     trashConfirm: string;
     noFilesFound: string;
     noFilesDesc: string;
+    statFiles: string;
   };
   duplicates: {
     title: string;
@@ -335,6 +379,10 @@ export interface TranslationSchema {
     hardlinkNotice: string;
     noDuplicatesFound: string;
     noDuplicatesDesc: string;
+    statSets: string;
+    statFiles: string;
+    setsShown: string;
+    filesSelected: string;
   };
   applications: {
     title: string;
@@ -414,6 +462,10 @@ export interface TranslationSchema {
     confirmDeleteDesc: string;
     noItemsFound: string;
     noItemsDesc: string;
+    statAllDesc: string;
+    statEnabledDesc: string;
+    statHighDesc: string;
+    statCriticalDesc: string;
   };
   privacy: {
     title: string;
@@ -437,6 +489,8 @@ export interface TranslationSchema {
     domainPlaceholder: string;
     noItemsFound: string;
     noItemsDesc: string;
+    runningBrowsers: string;
+    allTypes: string;
   };
   maintenance: {
     title: string;
@@ -453,6 +507,11 @@ export interface TranslationSchema {
     taskFailed: string;
     allCompleted: string;
     noTasksFound: string;
+    availableTasks: string;
+    tasksRun: string;
+    noTasksRunYet: string;
+    tasksSucceeded: string;
+    tasksFailed: string;
   };
   optimization: {
     title: string;
@@ -686,5 +745,8 @@ export interface TranslationSchema {
     releaseStatus: string;
     checkForUpdates: string;
     repoLink: string;
+    themeNight: string;
+    themeNightDesc: string;
+    autoUpdateDesc: string;
   };
 }

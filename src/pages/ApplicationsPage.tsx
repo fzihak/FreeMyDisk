@@ -463,12 +463,14 @@ export const ApplicationsPage: React.FC = () => {
             </p>
           </div>
         </div>
+      </div>
 
-        {/* Tab switcher - WinUI 3 Segmented Control */}
-        <div className="flex flex-wrap items-center gap-1 bg-black/20 p-0.5 rounded-[4px] border border-[var(--border-card)] self-start sm:self-auto">
+      {/* Tab switcher - WinUI 3 Segmented Control (own row so all tabs fit on one line) */}
+      <div className="flex">
+        <div className="flex flex-nowrap items-center gap-1 bg-black/20 p-0.5 rounded-[4px] border border-[var(--border-card)] max-w-full overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <button
             onClick={() => setActiveTab("installed")}
-            className={`px-3 py-1 rounded-[3px] text-xs font-medium transition-all cursor-pointer ${
+            className={`px-3 py-1 rounded-[3px] text-xs font-medium whitespace-nowrap transition-all cursor-pointer ${
               activeTab === "installed"
                 ? "bg-[#0078d4] text-white shadow-xs"
                 : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
@@ -481,7 +483,7 @@ export const ApplicationsPage: React.FC = () => {
               setActiveTab("uwp");
               if (uwpApps.length === 0) loadUwpApplications();
             }}
-            className={`px-3 py-1 rounded-[3px] text-xs font-medium transition-all cursor-pointer ${
+            className={`px-3 py-1 rounded-[3px] text-xs font-medium whitespace-nowrap transition-all cursor-pointer ${
               activeTab === "uwp"
                 ? "bg-purple-600 text-white shadow-xs"
                 : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
@@ -494,7 +496,7 @@ export const ApplicationsPage: React.FC = () => {
               setActiveTab("leftovers");
               if (deepGroups.length === 0) handleScanLeftovers();
             }}
-            className={`px-3 py-1 rounded-[3px] text-xs font-medium transition-all cursor-pointer ${
+            className={`px-3 py-1 rounded-[3px] text-xs font-medium whitespace-nowrap transition-all cursor-pointer ${
               activeTab === "leftovers"
                 ? "bg-[#0078d4] text-white shadow-xs"
                 : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"

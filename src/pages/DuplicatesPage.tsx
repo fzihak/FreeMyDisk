@@ -91,6 +91,19 @@ interface DisposalSummary {
   results: { path: string; success: boolean; error: string | null }[];
 }
 
+// Windows-managed files that must never be offered for deletion, even if a
+// scan result happens to include them (the backend also filters these out).
+const PROTECTED_SYSTEM_FILES = new Set([
+  "pagefile.sys",
+  "hiberfil.sys",
+  "swapfile.sys",
+  "dumpstack.log",
+  "dumpstack.log.tmp",
+]);
+
+const isProtectedSystemFile = (path: string): boolean =>
+  PROTECTED_SYSTEM_FILES.has((path.split(/[\\/]/).pop() || "").toLowerCase());
+
 export const DuplicatesPage: React.FC = () => {
   const { t } = useI18nStore();
   const { confirmBeforeDelete } = useSettingsStore();
@@ -171,6 +184,7 @@ export const DuplicatesPage: React.FC = () => {
     if (!scanResult) return;
     const target = scanResult.groups.find((g) => g.group_id === groupId);
     const file = target?.files.find((f) => f.path === path);
+    if (file && !file.selected && isProtectedSystemFile(file.path)) return;
     const unselectedLeft = target ? target.files.filter((f) => !f.selected).length : 0;
     if (file && !file.selected && unselectedLeft <= 1) {
       toast.warning(t.duplicates.keepOneCopy);
@@ -234,7 +248,7 @@ export const DuplicatesPage: React.FC = () => {
         ...group,
         files: group.files.map((f, idx) => ({
           ...f,
-          selected: idx !== keepIndex && !f.is_hardlink_or_clone,
+          selected: idx !== keepIndex && !f.is_hardlink_or_clone && !isProtectedSystemFile(f.path),
         })),
       };
     });
@@ -388,7 +402,9 @@ export const DuplicatesPage: React.FC = () => {
 
   const scanTargetLabel =
     selectedDrive === "ALL"
-      ? `All Drives (${volumes.length > 0 ? volumes.map((v) => v.mount_point).join(", ") : "All"})`
+      ? volumes.length > 0
+        ? `${t.common.allDrives} (${volumes.map((v) => v.mount_point.replace(/[\\/]+$/, "")).join(" ")})`
+        : t.common.allDrives
       : selectedDrive;
 
   return (
@@ -489,7 +505,7 @@ export const DuplicatesPage: React.FC = () => {
               }`}
             >
               <HardDrive20Regular className="w-3.5 h-3.5" />
-              <span className="font-semibold">All Drives</span>
+              <span className="font-semibold">{t.common.allDrives}</span>
               <span
                 className={`text-[10px] px-1.5 py-0.5 rounded-[3px] font-ibm-mono tabular-nums ${
                   selectedDrive === "ALL" ? "bg-white/20 text-white" : "bg-black/30 text-[var(--text-secondary)]"
@@ -527,7 +543,7 @@ export const DuplicatesPage: React.FC = () => {
                       isSelected ? "bg-white/20 text-white" : "bg-black/30 text-[var(--text-secondary)]"
                     }`}
                   >
-                    {freeGb} GB / {totalGb} GB
+                    {freeGb} GB {t.common.freeOf} {totalGb} GB
                   </span>
                 </button>
               );
@@ -580,27 +596,27 @@ export const DuplicatesPage: React.FC = () => {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <WinUICard className="p-3.5">
           <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] mb-1">
-            <span className="font-medium text-[11px]">{t.duplicates.duplicateSets}</span>
+            <span className="font-medium text-[11px]">{t.duplicates.statSets}</span>
             <Layer20Regular className="w-3.5 h-3.5 text-[#0078d4]" />
           </div>
           <div className="text-xl font-bold text-[var(--text-primary)] font-ibm-mono tabular-nums">
             {scanResult ? scanResult.total_groups.toLocaleString() : "—"}
           </div>
           <div className="text-[10px] text-[var(--text-muted)] font-ibm-mono tabular-nums mt-1">
-            {filteredGroups.length} {t.common.all}
+            {scanResult ? `${filteredGroups.length} ${t.duplicates.setsShown}` : t.common.notScannedYet}
           </div>
         </WinUICard>
 
         <WinUICard className="p-3.5">
           <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] mb-1">
-            <span className="font-medium text-[11px]">{t.common.files}</span>
+            <span className="font-medium text-[11px]">{t.duplicates.statFiles}</span>
             <DocumentCopy24Filled className="w-3.5 h-3.5 text-indigo-400" />
           </div>
           <div className="text-xl font-bold text-indigo-400 font-ibm-mono tabular-nums">
             {scanResult ? scanResult.total_duplicate_files.toLocaleString() : "—"}
           </div>
           <div className="text-[10px] text-[var(--text-muted)] font-ibm-mono tabular-nums mt-1">
-            {totalSelectedCount} {t.cleanup.itemsSelected}
+            {scanResult ? `${totalSelectedCount} ${t.duplicates.filesSelected}` : t.common.notScannedYet}
           </div>
         </WinUICard>
 
@@ -612,7 +628,7 @@ export const DuplicatesPage: React.FC = () => {
           <div className="text-xl font-bold text-emerald-400 font-ibm-mono tabular-nums">
             {scanResult ? formatBytes(scanResult.total_potential_savings) : "—"}
           </div>
-          <div className="text-[10px] text-[var(--text-muted)] font-ibm-mono truncate mt-1">
+          <div className="text-[10px] text-[var(--text-muted)] font-ibm-mono truncate mt-1" title={scanTargetLabel}>
             {scanTargetLabel}
           </div>
         </WinUICard>

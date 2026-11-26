@@ -68,7 +68,11 @@ export const ja: TranslationSchema = {
     "keepFile": "ファイルを残す",
     "permanentDelete": "完全に削除",
     "items": "項目",
-    "files": "ファイル"
+    "files": "ファイル",
+    "allDrives": "すべてのドライブ",
+    "freeOf": "空き / 合計",
+    "notScannedYet": "未スキャン",
+    "protectedSystemFile": "保護された Windows システムファイル（削除不可）"
   },
   "dashboard": {
     "title": "ディスク健全性と概要",
@@ -121,7 +125,43 @@ export const ja: TranslationSchema = {
     "systemReservedCategory": "システムおよび予約領域",
     "tempFilesCategory": "一時ファイルとキャッシュ",
     "usedSpaceCategory": "使用中",
-    "freeSpaceCategory": "空き容量"
+    "freeSpaceCategory": "空き容量",
+    "scanningHeadline": "Scanning…",
+    "categoriesInspected": "{count} categories inspected",
+    "categoriesHint": "Temporary files, cache & logs",
+    "reclaimable": "reclaimable",
+    "nothingToClean": "Nothing to clean right now",
+    "moreNeedsAdmin": "{size} more needs administrator rights",
+    "moreNeedsAppsClosed": "{size} more needs {apps} closed",
+    "lastCleanTitle": "Last clean",
+    "lastCleanFreed": "{size} freed",
+    "lastCleanRecycled": "{size} moved to Recycle Bin",
+    "lastCleanItems": "{count} items cleaned",
+    "lastCleanSkipped": "{count} skipped",
+    "lastCleanFailed": "{count} failed",
+    "reasonNeedsAdmin": "needs administrator",
+    "reasonInUse": "in use",
+    "reasonTrashUnavailable": "Recycle Bin unavailable",
+    "reasonProtected": "protected",
+    "refreshingResults": "Updating results…",
+    "duplicatesEngineDesc": "Byte-identical duplicate detection (BLAKE3) with hard-link protection",
+    "rescueWillDoTitle": "Emergency Rescue will:",
+    "rescueBinPermanent": "Permanently delete everything in the Recycle Bin ({items} items, {size}). This cannot be undone.",
+    "rescueBinEmpty": "Empty the Recycle Bin (it is empty now)",
+    "rescueTempSafe": "Remove temporary files, crash dumps, error reports and shader caches older than 24 hours. Files in use are kept.",
+    "rescueHiberAdmin": "Turn off hibernation and remove hiberfil.sys (needs administrator; skipped otherwise)",
+    "rescueWslNote": "Shut down WSL if it is running",
+    "rescueStepCounter": "Step {current} of {total}",
+    "rescueStepRecycleBin": "Emptying the Recycle Bin",
+    "rescueStepTemp": "Removing old temporary files",
+    "rescueStepHibernation": "Turning off hibernation",
+    "rescueStepWsl": "Shutting down WSL",
+    "rescueFreedSoFar": "{size} freed so far",
+    "rescueFinished": "Emergency Rescue finished: {size} freed",
+    "rescueStopped": "Emergency Rescue stopped before it finished",
+    "rescueStatusDone": "Done",
+    "rescueStatusSkipped": "Skipped",
+    "rescueStatusFailed": "Failed"
   },
   "cleanup": {
     "title": "ディープクリーンアップ",
@@ -169,7 +209,10 @@ export const ja: TranslationSchema = {
     "closeToUnlock": "アプリを終了してフォルダーを解放",
     "appsClosedSuccess": "キャッシュフォルダーを解放するため対象アプリを終了しました。",
     "retryFailed": "再試行に失敗しました",
-    "permanentDeleteFailed": "完全削除に失敗しました"
+    "permanentDeleteFailed": "完全削除に失敗しました",
+    "routeRecycleBinNote": "ファイルはごみ箱に移動され、復元できます。",
+    "routePermanentNote": "設定でごみ箱への移動がオフです：ファイルは完全に削除されます。",
+    "selectToClean": "クリーンアップする項目を選択"
   },
   "storage": {
     "title": "ストレージビジュアライザー",
@@ -229,7 +272,8 @@ export const ja: TranslationSchema = {
     "trashSelected": "選択項目をごみ箱へ",
     "trashConfirm": "選択した大容量ファイルをごみ箱へ移動してもよろしいですか？",
     "noFilesFound": "大容量ファイルは見つかりませんでした",
-    "noFilesDesc": "指定されたしきい値を超えるファイルはありません。"
+    "noFilesDesc": "指定されたしきい値を超えるファイルはありません。",
+    "statFiles": "大きなファイル"
   },
   "duplicates": {
     "title": "重複ファイル検索",
@@ -260,7 +304,11 @@ export const ja: TranslationSchema = {
     "potentialSavings": "削減可能容量",
     "hardlinkNotice": "同一i-node（ハードリンク）は空き容量の二重計上を防ぐため除外されます。",
     "noDuplicatesFound": "重複ファイルは見つかりませんでした",
-    "noDuplicatesDesc": "指定された条件で一致する重複ファイルはありません。"
+    "noDuplicatesDesc": "指定された条件で一致する重複ファイルはありません。",
+    "statSets": "重複セット",
+    "statFiles": "重複ファイル",
+    "setsShown": "件を現在のフィルターで表示",
+    "filesSelected": "件を削除対象に選択"
   },
   "applications": {
     "title": "アプリと残余データ",
@@ -339,7 +387,11 @@ export const ja: TranslationSchema = {
     "confirmDeleteTitle": "スタートアップ登録の削除",
     "confirmDeleteDesc": "この項目の自動起動登録を完全に削除しますか？",
     "noItemsFound": "項目が見つかりません",
-    "noItemsDesc": "該当するスタートアップ登録はありません。"
+    "noItemsDesc": "該当するスタートアップ登録はありません。",
+    "statAllDesc": "レジストリ、スタートアップフォルダー、タスク スケジューラ",
+    "statEnabledDesc": "サインイン時に自動起動",
+    "statHighDesc": "起動を遅くする有効な項目",
+    "statCriticalDesc": "Windows に必須、無効化不可"
   },
   "privacy": {
     "title": "プライバシークリーナー",
@@ -362,7 +414,9 @@ export const ja: TranslationSchema = {
     "addDomain": "ドメインを追加",
     "domainPlaceholder": "例: google.com, github.com",
     "noItemsFound": "項目が見つかりません",
-    "noItemsDesc": "消去対象のプライバシー履歴はありません。"
+    "noItemsDesc": "消去対象のプライバシー履歴はありません。",
+    "runningBrowsers": "実行中",
+    "allTypes": "すべての種類"
   },
   "maintenance": {
     "title": "システムメンテナンス",
@@ -378,7 +432,12 @@ export const ja: TranslationSchema = {
     "taskSuccess": "タスクが正常に完了しました",
     "taskFailed": "タスクの実行に失敗しました",
     "allCompleted": "すべてのメンテナンスが完了しました",
-    "noTasksFound": "タスクがありません"
+    "noTasksFound": "タスクがありません",
+    "availableTasks": "利用可能なタスク",
+    "tasksRun": "実行済みタスク",
+    "noTasksRunYet": "このセッションではまだタスクを実行していません",
+    "tasksSucceeded": "件成功",
+    "tasksFailed": "件失敗"
   },
   "optimization": {
     "title": "Windows最適化",
@@ -523,7 +582,10 @@ export const ja: TranslationSchema = {
     "versionLabel": "バージョン",
     "releaseStatus": "安定版リリース",
     "checkForUpdates": "更新プログラムを確認",
-    "repoLink": "GitHub公式リポジトリ"
+    "repoLink": "GitHub公式リポジトリ",
+    "themeNight": "OLED ナイト",
+    "themeNightDesc": "OLED 画面向けの純粋な黒",
+    "autoUpdateDesc": "アプリ起動時に毎回 GitHub で FreeMyDisk の新しいバージョンを確認します。"
   },
   "layout": {
     "physicalRam": "物理RAM",

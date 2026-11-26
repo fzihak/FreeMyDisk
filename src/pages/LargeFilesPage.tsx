@@ -68,6 +68,19 @@ interface DisposalSummary {
   failed_trash_paths: string[];
 }
 
+// Windows-managed files that must never be offered for deletion, even if a
+// scan result happens to include them (the backend also filters these out).
+const PROTECTED_SYSTEM_FILES = new Set([
+  "pagefile.sys",
+  "hiberfil.sys",
+  "swapfile.sys",
+  "dumpstack.log",
+  "dumpstack.log.tmp",
+]);
+
+const isProtectedSystemFile = (path: string): boolean =>
+  PROTECTED_SYSTEM_FILES.has((path.split(/[\\/]/).pop() || "").toLowerCase());
+
 export const LargeFilesPage: React.FC = () => {
   const { t } = useI18nStore();
   const { confirmBeforeDelete } = useSettingsStore();
@@ -299,6 +312,12 @@ export const LargeFilesPage: React.FC = () => {
     return Math.max(...scanResult.files.map((f) => f.size_bytes));
   }, [scanResult]);
 
+  // Rows that may be selected for removal (protected system files are excluded)
+  const selectableFiltered = useMemo(
+    () => filteredFiles.filter((f) => !isProtectedSystemFile(f.path)),
+    [filteredFiles]
+  );
+
   // Batch selection calculations
   const selectedFilesList = useMemo(() => {
     if (!scanResult || selectedPaths.size === 0) return [];
@@ -310,17 +329,18 @@ export const LargeFilesPage: React.FC = () => {
   }, [selectedFilesList]);
 
   const isAllFilteredSelected = useMemo(() => {
-    if (filteredFiles.length === 0) return false;
-    return filteredFiles.every((f) => selectedPaths.has(f.path));
-  }, [filteredFiles, selectedPaths]);
+    if (selectableFiltered.length === 0) return false;
+    return selectableFiltered.every((f) => selectedPaths.has(f.path));
+  }, [selectableFiltered, selectedPaths]);
 
   const isSomeFilteredSelected = useMemo(() => {
-    if (filteredFiles.length === 0 || isAllFilteredSelected) return false;
-    return filteredFiles.some((f) => selectedPaths.has(f.path));
-  }, [filteredFiles, selectedPaths, isAllFilteredSelected]);
+    if (selectableFiltered.length === 0 || isAllFilteredSelected) return false;
+    return selectableFiltered.some((f) => selectedPaths.has(f.path));
+  }, [selectableFiltered, selectedPaths, isAllFilteredSelected]);
 
   // Batch selection handlers
   const handleToggleRow = (index: number, path: string, event?: React.MouseEvent) => {
+    if (isProtectedSystemFile(path)) return;
     const next = new Set(selectedPaths);
     if (event?.shiftKey && lastSelectedIndex !== null && lastSelectedIndex !== index) {
       const start = Math.min(lastSelectedIndex, index);
@@ -328,7 +348,7 @@ export const LargeFilesPage: React.FC = () => {
       const targetState = !selectedPaths.has(path);
       for (let i = start; i <= end; i++) {
         const item = filteredFiles[i];
-        if (item) {
+        if (item && !isProtectedSystemFile(item.path)) {
           if (targetState) next.add(item.path);
           else next.delete(item.path);
         }
@@ -347,16 +367,16 @@ export const LargeFilesPage: React.FC = () => {
   const handleToggleMasterCheckbox = () => {
     const next = new Set(selectedPaths);
     if (isAllFilteredSelected) {
-      filteredFiles.forEach((f) => next.delete(f.path));
+      selectableFiltered.forEach((f) => next.delete(f.path));
     } else {
-      filteredFiles.forEach((f) => next.add(f.path));
+      selectableFiltered.forEach((f) => next.add(f.path));
     }
     setSelectedPaths(next);
   };
 
   const handleSelectAllFiltered = () => {
     const next = new Set(selectedPaths);
-    filteredFiles.forEach((f) => next.add(f.path));
+    selectableFiltered.forEach((f) => next.add(f.path));
     setSelectedPaths(next);
   };
 
@@ -367,7 +387,7 @@ export const LargeFilesPage: React.FC = () => {
 
   const handleInvertFiltered = () => {
     const next = new Set(selectedPaths);
-    filteredFiles.forEach((f) => {
+    selectableFiltered.forEach((f) => {
       if (next.has(f.path)) next.delete(f.path);
       else next.add(f.path);
     });
@@ -376,7 +396,7 @@ export const LargeFilesPage: React.FC = () => {
 
   const handleSelectGreaterThan = (bytes: number) => {
     const next = new Set(selectedPaths);
-    filteredFiles.forEach((f) => {
+    selectableFiltered.forEach((f) => {
       if (f.size_bytes >= bytes) {
         next.add(f.path);
       }
@@ -387,7 +407,7 @@ export const LargeFilesPage: React.FC = () => {
   const handleSelectOlderThanDays = (days: number) => {
     const cutoff = Math.floor(Date.now() / 1000) - days * 86400;
     const next = new Set(selectedPaths);
-    filteredFiles.forEach((f) => {
+    selectableFiltered.forEach((f) => {
       if (f.modified_at < cutoff) {
         next.add(f.path);
       }
@@ -408,7 +428,9 @@ export const LargeFilesPage: React.FC = () => {
 
   const scanTargetLabel =
     selectedDrive === "ALL"
-      ? `All Drives (${volumes.length > 0 ? volumes.map((v) => v.mount_point).join(", ") : "All"})`
+      ? volumes.length > 0
+        ? `${t.common.allDrives} (${volumes.map((v) => v.mount_point.replace(/[\\/]+$/, "")).join(" ")})`
+        : t.common.allDrives
       : selectedDrive;
 
   return (
@@ -492,7 +514,7 @@ export const LargeFilesPage: React.FC = () => {
               }`}
             >
               <HardDrive20Regular className="w-3.5 h-3.5" />
-              <span className="font-semibold">All Drives</span>
+              <span className="font-semibold">{t.common.allDrives}</span>
               <span
                 className={`text-[10px] px-1.5 py-0.5 rounded-[3px] font-ibm-mono tabular-nums ${
                   selectedDrive === "ALL" ? "bg-white/20 text-white" : "bg-black/30 text-[var(--text-secondary)]"
@@ -530,7 +552,7 @@ export const LargeFilesPage: React.FC = () => {
                       isSelected ? "bg-white/20 text-white" : "bg-black/30 text-[var(--text-secondary)]"
                     }`}
                   >
-                    {freeGb} GB / {totalGb} GB
+                    {freeGb} GB {t.common.freeOf} {totalGb} GB
                   </span>
                 </button>
               );
@@ -576,14 +598,14 @@ export const LargeFilesPage: React.FC = () => {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <WinUICard className="p-3.5">
           <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] mb-1">
-            <span className="font-medium text-[11px]">{t.common.files}</span>
+            <span className="font-medium text-[11px]">{t.largeFiles.statFiles}</span>
             <DocumentFolder24Filled className="w-3.5 h-3.5 text-[#0078d4]" />
           </div>
           <div className="text-xl font-bold text-[var(--text-primary)] font-ibm-mono tabular-nums">
             {scanResult ? scanResult.total_files.toLocaleString() : "—"}
           </div>
           <div className="text-[10px] text-[var(--text-muted)] font-ibm-mono mt-1">
-            ≥ {minSizeMb} MB
+            {scanResult ? `≥ ${minSizeMb} MB` : t.common.notScannedYet}
           </div>
         </WinUICard>
 
@@ -595,7 +617,7 @@ export const LargeFilesPage: React.FC = () => {
           <div className="text-xl font-bold text-indigo-400 font-ibm-mono tabular-nums">
             {scanResult ? formatBytes(scanResult.total_bytes) : "—"}
           </div>
-          <div className="text-[10px] text-[var(--text-muted)] font-ibm-mono truncate mt-1">
+          <div className="text-[10px] text-[var(--text-muted)] font-ibm-mono truncate mt-1" title={scanTargetLabel}>
             {scanTargetLabel}
           </div>
         </WinUICard>
@@ -630,7 +652,7 @@ export const LargeFilesPage: React.FC = () => {
       {/* Category Filter & Search Bar */}
       <WinUICard className="p-3 flex flex-col lg:flex-row items-center justify-between gap-3">
         {/* Category Tabs */}
-        <div className="flex items-center gap-1.5 overflow-x-auto w-full lg:w-auto pb-1 lg:pb-0">
+        <div className="flex items-center gap-1.5 min-w-0 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden w-full lg:w-auto">
           {categories.map((cat) => {
             const count = categoryStats[cat]?.count || 0;
             const bytes = categoryStats[cat]?.bytes || 0;
@@ -801,12 +823,16 @@ export const LargeFilesPage: React.FC = () => {
             {filteredFiles.map((file, idx) => {
               const percentage = Math.max(5, Math.round((file.size_bytes / maxFileSize) * 100));
               const isSelected = selectedPaths.has(file.path);
+              const isProtected = isProtectedSystemFile(file.path);
 
               return (
                 <div
                   key={file.path}
                   onClick={(e) => handleToggleRow(idx, file.path, e)}
-                  className={`px-4 py-3 flex items-center justify-between gap-4 transition-colors cursor-pointer select-none ${
+                  title={isProtected ? t.common.protectedSystemFile : undefined}
+                  className={`px-4 py-3 flex items-center justify-between gap-4 transition-colors select-none ${
+                    isProtected ? "cursor-default opacity-70" : "cursor-pointer"
+                  } ${
                     isSelected
                       ? "bg-[#0078d4]/10 hover:bg-[#0078d4]/15 border-l-2 border-[#0078d4]"
                       : "hover:bg-white/[0.02]"
@@ -878,14 +904,14 @@ export const LargeFilesPage: React.FC = () => {
                       <FolderOpen20Regular className="w-3.5 h-3.5" />
                     </button>
 
-                    {/* Quick Trash Button */}
+                    {/* Quick Trash Button (disabled for protected system files) */}
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleQuickTrash(file.path);
+                        if (!isProtected) handleQuickTrash(file.path);
                       }}
-                      disabled={trashingPath === file.path || batchTrashing}
-                      title={t.largeFiles.trashSelected}
+                      disabled={isProtected || trashingPath === file.path || batchTrashing}
+                      title={isProtected ? t.common.protectedSystemFile : t.largeFiles.trashSelected}
                       className="p-1.5 bg-black/20 hover:bg-rose-500/20 hover:text-rose-400 text-[var(--text-muted)] rounded-[4px] transition-all cursor-pointer disabled:opacity-50 border border-[var(--border-card)]"
                     >
                       <Delete20Regular className={`w-3.5 h-3.5 ${trashingPath === file.path ? "animate-spin text-rose-400" : ""}`} />

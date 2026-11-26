@@ -346,30 +346,28 @@ export const OptimizationPage: React.FC = () => {
   ];
 
   return (
-    <div className="p-8 max-w-5xl mx-auto space-y-6 select-none font-sans text-[var(--text-primary)] pb-28">
+    <div className="p-6 max-w-5xl mx-auto space-y-4 select-none font-sans text-[var(--text-primary)] pb-24">
       {/* WinUI Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-1">
-        <div className="flex items-center gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
           <div
-            className={`w-12 h-12 rounded-lg flex items-center justify-center shrink-0 shadow-sm border ${
-              activeTab === "system"
-                ? "bg-amber-500/10 border-amber-500/20 text-amber-400"
-                : "bg-blue-500/10 border-blue-500/20 text-blue-400"
+            className={`w-10 h-10 rounded-[4px] bg-white/[0.04] border border-[var(--border-subtle)] flex items-center justify-center shrink-0 ${
+              activeTab === "system" ? "text-amber-400" : "text-blue-400"
             }`}
           >
             {activeTab === "system" ? (
-              <Gauge24Filled className="w-7 h-7" />
+              <Gauge24Filled className="w-6 h-6" />
             ) : (
-              <Server20Filled className="w-7 h-7" />
+              <Server20Filled className="w-6 h-6" />
             )}
           </div>
-          <div>
-            <div className="flex items-center gap-2.5">
-              <h1 className="text-2xl font-semibold tracking-tight text-[var(--text-primary)]">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl font-semibold tracking-tight text-[var(--text-primary)]">
                 {activeTab === "system" ? t.optimization.title : t.virtualization.title}
               </h1>
               <span
-                className={`px-2.5 py-0.5 rounded-full text-[11px] font-ibm-mono font-medium uppercase tracking-wider border ${
+                className={`px-2 py-0.5 rounded-[4px] text-[10px] font-ibm-mono uppercase tracking-wider border ${
                   activeTab === "system"
                     ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
                     : "bg-blue-500/10 text-blue-400 border-blue-500/20"
@@ -378,7 +376,7 @@ export const OptimizationPage: React.FC = () => {
                 {activeTab === "system" ? t.optimization.windowsFeatures : "WSL2 • DOCKER • VM"}
               </span>
             </div>
-            <p className="text-xs text-[var(--text-secondary)] mt-1">
+            <p className="text-xs text-[var(--text-secondary)] mt-0.5">
               {activeTab === "system" ? t.optimization.subtitle : t.virtualization.subtitle}
             </p>
           </div>
@@ -389,9 +387,9 @@ export const OptimizationPage: React.FC = () => {
             variant="standard"
             onClick={loadOverview}
             disabled={loading}
-            className="flex items-center gap-2 self-start sm:self-auto px-4 py-2"
+            className="flex items-center gap-1.5 self-start sm:self-auto shrink-0"
           >
-            <ArrowClockwise20Regular className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+            <ArrowClockwise20Regular className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
             <span>{loading ? t.common.scanning : t.common.refresh}</span>
           </WinUIButton>
         )}

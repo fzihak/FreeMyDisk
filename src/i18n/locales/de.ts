@@ -68,7 +68,11 @@ export const de: TranslationSchema = {
     "keepFile": "Datei behalten",
     "permanentDelete": "Endgültig löschen",
     "items": "Elemente",
-    "files": "Dateien"
+    "files": "Dateien",
+    "allDrives": "Alle Laufwerke",
+    "freeOf": "frei von",
+    "notScannedYet": "Noch nicht gescannt",
+    "protectedSystemFile": "Geschützte Windows-Systemdatei (kann nicht entfernt werden)"
   },
   "dashboard": {
     "title": "Festplatten-Zustand & Übersicht",
@@ -121,7 +125,43 @@ export const de: TranslationSchema = {
     "systemReservedCategory": "System- & reservierter Speicher",
     "tempFilesCategory": "Temporäre Dateien & Caches",
     "usedSpaceCategory": "Belegt",
-    "freeSpaceCategory": "Freier Speicher"
+    "freeSpaceCategory": "Freier Speicher",
+    "scanningHeadline": "Scanning…",
+    "categoriesInspected": "{count} categories inspected",
+    "categoriesHint": "Temporary files, cache & logs",
+    "reclaimable": "reclaimable",
+    "nothingToClean": "Nothing to clean right now",
+    "moreNeedsAdmin": "{size} more needs administrator rights",
+    "moreNeedsAppsClosed": "{size} more needs {apps} closed",
+    "lastCleanTitle": "Last clean",
+    "lastCleanFreed": "{size} freed",
+    "lastCleanRecycled": "{size} moved to Recycle Bin",
+    "lastCleanItems": "{count} items cleaned",
+    "lastCleanSkipped": "{count} skipped",
+    "lastCleanFailed": "{count} failed",
+    "reasonNeedsAdmin": "needs administrator",
+    "reasonInUse": "in use",
+    "reasonTrashUnavailable": "Recycle Bin unavailable",
+    "reasonProtected": "protected",
+    "refreshingResults": "Updating results…",
+    "duplicatesEngineDesc": "Byte-identical duplicate detection (BLAKE3) with hard-link protection",
+    "rescueWillDoTitle": "Emergency Rescue will:",
+    "rescueBinPermanent": "Permanently delete everything in the Recycle Bin ({items} items, {size}). This cannot be undone.",
+    "rescueBinEmpty": "Empty the Recycle Bin (it is empty now)",
+    "rescueTempSafe": "Remove temporary files, crash dumps, error reports and shader caches older than 24 hours. Files in use are kept.",
+    "rescueHiberAdmin": "Turn off hibernation and remove hiberfil.sys (needs administrator; skipped otherwise)",
+    "rescueWslNote": "Shut down WSL if it is running",
+    "rescueStepCounter": "Step {current} of {total}",
+    "rescueStepRecycleBin": "Emptying the Recycle Bin",
+    "rescueStepTemp": "Removing old temporary files",
+    "rescueStepHibernation": "Turning off hibernation",
+    "rescueStepWsl": "Shutting down WSL",
+    "rescueFreedSoFar": "{size} freed so far",
+    "rescueFinished": "Emergency Rescue finished: {size} freed",
+    "rescueStopped": "Emergency Rescue stopped before it finished",
+    "rescueStatusDone": "Done",
+    "rescueStatusSkipped": "Skipped",
+    "rescueStatusFailed": "Failed"
   },
   "cleanup": {
     "title": "Tiefenbereinigung",
@@ -169,7 +209,10 @@ export const de: TranslationSchema = {
     "closeToUnlock": "Schließen, um Verzeichnisse freizugeben",
     "appsClosedSuccess": "Aktive Anwendungen wurden geschlossen.",
     "retryFailed": "Wiederholung fehlgeschlagen",
-    "permanentDeleteFailed": "Endgültiges Löschen fehlgeschlagen"
+    "permanentDeleteFailed": "Endgültiges Löschen fehlgeschlagen",
+    "routeRecycleBinNote": "Dateien werden in den Papierkorb verschoben und lassen sich wiederherstellen.",
+    "routePermanentNote": "Papierkorb-Umleitung ist in den Einstellungen aus: Dateien werden endgültig gelöscht.",
+    "selectToClean": "Elemente zum Bereinigen auswählen"
   },
   "storage": {
     "title": "Speicher-Visualisierer",
@@ -229,7 +272,8 @@ export const de: TranslationSchema = {
     "trashSelected": "In den Papierkorb",
     "trashConfirm": "Ausgewählte Dateien in den Papierkorb verschieben?",
     "noFilesFound": "Keine großen Dateien gefunden",
-    "noFilesDesc": "Keine Dateien über der Mindestgröße gefunden."
+    "noFilesDesc": "Keine Dateien über der Mindestgröße gefunden.",
+    "statFiles": "Große Dateien"
   },
   "duplicates": {
     "title": "Duplikate-Finder",
@@ -260,7 +304,11 @@ export const de: TranslationSchema = {
     "potentialSavings": "Mögliche Einsparung",
     "hardlinkNotice": "Identische Inodes (Hardlinks) werden nicht doppelt gezählt.",
     "noDuplicatesFound": "Keine Duplikate gefunden",
-    "noDuplicatesDesc": "Keine identischen Dateien auf dem Laufwerk entdeckt."
+    "noDuplicatesDesc": "Keine identischen Dateien auf dem Laufwerk entdeckt.",
+    "statSets": "Duplikat-Gruppen",
+    "statFiles": "Doppelte Dateien",
+    "setsShown": "mit aktuellen Filtern angezeigt",
+    "filesSelected": "zum Entfernen ausgewählt"
   },
   "applications": {
     "title": "Apps & Reste",
@@ -339,7 +387,11 @@ export const de: TranslationSchema = {
     "confirmDeleteTitle": "Autostart-Eintrag löschen",
     "confirmDeleteDesc": "Möchten Sie diesen Autostart-Eintrag wirklich dauerhaft entfernen?",
     "noItemsFound": "Keine Einträge gefunden",
-    "noItemsDesc": "Keine Autostart-Programme vorhanden."
+    "noItemsDesc": "Keine Autostart-Programme vorhanden.",
+    "statAllDesc": "Registry, Autostart-Ordner & geplante Aufgaben",
+    "statEnabledDesc": "Starten automatisch bei der Anmeldung",
+    "statHighDesc": "Aktivierte Einträge, die den Start verlangsamen",
+    "statCriticalDesc": "Von Windows benötigt, nicht deaktivierbar"
   },
   "privacy": {
     "title": "Datenschutz",
@@ -362,7 +414,9 @@ export const de: TranslationSchema = {
     "addDomain": "Domain hinzufügen",
     "domainPlaceholder": "z.B. google.de, github.com",
     "noItemsFound": "Keine Einträge gefunden",
-    "noItemsDesc": "Keine Datenschutzspuren vorhanden."
+    "noItemsDesc": "Keine Datenschutzspuren vorhanden.",
+    "runningBrowsers": "Aktiv",
+    "allTypes": "Alle Typen"
   },
   "maintenance": {
     "title": "Systemwartung",
@@ -378,7 +432,12 @@ export const de: TranslationSchema = {
     "taskSuccess": "Aufgabe erfolgreich abgeschlossen",
     "taskFailed": "Ausführung fehlgeschlagen",
     "allCompleted": "Alle Aufgaben abgeschlossen",
-    "noTasksFound": "Keine Aufgaben gefunden"
+    "noTasksFound": "Keine Aufgaben gefunden",
+    "availableTasks": "Verfügbare Aufgaben",
+    "tasksRun": "Ausgeführte Aufgaben",
+    "noTasksRunYet": "In dieser Sitzung noch keine Aufgaben ausgeführt",
+    "tasksSucceeded": "erfolgreich",
+    "tasksFailed": "fehlgeschlagen"
   },
   "optimization": {
     "title": "Windows-Optimierer",
@@ -523,7 +582,10 @@ export const de: TranslationSchema = {
     "versionLabel": "Version",
     "releaseStatus": "Stabiles Release",
     "checkForUpdates": "Nach Updates suchen",
-    "repoLink": "Offizielles GitHub-Repository"
+    "repoLink": "Offizielles GitHub-Repository",
+    "themeNight": "OLED-Nacht",
+    "themeNightDesc": "Reines Schwarz für OLED-Bildschirme",
+    "autoUpdateDesc": "Bei jedem App-Start auf GitHub nach einer neueren FreeMyDisk-Version suchen."
   },
   "layout": {
     "physicalRam": "Physischer RAM",

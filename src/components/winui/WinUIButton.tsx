@@ -40,7 +40,7 @@ export const WinUIButton: React.FC<WinUIButtonProps> = ({
   return (
     <button
       disabled={disabled}
-      className={`inline-flex items-center justify-center rounded-[4px] border font-normal transition-all duration-100 select-none cursor-pointer active:scale-[0.98] ${sizeClasses} ${variantClasses} ${
+      className={`inline-flex items-center justify-center whitespace-nowrap rounded-[4px] border font-normal transition-all duration-100 select-none cursor-pointer active:scale-[0.98] ${sizeClasses} ${variantClasses} ${
         disabled ? "opacity-40 cursor-not-allowed pointer-events-none" : ""
       } ${className}`}
       {...props}

@@ -68,7 +68,11 @@ export const en: TranslationSchema = {
     "keepFile": "Keep File",
     "permanentDelete": "Permanently Delete",
     "items": "items",
-    "files": "files"
+    "files": "files",
+    "allDrives": "All Drives",
+    "freeOf": "free of",
+    "notScannedYet": "Not scanned yet",
+    "protectedSystemFile": "Protected Windows system file (cannot be removed)"
   },
   "dashboard": {
     "title": "Disk Health & Overview",
@@ -121,11 +125,47 @@ export const en: TranslationSchema = {
     "systemReservedCategory": "System & Reserved Files",
     "tempFilesCategory": "Temporary Files & Caches",
     "usedSpaceCategory": "In Use",
-    "freeSpaceCategory": "Free Space"
+    "freeSpaceCategory": "Free Space",
+    "scanningHeadline": "Scanning…",
+    "categoriesInspected": "{count} categories inspected",
+    "categoriesHint": "Temporary files, cache & logs",
+    "reclaimable": "reclaimable",
+    "nothingToClean": "Nothing to clean right now",
+    "moreNeedsAdmin": "{size} more needs administrator rights",
+    "moreNeedsAppsClosed": "{size} more needs {apps} closed",
+    "lastCleanTitle": "Last clean",
+    "lastCleanFreed": "{size} freed",
+    "lastCleanRecycled": "{size} moved to Recycle Bin",
+    "lastCleanItems": "{count} items cleaned",
+    "lastCleanSkipped": "{count} skipped",
+    "lastCleanFailed": "{count} failed",
+    "reasonNeedsAdmin": "needs administrator",
+    "reasonInUse": "in use",
+    "reasonTrashUnavailable": "Recycle Bin unavailable",
+    "reasonProtected": "protected",
+    "refreshingResults": "Updating results…",
+    "duplicatesEngineDesc": "Byte-identical duplicate detection (BLAKE3) with hard-link protection",
+    "rescueWillDoTitle": "Emergency Rescue will:",
+    "rescueBinPermanent": "Permanently delete everything in the Recycle Bin ({items} items, {size}). This cannot be undone.",
+    "rescueBinEmpty": "Empty the Recycle Bin (it is empty now)",
+    "rescueTempSafe": "Remove temporary files, crash dumps, error reports and shader caches older than 24 hours. Files in use are kept.",
+    "rescueHiberAdmin": "Turn off hibernation and remove hiberfil.sys (needs administrator; skipped otherwise)",
+    "rescueWslNote": "Shut down WSL if it is running",
+    "rescueStepCounter": "Step {current} of {total}",
+    "rescueStepRecycleBin": "Emptying the Recycle Bin",
+    "rescueStepTemp": "Removing old temporary files",
+    "rescueStepHibernation": "Turning off hibernation",
+    "rescueStepWsl": "Shutting down WSL",
+    "rescueFreedSoFar": "{size} freed so far",
+    "rescueFinished": "Emergency Rescue finished: {size} freed",
+    "rescueStopped": "Emergency Rescue stopped before it finished",
+    "rescueStatusDone": "Done",
+    "rescueStatusSkipped": "Skipped",
+    "rescueStatusFailed": "Failed"
   },
   "cleanup": {
     "title": "Deep System & Cache Cleanup",
-    "subtitle": "Targets temporary system files, shader caches, browser databases, build artifacts, and downloads. Files are safely routed to Recycle Bin by default.",
+    "subtitle": "Targets temporary system files, shader caches, browser databases, build artifacts, and downloads.",
     "safeBadge": "SAFE CLEANUP",
     "rescan": "Rescan Rules",
     "scanningFiles": "Scanning filesystem for cleanable junk files...",
@@ -169,7 +209,10 @@ export const en: TranslationSchema = {
     "closeToUnlock": "Close to unlock directories",
     "appsClosedSuccess": "Closed active application(s) to unlock cache directories.",
     "retryFailed": "Retry failed",
-    "permanentDeleteFailed": "Permanent delete failed"
+    "permanentDeleteFailed": "Permanent delete failed",
+    "routeRecycleBinNote": "Files are moved to the Recycle Bin, so you can restore them.",
+    "routePermanentNote": "Recycle Bin routing is off in Settings: files are deleted permanently.",
+    "selectToClean": "Select items to clean"
   },
   "storage": {
     "title": "Storage Space Visualizer & Heavy Folders",
@@ -229,7 +272,8 @@ export const en: TranslationSchema = {
     "trashSelected": "Move to Recycle Bin",
     "trashConfirm": "Are you sure you want to move this file to the Recycle Bin?",
     "noFilesFound": "No Large Files Found",
-    "noFilesDesc": "No files matching your size threshold and filters were located."
+    "noFilesDesc": "No files matching your size threshold and filters were located.",
+    "statFiles": "Large Files"
   },
   "duplicates": {
     "title": "Duplicate Files Finder",
@@ -260,7 +304,11 @@ export const en: TranslationSchema = {
     "potentialSavings": "Potential Reclaimable Space",
     "hardlinkNotice": "Hard-link alias (shares disk blocks, 0 bytes reclaimable)",
     "noDuplicatesFound": "No Duplicates Found",
-    "noDuplicatesDesc": "All files in this location appear to be unique."
+    "noDuplicatesDesc": "All files in this location appear to be unique.",
+    "statSets": "Duplicate Sets",
+    "statFiles": "Duplicate Files",
+    "setsShown": "shown with current filters",
+    "filesSelected": "selected for removal"
   },
   "applications": {
     "title": "Software & Bloatware Manager",
@@ -339,7 +387,11 @@ export const en: TranslationSchema = {
     "confirmDeleteTitle": "Confirm Startup Entry Removal",
     "confirmDeleteDesc": "Are you sure you want to delete this startup registry entry permanently?",
     "noItemsFound": "No Startup Items Found",
-    "noItemsDesc": "No startup applications match your current filters."
+    "noItemsDesc": "No startup applications match your current filters.",
+    "statAllDesc": "Registry, Startup folder & scheduled tasks",
+    "statEnabledDesc": "Launch automatically at sign-in",
+    "statHighDesc": "Enabled entries that slow down boot",
+    "statCriticalDesc": "Required by Windows, cannot be disabled"
   },
   "privacy": {
     "title": "Browser & Privacy Cleaner",
@@ -362,7 +414,9 @@ export const en: TranslationSchema = {
     "addDomain": "Add Domain",
     "domainPlaceholder": "e.g. github.com",
     "noItemsFound": "Zero Privacy Items Found",
-    "noItemsDesc": "No browsing traces or tracking files found matching your criteria."
+    "noItemsDesc": "No browsing traces or tracking files found matching your criteria.",
+    "runningBrowsers": "Running",
+    "allTypes": "All Types"
   },
   "maintenance": {
     "title": "System Maintenance & Health",
@@ -378,7 +432,12 @@ export const en: TranslationSchema = {
     "taskSuccess": "Maintenance task completed successfully.",
     "taskFailed": "Task execution failed.",
     "allCompleted": "All recommended maintenance tasks finished successfully.",
-    "noTasksFound": "No maintenance tasks available."
+    "noTasksFound": "No maintenance tasks available.",
+    "availableTasks": "Available Tasks",
+    "tasksRun": "Tasks Run",
+    "noTasksRunYet": "No tasks run yet this session",
+    "tasksSucceeded": "succeeded",
+    "tasksFailed": "failed"
   },
   "optimization": {
     "title": "Windows System Optimizer",
@@ -523,7 +582,10 @@ export const en: TranslationSchema = {
     "versionLabel": "Version",
     "releaseStatus": "Production Release",
     "checkForUpdates": "Check for Updates",
-    "repoLink": "GitHub Repository"
+    "repoLink": "GitHub Repository",
+    "themeNight": "OLED Night",
+    "themeNightDesc": "Pure black for OLED screens",
+    "autoUpdateDesc": "Check GitHub for a newer FreeMyDisk release each time the app starts."
   },
   "layout": {
     "physicalRam": "Physical RAM",

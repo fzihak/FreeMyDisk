@@ -231,11 +231,11 @@ export const PrivacyPage: React.FC = () => {
     <div className="p-6 max-w-5xl mx-auto space-y-4 select-none font-sans text-[var(--text-primary)] pb-24">
       {/* WinUI 3 Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 min-w-0">
           <div className="w-10 h-10 rounded-[4px] bg-white/[0.04] border border-[var(--border-subtle)] flex items-center justify-center text-purple-400 shrink-0">
             <ShieldCheckmark24Filled className="w-6 h-6" />
           </div>
-          <div>
+          <div className="min-w-0">
             <div className="flex items-center gap-2">
               <h1 className="text-xl font-semibold tracking-tight text-[var(--text-primary)]">
                 {t.privacy.title}
@@ -250,21 +250,20 @@ export const PrivacyPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className="flex items-center gap-2 shrink-0">
           <WinUIButton
             variant="standard"
             onClick={() => setWhitelistModalOpen(true)}
-            className="flex items-center gap-1.5 font-ibm-mono text-xs"
+            icon={<Globe20Regular className="w-3.5 h-3.5 text-cyan-400" />}
           >
-            <Globe20Regular className="w-3.5 h-3.5 text-cyan-400" />
-            <span className="font-sans">{t.privacy.cookieWhitelist}</span> ({whitelistDomains.length})
+            {t.privacy.cookieWhitelist} ({whitelistDomains.length})
           </WinUIButton>
 
           <WinUIButton
-            variant="subtle"
+            variant="standard"
             onClick={handleScan}
             disabled={loading}
-            className="flex items-center gap-1.5 text-xs"
+            className="flex items-center gap-1.5"
           >
             <ArrowClockwise20Regular className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
             <span>{loading ? t.common.scanning : t.common.rescan}</span>
@@ -275,7 +274,7 @@ export const PrivacyPage: React.FC = () => {
               variant="primary"
               onClick={handleClean}
               disabled={cleaning || loading}
-              className="flex items-center gap-1.5 font-ibm-mono text-xs bg-purple-600 hover:bg-purple-500 text-white"
+              className="flex items-center gap-1.5 bg-purple-600 hover:bg-purple-500 text-white"
             >
               <Delete20Regular className="w-3.5 h-3.5" />
               <span>{cleaning ? t.privacy.cleaningProgress : `${t.privacy.cleanSelected} (${formatBytes(selectedBytes)})`}</span>
@@ -290,8 +289,10 @@ export const PrivacyPage: React.FC = () => {
           <div className="flex items-center gap-2.5 min-w-0">
             <Warning20Filled className="w-4 h-4 text-amber-400 shrink-0" />
             <div className="text-xs text-amber-300">
-              <span className="font-semibold">{t.privacy.activeBrowserNotice}:</span>{" "}
-              {scanResult.running_browsers.join(", ")}
+              <span className="font-semibold">{t.privacy.activeBrowserNotice}</span>{" "}
+              <span>
+                {t.privacy.runningBrowsers}: {scanResult.running_browsers.join(", ")}
+              </span>
             </div>
           </div>
           <WinUIButton
@@ -355,9 +356,9 @@ export const PrivacyPage: React.FC = () => {
         {/* Category Pills & Browser Filters */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1 border-t border-[var(--border-divider)]">
           {/* Category Filter Pills */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+          <div className="flex items-center gap-1.5 min-w-0 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {[
-              { id: "all", label: "All Types" },
+              { id: "all", label: t.privacy.allTypes },
               { id: "cache", label: t.privacy.categoryCache },
               { id: "history", label: t.privacy.categoryHistory },
               { id: "cookies", label: t.privacy.categoryCookies },
@@ -379,7 +380,7 @@ export const PrivacyPage: React.FC = () => {
           </div>
 
           {/* Browser Filter Pills */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+          <div className="flex items-center gap-1.5 min-w-0 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <button
               onClick={() => setActiveBrowserFilter("all")}
               className={`px-2.5 py-0.5 rounded-[4px] text-xs font-medium transition-all whitespace-nowrap cursor-pointer ${
@@ -388,7 +389,7 @@ export const PrivacyPage: React.FC = () => {
                   : "bg-black/20 text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border-card)]"
               }`}
             >
-              {t.privacy.filterAll} ({items.length})
+              {t.privacy.filterAll} ({browserNames.length})
             </button>
             {browserNames.map((name) => (
               <button

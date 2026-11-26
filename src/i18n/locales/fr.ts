@@ -68,7 +68,11 @@ export const fr: TranslationSchema = {
     "keepFile": "Conserver le fichier",
     "permanentDelete": "Supprimer définitivement",
     "items": "éléments",
-    "files": "fichiers"
+    "files": "fichiers",
+    "allDrives": "Tous les lecteurs",
+    "freeOf": "libres sur",
+    "notScannedYet": "Pas encore analysé",
+    "protectedSystemFile": "Fichier système Windows protégé (suppression impossible)"
   },
   "dashboard": {
     "title": "État et santé du disque",
@@ -121,11 +125,47 @@ export const fr: TranslationSchema = {
     "systemReservedCategory": "Fichiers système et réservés",
     "tempFilesCategory": "Fichiers temporaires et caches",
     "usedSpaceCategory": "Utilisé",
-    "freeSpaceCategory": "Espace libre"
+    "freeSpaceCategory": "Espace libre",
+    "scanningHeadline": "Scanning…",
+    "categoriesInspected": "{count} categories inspected",
+    "categoriesHint": "Temporary files, cache & logs",
+    "reclaimable": "reclaimable",
+    "nothingToClean": "Nothing to clean right now",
+    "moreNeedsAdmin": "{size} more needs administrator rights",
+    "moreNeedsAppsClosed": "{size} more needs {apps} closed",
+    "lastCleanTitle": "Last clean",
+    "lastCleanFreed": "{size} freed",
+    "lastCleanRecycled": "{size} moved to Recycle Bin",
+    "lastCleanItems": "{count} items cleaned",
+    "lastCleanSkipped": "{count} skipped",
+    "lastCleanFailed": "{count} failed",
+    "reasonNeedsAdmin": "needs administrator",
+    "reasonInUse": "in use",
+    "reasonTrashUnavailable": "Recycle Bin unavailable",
+    "reasonProtected": "protected",
+    "refreshingResults": "Updating results…",
+    "duplicatesEngineDesc": "Byte-identical duplicate detection (BLAKE3) with hard-link protection",
+    "rescueWillDoTitle": "Emergency Rescue will:",
+    "rescueBinPermanent": "Permanently delete everything in the Recycle Bin ({items} items, {size}). This cannot be undone.",
+    "rescueBinEmpty": "Empty the Recycle Bin (it is empty now)",
+    "rescueTempSafe": "Remove temporary files, crash dumps, error reports and shader caches older than 24 hours. Files in use are kept.",
+    "rescueHiberAdmin": "Turn off hibernation and remove hiberfil.sys (needs administrator; skipped otherwise)",
+    "rescueWslNote": "Shut down WSL if it is running",
+    "rescueStepCounter": "Step {current} of {total}",
+    "rescueStepRecycleBin": "Emptying the Recycle Bin",
+    "rescueStepTemp": "Removing old temporary files",
+    "rescueStepHibernation": "Turning off hibernation",
+    "rescueStepWsl": "Shutting down WSL",
+    "rescueFreedSoFar": "{size} freed so far",
+    "rescueFinished": "Emergency Rescue finished: {size} freed",
+    "rescueStopped": "Emergency Rescue stopped before it finished",
+    "rescueStatusDone": "Done",
+    "rescueStatusSkipped": "Skipped",
+    "rescueStatusFailed": "Failed"
   },
   "cleanup": {
     "title": "Nettoyage approfondi du système et des caches",
-    "subtitle": "Supprime les fichiers système temporaires, shaders, bases de données de navigateurs et archives de compilation. Les fichiers vont à la corbeille par défaut.",
+    "subtitle": "Supprime les fichiers système temporaires, shaders, bases de données de navigateurs et archives de compilation.",
     "safeBadge": "NETTOYAGE SÉCURISÉ",
     "rescan": "Réanalyser les règles",
     "scanningFiles": "Recherche des fichiers pouvant être nettoyés...",
@@ -169,7 +209,10 @@ export const fr: TranslationSchema = {
     "closeToUnlock": "Fermer pour déverrouiller les dossiers",
     "appsClosedSuccess": "Applications fermées avec succès pour libérer les dossiers de cache.",
     "retryFailed": "Échec de la nouvelle tentative",
-    "permanentDeleteFailed": "Échec de la suppression définitive"
+    "permanentDeleteFailed": "Échec de la suppression définitive",
+    "routeRecycleBinNote": "Les fichiers sont déplacés vers la Corbeille et peuvent être restaurés.",
+    "routePermanentNote": "L'envoi vers la Corbeille est désactivé dans les Paramètres : les fichiers sont supprimés définitivement.",
+    "selectToClean": "Sélectionnez des éléments à nettoyer"
   },
   "storage": {
     "title": "Visualiseur d'espace et dossiers volumineux",
@@ -229,7 +272,8 @@ export const fr: TranslationSchema = {
     "trashSelected": "Mettre à la corbeille",
     "trashConfirm": "Voulez-vous vraiment placer ce fichier dans la corbeille ?",
     "noFilesFound": "Aucun fichier volumineux trouvé",
-    "noFilesDesc": "Aucun fichier ne correspond aux critères de taille et aux filtres choisis."
+    "noFilesDesc": "Aucun fichier ne correspond aux critères de taille et aux filtres choisis.",
+    "statFiles": "Fichiers volumineux"
   },
   "duplicates": {
     "title": "Recherche de fichiers en double",
@@ -260,7 +304,11 @@ export const fr: TranslationSchema = {
     "potentialSavings": "Gain d'espace potentiel",
     "hardlinkNotice": "Lien physique (partage les blocs disque, 0 octet libérable)",
     "noDuplicatesFound": "Aucun doublon trouvé",
-    "noDuplicatesDesc": "Tous les fichiers analysés dans cet emplacement sont uniques."
+    "noDuplicatesDesc": "Tous les fichiers analysés dans cet emplacement sont uniques.",
+    "statSets": "Groupes de doublons",
+    "statFiles": "Fichiers en double",
+    "setsShown": "affichés avec les filtres actuels",
+    "filesSelected": "sélectionnés pour suppression"
   },
   "applications": {
     "title": "Gestionnaire de logiciels et composants superflus",
@@ -339,7 +387,11 @@ export const fr: TranslationSchema = {
     "confirmDeleteTitle": "Confirmer la suppression",
     "confirmDeleteDesc": "Voulez-vous vraiment supprimer définitivement cette entrée du registre Windows ?",
     "noItemsFound": "Aucun élément de démarrage",
-    "noItemsDesc": "Aucune application de démarrage ne correspond à vos filtres."
+    "noItemsDesc": "Aucune application de démarrage ne correspond à vos filtres.",
+    "statAllDesc": "Registre, dossier Démarrage et tâches planifiées",
+    "statEnabledDesc": "Se lancent automatiquement à l'ouverture de session",
+    "statHighDesc": "Entrées actives qui ralentissent le démarrage",
+    "statCriticalDesc": "Requises par Windows, impossible à désactiver"
   },
   "privacy": {
     "title": "Nettoyeur de confidentialité",
@@ -362,7 +414,9 @@ export const fr: TranslationSchema = {
     "addDomain": "Ajouter un domaine",
     "domainPlaceholder": "ex. github.com",
     "noItemsFound": "Zéro élément trouvé",
-    "noItemsDesc": "Aucune trace de navigation ne correspond à vos critères."
+    "noItemsDesc": "Aucune trace de navigation ne correspond à vos critères.",
+    "runningBrowsers": "En cours",
+    "allTypes": "Tous les types"
   },
   "maintenance": {
     "title": "Maintenance et santé système",
@@ -378,7 +432,12 @@ export const fr: TranslationSchema = {
     "taskSuccess": "Tâche de maintenance effectuée avec succès.",
     "taskFailed": "L'exécution de la tâche a échoué.",
     "allCompleted": "Toutes les tâches recommandées ont été exécutées avec succès.",
-    "noTasksFound": "Aucune tâche de maintenance disponible."
+    "noTasksFound": "Aucune tâche de maintenance disponible.",
+    "availableTasks": "Tâches disponibles",
+    "tasksRun": "Tâches exécutées",
+    "noTasksRunYet": "Aucune tâche exécutée pendant cette session",
+    "tasksSucceeded": "réussies",
+    "tasksFailed": "échouées"
   },
   "optimization": {
     "title": "Optimiseur du système Windows",
@@ -523,7 +582,10 @@ export const fr: TranslationSchema = {
     "versionLabel": "Version",
     "releaseStatus": "Version finale de production",
     "checkForUpdates": "Rechercher des mises à jour",
-    "repoLink": "Dépôt GitHub"
+    "repoLink": "Dépôt GitHub",
+    "themeNight": "Nuit OLED",
+    "themeNightDesc": "Noir pur pour écrans OLED",
+    "autoUpdateDesc": "Rechercher sur GitHub une version plus récente de FreeMyDisk à chaque démarrage de l'application."
   },
   "layout": {
     "physicalRam": "RAM physique",
