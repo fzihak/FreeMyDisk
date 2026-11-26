@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Download the latest version
+    url: https://github.com/fzihak/FreeMyDisk/releases/latest
+    about: Check whether the issue is already fixed in the newest release.

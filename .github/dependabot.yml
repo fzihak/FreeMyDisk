@@ -11,3 +11,12 @@ updates:
     groups:
       github-actions:
         patterns: ["*"]
+    # These major versions broke CI or change the release build; update them
+    # by hand after testing (tauri-action only runs on a real release).
+    ignore:
+      - dependency-name: "pnpm/action-setup"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "actions/cache"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "tauri-apps/tauri-action"
+        update-types: ["version-update:semver-major"]

@@ -172,7 +172,8 @@ fn test_live_candidates_and_plan() {
     let candidates = engine
         .scan_all_candidates(&rule_ids, &cancel)
         .expect("Candidates scan failed");
-    assert!(!candidates.is_empty(), "Candidates should not be empty");
+    // A clean machine (such as a fresh CI runner) may have nothing to clean;
+    // the plan must still be consistent with what was found.
     let candidate_count = candidates.len();
     println!(
         "\n=== CANDIDATES COUNT for Chrome & Temp: {} ===",
@@ -196,8 +197,9 @@ fn test_live_candidates_and_plan() {
     // The machine's real cache contents vary (CI runners often hold only
     // empty or freshly created temp entries), so check that the plan is
     // consistent rather than that this machine has something to clean.
-    assert!(
-        !plan.items.is_empty(),
+    assert_eq!(
+        plan.items.is_empty(),
+        candidate_count == 0,
         "Plan should keep the scanned candidates"
     );
     assert_eq!(
