@@ -57,16 +57,16 @@ export const WinUIToggle: React.FC<WinUIToggleProps> = ({
       <div
         className={`relative w-10 h-5 rounded-full transition-all duration-150 ease-out ${
           checked
-            ? "bg-[#0078d4] hover:bg-[#106ebe] border border-transparent shadow-sm"
-            : "bg-black/20 hover:bg-black/30 border border-white/40 hover:border-white/60"
+            ? "bg-[var(--accent)] hover:bg-[var(--accent-hover)] border border-transparent"
+            : "bg-transparent hover:bg-[var(--fill-subtle)] border border-[var(--text-secondary)]"
         }`}
       >
         {/* Sliding thumb knob */}
         <span
-          className={`absolute top-1/2 -translate-y-1/2 rounded-full bg-white transition-all duration-150 ease-out shadow-[0_1px_2px_rgba(0,0,0,0.3)] ${
+          className={`absolute top-1/2 -translate-y-1/2 rounded-full transition-all duration-150 ease-out ${
             checked
-              ? "left-[23px] w-3.5 h-3.5"
-              : "left-[3px] w-3 h-3 bg-white/90"
+              ? "left-[22px] w-3.5 h-3.5 bg-white"
+              : "left-[3px] w-3 h-3 bg-[var(--text-secondary)]"
           }`}
         />
       </div>

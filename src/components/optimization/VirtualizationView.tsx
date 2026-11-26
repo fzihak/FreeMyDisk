@@ -2,21 +2,21 @@ import React, { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { useI18nStore } from "@/i18n";
-import { WinUICard } from "@/components/winui/WinUICard";
 import { WinUIButton } from "@/components/winui/WinUIButton";
 import { toast } from "@/stores/toast-store";
+import { SectionTitle, Card, StatCard, Badge, ProgressBar, EmptyState } from "@/components/ui";
 import {
-  Server20Filled,
-  Box20Filled,
-  Desktop20Filled,
+  Server20Regular,
+  Box20Regular,
+  Desktop20Regular,
   ArrowClockwise20Regular,
+  ArrowMinimize20Regular,
   CheckmarkCircle20Filled,
-  ShieldError20Filled,
+  Warning20Regular,
   Info20Regular,
   FolderOpen16Regular,
   Delete20Regular,
-  Flash20Filled,
-  Sparkle20Filled,
+  Sparkle20Regular,
 } from "@fluentui/react-icons";
 
 export interface WslDistribution {
@@ -76,7 +76,10 @@ export interface CompactionResult {
   message: string;
 }
 
-export const VirtualizationView: React.FC = () => {
+export const VirtualizationView: React.FC<{
+  /** Bumped by the parent page's Refresh button to reload the overview. */
+  refreshToken?: number;
+}> = ({ refreshToken = 0 }) => {
   const { t } = useI18nStore();
   const [overview, setOverview] = useState<VirtualizationOverview | null>(null);
   const [loading, setLoading] = useState(false);
@@ -106,7 +109,7 @@ export const VirtualizationView: React.FC = () => {
 
   useEffect(() => {
     loadOverview();
-  }, []);
+  }, [refreshToken]);
 
   const handleCompactWsl = async (distro: WslDistribution) => {
     setCompactingDistro(distro.name);
@@ -159,356 +162,301 @@ export const VirtualizationView: React.FC = () => {
     (overview?.total_wsl_reclaimable || 0) +
     (overview?.docker?.total_reclaimable_bytes || 0);
 
+  const operationLabel = compactingDistro
+    ? `${t.virtualization.compacting} ${compactingDistro}`
+    : pruningType
+    ? t.virtualization.dockerPruning
+    : loading
+    ? t.common.scanning
+    : null;
+
+  const tileClass =
+    "w-9 h-9 rounded-md bg-[var(--fill-subtle)] border border-[var(--border-card)] flex items-center justify-center shrink-0 text-[var(--text-secondary)] [&_svg]:w-5 [&_svg]:h-5";
+
+  const revealButton = (path: string) => (
+    <span title={t.virtualization.revealInExplorer} className="shrink-0">
+      <WinUIButton
+        variant="subtle"
+        size="sm"
+        className="w-7 !px-0"
+        aria-label={t.virtualization.revealInExplorer}
+        onClick={() => handleReveal(path)}
+        icon={<FolderOpen16Regular className="w-4 h-4 text-[var(--text-secondary)]" />}
+      />
+    </span>
+  );
+
   return (
-    <div className="space-y-6 select-none font-sans text-[var(--text-primary)]">
-      {/* 4-Stat Strip */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 font-ibm-mono">
-        {/* WSL2 Card */}
-        <WinUICard className="p-5 flex flex-col justify-between space-y-3">
-          <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] font-sans">
-            <span className="font-medium">{t.virtualization.statWsl}</span>
-            <Server20Filled className="w-4 h-4 text-blue-400 shrink-0" />
-          </div>
-          <div>
-            <div className="text-2xl font-bold text-blue-400 tabular-nums">
-              {formatBytes(overview?.total_wsl_bytes || 0)}
-            </div>
-            <div className="text-xs text-[var(--text-muted)] mt-1 font-sans">
-              {overview?.wsl_distributions.length || 0} {t.common.items}
-            </div>
-          </div>
-        </WinUICard>
-
-        {/* Docker Card */}
-        <WinUICard className="p-5 flex flex-col justify-between space-y-3">
-          <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] font-sans">
-            <span className="font-medium">{t.virtualization.statDocker}</span>
-            <Box20Filled className="w-4 h-4 text-cyan-400 shrink-0" />
-          </div>
-          <div>
-            <div className="text-2xl font-bold text-cyan-400 tabular-nums">
-              {formatBytes(overview?.docker?.total_space_bytes || 0)}
-            </div>
-            <div className="text-xs text-[var(--text-muted)] mt-1 font-sans">
-              {!overview?.docker?.is_installed
-                ? t.virtualization.dockerNotInstalled
-                : !overview?.docker?.is_running
-                ? t.virtualization.dockerNotRunning
-                : `${overview.docker.categories.length} ${t.virtualization.dockerItems}`}
-            </div>
-          </div>
-        </WinUICard>
-
-        {/* VM Card */}
-        <WinUICard className="p-5 flex flex-col justify-between space-y-3">
-          <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] font-sans">
-            <span className="font-medium">{t.virtualization.statVm}</span>
-            <Desktop20Filled className="w-4 h-4 text-purple-400 shrink-0" />
-          </div>
-          <div>
-            <div className="text-2xl font-bold text-purple-400 tabular-nums">
-              {formatBytes(overview?.total_vm_bytes || 0)}
-            </div>
-            <div className="text-xs text-[var(--text-muted)] mt-1 font-sans">
-              {overview?.hyperv_disks.length || 0} {t.common.files}
-            </div>
-          </div>
-        </WinUICard>
-
-        {/* Total Reclaimable Card */}
-        <WinUICard className="p-5 flex flex-col justify-between space-y-3">
-          <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] font-sans">
-            <span className="font-medium">{t.virtualization.statTotalReclaimable}</span>
-            <Sparkle20Filled className="w-4 h-4 text-emerald-400 shrink-0" />
-          </div>
-          <div>
-            <div className="text-2xl font-bold text-emerald-400 tabular-nums">
-              {formatBytes(totalReclaimable)}
-            </div>
-            <div className="text-xs text-[var(--text-muted)] mt-1 font-sans">
-              {t.virtualization.reclaimable}
-            </div>
-          </div>
-        </WinUICard>
+    <div className="space-y-5 select-none">
+      {/* Stat row */}
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard
+          label={t.virtualization.statWsl}
+          value={formatBytes(overview?.total_wsl_bytes || 0)}
+          hint={`${overview?.wsl_distributions.length || 0} ${t.common.items}`}
+          icon={<Server20Regular />}
+        />
+        <StatCard
+          label={t.virtualization.statDocker}
+          value={formatBytes(overview?.docker?.total_space_bytes || 0)}
+          hint={
+            !overview?.docker?.is_installed
+              ? t.virtualization.dockerNotInstalled
+              : !overview?.docker?.is_running
+              ? t.virtualization.dockerNotRunning
+              : `${overview.docker.categories.length} ${t.virtualization.dockerItems}`
+          }
+          icon={<Box20Regular />}
+        />
+        <StatCard
+          label={t.virtualization.statVm}
+          value={formatBytes(overview?.total_vm_bytes || 0)}
+          hint={`${overview?.hyperv_disks.length || 0} ${t.common.files}`}
+          icon={<Desktop20Regular />}
+        />
+        <StatCard
+          label={t.virtualization.statTotalReclaimable}
+          value={formatBytes(totalReclaimable)}
+          hint={t.virtualization.reclaimable}
+          icon={<Sparkle20Regular />}
+          tone={totalReclaimable > 0 ? "success" : "neutral"}
+        />
       </div>
 
-      {/* Safety Notice Callout */}
-      <div className="p-4 rounded-lg bg-blue-500/10 border border-blue-500/20 text-xs text-blue-300 flex items-start gap-3">
-        <Info20Regular className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
-        <div className="space-y-1">
-          <span className="font-semibold">{t.virtualization.wslNotice}</span>
-          <p className="text-blue-300/80 leading-relaxed">
-            {t.virtualization.wslDesc}
-          </p>
-        </div>
-      </div>
-
-      {/* 1. WSL2 Section */}
-      <div className="space-y-3 pt-2">
-        <div className="flex items-center justify-between px-1">
-          <div className="flex items-center gap-2">
-            <Server20Filled className="w-4 h-4 text-blue-400" />
-            <h2 className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">
-              {t.virtualization.wslTitle}
-            </h2>
+      {/* Running operation */}
+      {operationLabel && (
+        <Card className="space-y-2">
+          <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]">
+            <ArrowClockwise20Regular className="w-4 h-4 animate-spin text-[var(--accent-text)]" />
+            <span className="truncate">{operationLabel}</span>
           </div>
-          <WinUIButton
-            variant="subtle"
-            size="sm"
-            onClick={loadOverview}
-            disabled={loading}
-            icon={<ArrowClockwise20Regular className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />}
-          >
-            {t.common.refresh}
-          </WinUIButton>
-        </div>
+          <ProgressBar value={75} className="animate-pulse" />
+          {(compactingDistro || pruningType) && (
+            <p className="text-xs text-[var(--text-muted)]">{t.virtualization.operationInProgress}</p>
+          )}
+        </Card>
+      )}
 
-        {overview?.wsl_distributions && overview.wsl_distributions.length > 0 ? (
-          <WinUICard className="divide-y divide-[var(--border-divider)]">
+      {/* Safety notice */}
+      <Card className="py-3 flex items-start gap-3">
+        <Info20Regular className="w-4 h-4 shrink-0 mt-0.5 text-[var(--accent-text)]" />
+        <div className="space-y-0.5 min-w-0">
+          <div className="text-sm font-semibold text-[var(--text-primary)]">{t.virtualization.wslNotice}</div>
+          <p className="text-xs text-[var(--text-secondary)] leading-relaxed">{t.virtualization.wslDesc}</p>
+        </div>
+      </Card>
+
+      {/* 1. WSL2 */}
+      <SectionTitle>{t.virtualization.wslTitle}</SectionTitle>
+      {overview?.wsl_distributions && overview.wsl_distributions.length > 0 ? (
+        <Card padded={false} className="overflow-hidden">
+          <div className="divide-y divide-[var(--border-divider)]">
             {overview.wsl_distributions.map((distro) => {
               const isCompacting = compactingDistro === distro.name;
               const hasReclaimable = distro.reclaimable_estimate > 0;
-              const percentUsed = distro.vhdx_virtual_bytes > 0
-                ? Math.min(100, Math.round((distro.vhdx_actual_bytes / distro.vhdx_virtual_bytes) * 100))
-                : 100;
+              const percentUsed =
+                distro.vhdx_virtual_bytes > 0
+                  ? Math.min(100, Math.round((distro.vhdx_actual_bytes / distro.vhdx_virtual_bytes) * 100))
+                  : 100;
+              const running = distro.state.toLowerCase() === "running";
 
               return (
                 <div
                   key={distro.name}
-                  className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 hover:bg-white/[0.015] transition-colors"
+                  className="px-4 py-3 flex flex-col md:flex-row md:items-center gap-3 hover:bg-[var(--fill-subtle)] transition-colors"
                 >
-                  <div className="flex items-start gap-4 flex-1 min-w-0">
-                    <div className="w-10 h-10 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20 flex items-center justify-center shrink-0 mt-0.5">
-                      <Server20Filled className="w-5 h-5" />
+                  <div className="flex items-start gap-3 flex-1 min-w-0">
+                    <div className={tileClass}>
+                      <Server20Regular />
                     </div>
-                    <div className="space-y-2 flex-1 min-w-0">
-                      <div className="flex items-center gap-2.5 flex-wrap">
-                        <h3 className="font-semibold text-[var(--text-primary)] text-sm">
-                          {distro.name}
-                        </h3>
-                        {distro.is_default && (
-                          <span className="text-xs font-ibm-mono px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 font-medium">
-                            {t.virtualization.defaultBadge}
-                          </span>
-                        )}
-                        <span
-                          className={`text-xs font-ibm-mono px-2 py-0.5 rounded border font-medium ${
-                            distro.state.toLowerCase() === "running"
-                              ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-                              : "bg-slate-500/10 text-slate-400 border-slate-500/20"
-                          }`}
-                        >
-                          {distro.state.toLowerCase() === "running"
-                            ? t.virtualization.stateRunning
-                            : t.virtualization.stateStopped}
-                        </span>
-                        <span className="text-xs font-ibm-mono text-[var(--text-muted)]">
-                          WSL v{distro.version}
-                        </span>
+                    <div className="flex-1 min-w-0 space-y-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-semibold text-[var(--text-primary)]">{distro.name}</span>
+                        {distro.is_default && <Badge tone="accent">{t.virtualization.defaultBadge}</Badge>}
+                        <Badge tone={running ? "success" : "neutral"}>
+                          {running ? t.virtualization.stateRunning : t.virtualization.stateStopped}
+                        </Badge>
+                        <span className="font-code text-xs text-[var(--text-muted)]">WSL v{distro.version}</span>
                       </div>
 
-                      {/* Path and reveal */}
-                      <div className="flex items-center gap-2 text-xs text-[var(--text-muted)] font-ibm-mono truncate">
-                        <span className="truncate max-w-md">{distro.vhdx_path}</span>
-                        <button
-                          onClick={() => handleReveal(distro.vhdx_path)}
-                          title={t.virtualization.revealInExplorer}
-                          className="hover:text-[var(--text-primary)] text-[var(--text-secondary)] transition-colors p-0.5"
-                        >
-                          <FolderOpen16Regular className="w-3.5 h-3.5" />
-                        </button>
+                      <div className="flex items-center gap-1 min-w-0">
+                        <span className="font-code text-xs text-[var(--text-muted)] truncate select-text" title={distro.vhdx_path}>
+                          {distro.vhdx_path}
+                        </span>
+                        {revealButton(distro.vhdx_path)}
                       </div>
 
-                      {/* Visual Size Bar */}
-                      <div className="space-y-1 pt-1 max-w-lg">
-                        <div className="flex items-center justify-between text-xs text-[var(--text-muted)]">
+                      <div className="space-y-1 max-w-lg">
+                        <div className="flex items-center justify-between gap-3 text-xs text-[var(--text-muted)]">
                           <span>
                             {t.virtualization.totalSize}:{" "}
-                            <strong className="text-[var(--text-primary)] font-ibm-mono">
+                            <span className="text-[var(--text-primary)] font-ibm-mono">
                               {formatBytes(distro.vhdx_actual_bytes)}
-                            </strong>
+                            </span>
                           </span>
                           {distro.vhdx_virtual_bytes > 0 && (
                             <span>
                               {t.virtualization.virtualSize}:{" "}
-                              <strong className="text-[var(--text-primary)] font-ibm-mono">
+                              <span className="text-[var(--text-primary)] font-ibm-mono">
                                 {formatBytes(distro.vhdx_virtual_bytes)}
-                              </strong>
+                              </span>
                             </span>
                           )}
                         </div>
-                        <div className="w-full h-1.5 rounded-full bg-white/10 overflow-hidden">
-                          <div
-                            className="h-full bg-gradient-to-r from-blue-500 to-cyan-400 rounded-full transition-all duration-300"
-                            style={{ width: `${percentUsed}%` }}
-                          />
-                        </div>
+                        <ProgressBar value={percentUsed} />
                       </div>
                     </div>
                   </div>
 
-                  {/* Actions & Metrics */}
-                  <div className="flex items-center gap-6 shrink-0 self-end md:self-center">
-                    <div className="text-right font-ibm-mono">
-                      <div className="text-xs text-[var(--text-muted)] font-sans">
-                        {t.virtualization.reclaimable}
-                      </div>
+                  <div className="flex items-center gap-4 shrink-0 self-end md:self-center">
+                    <div className="text-right">
+                      <div className="text-xs text-[var(--text-muted)]">{t.virtualization.reclaimable}</div>
                       <div
-                        className={`text-sm font-bold tabular-nums ${
-                          hasReclaimable ? "text-emerald-400" : "text-[var(--text-muted)]"
+                        className={`text-sm font-semibold font-ibm-mono ${
+                          hasReclaimable ? "text-[var(--success)]" : "text-[var(--text-muted)]"
                         }`}
                       >
                         {formatBytes(distro.reclaimable_estimate)}
                       </div>
                     </div>
-
-                    <div className="pl-2 border-l border-[var(--border-divider)]">
-                      <WinUIButton
-                        variant="primary"
-                        onClick={() => handleCompactWsl(distro)}
-                        disabled={isCompacting || Boolean(compactingDistro)}
-                        icon={
-                          isCompacting ? (
-                            <ArrowClockwise20Regular className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <Flash20Filled className="w-4 h-4" />
-                          )
-                        }
-                      >
-                        {isCompacting ? t.virtualization.compacting : t.virtualization.compactVhdx}
-                      </WinUIButton>
-                    </div>
+                    <WinUIButton
+                      variant="standard"
+                      onClick={() => handleCompactWsl(distro)}
+                      disabled={isCompacting || Boolean(compactingDistro)}
+                      icon={
+                        isCompacting ? (
+                          <ArrowClockwise20Regular className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <ArrowMinimize20Regular className="w-4 h-4" />
+                        )
+                      }
+                    >
+                      {isCompacting ? t.virtualization.compacting : t.virtualization.compactVhdx}
+                    </WinUIButton>
                   </div>
                 </div>
               );
             })}
-          </WinUICard>
-        ) : (
-          <WinUICard className="p-8 text-center space-y-2 text-[var(--text-muted)]">
-            <Server20Filled className="w-8 h-8 mx-auto text-[var(--text-secondary)] opacity-60" />
-            <div className="text-sm font-medium text-[var(--text-primary)]">
-              {t.virtualization.noDistros}
-            </div>
-            <p className="text-xs max-w-md mx-auto">{t.virtualization.noDistrosDesc}</p>
-          </WinUICard>
-        )}
-      </div>
-
-      {/* 2. Docker Storage Section */}
-      <div className="space-y-3 pt-2">
-        <div className="flex items-center justify-between px-1">
-          <div className="flex items-center gap-2">
-            <Box20Filled className="w-4 h-4 text-cyan-400" />
-            <h2 className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">
-              {t.virtualization.dockerTitle}
-            </h2>
           </div>
-          {overview?.docker?.is_running && (
-            <div className="flex items-center gap-2">
-              <WinUIButton
-                variant="danger"
-                size="sm"
-                onClick={() => handleDockerPrune("all")}
-                disabled={Boolean(pruningType)}
-                icon={<Delete20Regular className="w-3.5 h-3.5" />}
-              >
-                {pruningType === "all" ? t.virtualization.dockerPruning : t.virtualization.dockerPruneAll}
-              </WinUIButton>
-            </div>
-          )}
-        </div>
+        </Card>
+      ) : (
+        <EmptyState
+          icon={<Server20Regular />}
+          title={t.virtualization.noDistros}
+          description={t.virtualization.noDistrosDesc}
+        />
+      )}
 
-        {!overview?.docker?.is_installed ? (
-          <WinUICard className="p-8 text-center space-y-2 text-[var(--text-muted)]">
-            <Box20Filled className="w-8 h-8 mx-auto text-[var(--text-secondary)] opacity-40" />
-            <div className="text-sm font-medium text-[var(--text-primary)]">
-              {t.virtualization.dockerNotInstalled}
-            </div>
-            <p className="text-xs max-w-md mx-auto">
-              {t.virtualization.dockerNotInstalledDesc}
-            </p>
-          </WinUICard>
-        ) : !overview?.docker?.is_running ? (
-          <WinUICard className="p-8 text-center space-y-2 text-[var(--text-muted)]">
-            <ShieldError20Filled className="w-8 h-8 mx-auto text-amber-400 opacity-80" />
-            <div className="text-sm font-medium text-[var(--text-primary)]">
-              {t.virtualization.dockerNotRunning}
-            </div>
-            <p className="text-xs max-w-md mx-auto">
-              {t.virtualization.dockerNotRunningDesc}
-            </p>
-          </WinUICard>
-        ) : (
-          <WinUICard className="divide-y divide-[var(--border-divider)]">
-            {/* Docker Daemon Details Strip */}
-            <div className="p-4 px-6 bg-white/[0.02] flex items-center justify-between text-xs text-[var(--text-secondary)]">
-              <div className="flex items-center gap-4">
+      {/* 2. Docker */}
+      <SectionTitle
+        action={
+          overview?.docker?.is_running ? (
+            <WinUIButton
+              variant="danger"
+              size="sm"
+              onClick={() => handleDockerPrune("all")}
+              disabled={Boolean(pruningType)}
+              icon={
+                pruningType === "all" ? (
+                  <ArrowClockwise20Regular className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Delete20Regular className="w-3.5 h-3.5" />
+                )
+              }
+            >
+              {pruningType === "all" ? t.virtualization.dockerPruning : t.virtualization.dockerPruneAll}
+            </WinUIButton>
+          ) : undefined
+        }
+      >
+        {t.virtualization.dockerTitle}
+      </SectionTitle>
+
+      {!overview?.docker?.is_installed ? (
+        <EmptyState
+          icon={<Box20Regular />}
+          title={t.virtualization.dockerNotInstalled}
+          description={t.virtualization.dockerNotInstalledDesc}
+        />
+      ) : !overview?.docker?.is_running ? (
+        <EmptyState
+          icon={<Warning20Regular className="text-[var(--brand-amber)]" />}
+          title={t.virtualization.dockerNotRunning}
+          description={t.virtualization.dockerNotRunningDesc}
+        />
+      ) : (
+        <Card padded={false} className="overflow-hidden">
+          <div className="divide-y divide-[var(--border-divider)]">
+            {/* Engine details */}
+            <div className="px-4 py-3 flex flex-wrap items-center justify-between gap-3 text-xs text-[var(--text-secondary)]">
+              <div className="flex items-center gap-3 flex-wrap">
                 <span className="flex items-center gap-1.5">
-                  <CheckmarkCircle20Filled className="w-4 h-4 text-emerald-400" />
-                  <span className="font-medium text-[var(--text-primary)]">
-                    Docker Engine v{overview.docker.server_version || "WSL2"}
+                  <CheckmarkCircle20Filled className="w-4 h-4 text-[var(--success)]" />
+                  <span className="text-sm font-medium text-[var(--text-primary)]">
+                    {t.virtualization.dockerEngine} v{overview.docker.server_version || "WSL2"}
                   </span>
                 </span>
                 {overview.docker.storage_driver && (
-                  <span className="font-ibm-mono text-xs text-[var(--text-muted)]">
-                    Driver: {overview.docker.storage_driver}
+                  <span className="text-[var(--text-muted)]">
+                    {t.virtualization.dockerDriver}:{" "}
+                    <span className="font-code">{overview.docker.storage_driver}</span>
                   </span>
                 )}
               </div>
-              <div className="font-ibm-mono text-xs text-[var(--text-muted)]">
+              <div className="text-[var(--text-muted)]">
                 {t.virtualization.statTotalReclaimable}:{" "}
-                <span className="text-emerald-400 font-bold">
+                <span className="font-ibm-mono font-semibold text-[var(--success)]">
                   {formatBytes(overview.docker.total_reclaimable_bytes)}
                 </span>
               </div>
             </div>
 
-            {/* Docker Categories */}
+            {/* Categories */}
             {overview.docker.categories.map((cat) => {
-              const targetKey =
-                cat.category.toLowerCase().includes("build")
-                  ? "build_cache"
-                  : cat.category.toLowerCase().includes("image")
-                  ? "images"
-                  : cat.category.toLowerCase().includes("volume")
-                  ? "volumes"
-                  : "containers";
+              const targetKey = cat.category.toLowerCase().includes("build")
+                ? "build_cache"
+                : cat.category.toLowerCase().includes("image")
+                ? "images"
+                : cat.category.toLowerCase().includes("volume")
+                ? "volumes"
+                : "containers";
 
               const isPruningThis = pruningType === targetKey;
 
               return (
                 <div
                   key={cat.category}
-                  className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-white/[0.015] transition-colors"
+                  className="px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-3 hover:bg-[var(--fill-subtle)] transition-colors"
                 >
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-sm text-[var(--text-primary)]">
-                        {cat.category}
-                      </span>
-                      <span className="text-xs font-ibm-mono px-2 py-0.5 rounded bg-white/[0.06] text-[var(--text-secondary)]">
-                        {cat.total_count} {t.virtualization.dockerItems} ({cat.active_count} {t.virtualization.dockerActive})
-                      </span>
+                  <div className="flex items-start gap-3 flex-1 min-w-0">
+                    <div className={tileClass}>
+                      <Box20Regular />
                     </div>
-                    <div className="text-xs text-[var(--text-muted)] font-ibm-mono">
-                      {t.virtualization.totalSize}: {formatBytes(cat.size_bytes)}
+                    <div className="flex-1 min-w-0 space-y-0.5">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-semibold text-[var(--text-primary)]">{cat.category}</span>
+                        <Badge>
+                          {cat.total_count} {t.virtualization.dockerItems} ({cat.active_count} {t.virtualization.dockerActive})
+                        </Badge>
+                      </div>
+                      <div className="text-xs text-[var(--text-muted)]">
+                        {t.virtualization.totalSize}:{" "}
+                        <span className="font-ibm-mono">{formatBytes(cat.size_bytes)}</span>
+                      </div>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-4">
-                    <div className="text-right font-ibm-mono">
-                      <div className="text-xs text-[var(--text-muted)] font-sans">
-                        {t.virtualization.reclaimable}
-                      </div>
+                  <div className="flex items-center gap-4 shrink-0 self-end sm:self-center">
+                    <div className="text-right">
+                      <div className="text-xs text-[var(--text-muted)]">{t.virtualization.reclaimable}</div>
                       <div
-                        className={`text-sm font-bold tabular-nums ${
-                          cat.reclaimable_bytes > 0 ? "text-emerald-400" : "text-[var(--text-muted)]"
+                        className={`text-sm font-semibold font-ibm-mono ${
+                          cat.reclaimable_bytes > 0 ? "text-[var(--success)]" : "text-[var(--text-muted)]"
                         }`}
                       >
                         {formatBytes(cat.reclaimable_bytes)}
                       </div>
                     </div>
-
                     <WinUIButton
                       variant="standard"
                       size="sm"
@@ -528,73 +476,64 @@ export const VirtualizationView: React.FC = () => {
                 </div>
               );
             })}
-          </WinUICard>
-        )}
-      </div>
-
-      {/* 3. Hyper-V & VM Images Section */}
-      <div className="space-y-3 pt-2">
-        <div className="flex items-center justify-between px-1">
-          <div className="flex items-center gap-2">
-            <Desktop20Filled className="w-4 h-4 text-purple-400" />
-            <h2 className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">
-              {t.virtualization.vmTitle}
-            </h2>
           </div>
-          <span className="text-xs text-[var(--text-muted)] font-ibm-mono">
+        </Card>
+      )}
+
+      {/* 3. Hyper-V and VM images */}
+      <SectionTitle
+        action={
+          <span className="text-xs text-[var(--text-muted)]">
             {overview?.hyperv_disks.length || 0} {t.common.files}
           </span>
-        </div>
+        }
+      >
+        {t.virtualization.vmTitle}
+      </SectionTitle>
 
-        {overview?.hyperv_disks && overview.hyperv_disks.length > 0 ? (
-          <WinUICard className="divide-y divide-[var(--border-divider)]">
+      {overview?.hyperv_disks && overview.hyperv_disks.length > 0 ? (
+        <Card padded={false} className="overflow-hidden">
+          <div className="divide-y divide-[var(--border-divider)]">
             {overview.hyperv_disks.map((disk) => (
               <div
                 key={disk.disk_path}
-                className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-white/[0.015] transition-colors"
+                className="px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-3 hover:bg-[var(--fill-subtle)] transition-colors"
               >
-                <div className="space-y-1.5 min-w-0 flex-1">
-                  <div className="flex items-center gap-2.5">
-                    <span className="font-semibold text-sm text-[var(--text-primary)]">
-                      {disk.vm_name}
-                    </span>
-                    <span className="text-xs font-ibm-mono px-2 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20 font-medium">
-                      {disk.format}
-                    </span>
+                <div className="flex items-start gap-3 flex-1 min-w-0">
+                  <div className={tileClass}>
+                    <Desktop20Regular />
                   </div>
-                  <div className="flex items-center gap-2 text-xs text-[var(--text-muted)] font-ibm-mono truncate">
-                    <span className="truncate max-w-xl">{disk.disk_path}</span>
-                    <button
-                      onClick={() => handleReveal(disk.disk_path)}
-                      title={t.virtualization.revealInExplorer}
-                      className="hover:text-[var(--text-primary)] text-[var(--text-secondary)] transition-colors p-0.5"
-                    >
-                      <FolderOpen16Regular className="w-3.5 h-3.5" />
-                    </button>
+                  <div className="flex-1 min-w-0 space-y-0.5">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm font-semibold text-[var(--text-primary)]">{disk.vm_name}</span>
+                      <Badge className="font-code">{disk.format}</Badge>
+                    </div>
+                    <div className="flex items-center gap-1 min-w-0">
+                      <span className="font-code text-xs text-[var(--text-muted)] truncate select-text" title={disk.disk_path}>
+                        {disk.disk_path}
+                      </span>
+                      {revealButton(disk.disk_path)}
+                    </div>
                   </div>
                 </div>
 
-                <div className="text-right font-ibm-mono shrink-0">
-                  <div className="text-xs text-[var(--text-muted)] font-sans">
-                    {t.virtualization.totalSize}
-                  </div>
-                  <div className="text-sm font-bold text-purple-400 tabular-nums">
+                <div className="text-right shrink-0 self-end sm:self-center">
+                  <div className="text-xs text-[var(--text-muted)]">{t.virtualization.totalSize}</div>
+                  <div className="text-sm font-semibold font-ibm-mono text-[var(--text-primary)]">
                     {formatBytes(disk.size_bytes)}
                   </div>
                 </div>
               </div>
             ))}
-          </WinUICard>
-        ) : (
-          <WinUICard className="p-8 text-center space-y-2 text-[var(--text-muted)]">
-            <Desktop20Filled className="w-8 h-8 mx-auto text-[var(--text-secondary)] opacity-40" />
-            <div className="text-sm font-medium text-[var(--text-primary)]">
-              {t.virtualization.vmNoDisks}
-            </div>
-            <p className="text-xs max-w-md mx-auto">{t.virtualization.vmNoDisksDesc}</p>
-          </WinUICard>
-        )}
-      </div>
+          </div>
+        </Card>
+      ) : (
+        <EmptyState
+          icon={<Desktop20Regular />}
+          title={t.virtualization.vmNoDisks}
+          description={t.virtualization.vmNoDisksDesc}
+        />
+      )}
     </div>
   );
 };

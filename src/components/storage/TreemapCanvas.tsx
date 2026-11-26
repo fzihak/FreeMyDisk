@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import * as d3 from "d3";
+import { useI18nStore } from "@/i18n";
 
 export interface StorageTreeNode {
   path: string;
@@ -29,25 +30,105 @@ interface RectNode {
   isParentHeader?: boolean;
 }
 
+/**
+ * Calm Fluent-like hues. They are never drawn as-is: each one is blended into
+ * the card background (read from the CSS variables), so tiles stay muted and
+ * readable in both dark and light themes. Folders take a hue by position,
+ * files share one neutral hue.
+ */
 const PALETTE = [
-  "#0078d4", // Windows Accent Blue
-  "#8b5cf6", // Purple
-  "#06b6d4", // Cyan
-  "#10b981", // Emerald
-  "#f59e0b", // Amber
-  "#ec4899", // Pink
-  "#6366f1", // Indigo
-  "#14b8a6", // Teal
-  "#f97316", // Orange
-  "#0ea5e9", // Sky
+  "#0078d4", // blue
+  "#038387", // teal
+  "#8764b8", // purple
+  "#498205", // green
+  "#ca5010", // copper
 ];
+const FILE_HUE = "#69797e"; // steel grey
+
+type RGB = [number, number, number];
+
+const parseColor = (value: string, fallback: RGB): RGB => {
+  const v = value.trim();
+  const hex = v.match(/^#([0-9a-f]{6})$/i);
+  if (hex) {
+    const n = parseInt(hex[1], 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  }
+  const rgb = v.match(/rgba?\(([^)]+)\)/i);
+  if (rgb) {
+    const [r, g, b] = rgb[1].split(",").map((x) => parseFloat(x));
+    if ([r, g, b].every((x) => Number.isFinite(x))) return [r, g, b];
+  }
+  return fallback;
+};
+
+const mix = (a: RGB, b: RGB, amount: number): string => {
+  const c = a.map((x, i) => Math.round(x * amount + b[i] * (1 - amount)));
+  return `rgb(${c[0]}, ${c[1]}, ${c[2]})`;
+};
+
+interface CanvasTheme {
+  bg: RGB;
+  bgCss: string;
+  text: string;
+  textSecondary: string;
+  focus: string;
+  font: string;
+  isLight: boolean;
+}
+
+/** Reads the theme tokens the canvas needs from index.css. */
+const readTheme = (): CanvasTheme => {
+  const root = getComputedStyle(document.documentElement);
+  const get = (name: string, fb: string) => root.getPropertyValue(name).trim() || fb;
+  const bgCss = get("--bg-card", "#2d2d2d");
+  const bg = parseColor(bgCss, [45, 45, 45]);
+  const luminance = (0.2126 * bg[0] + 0.7152 * bg[1] + 0.0722 * bg[2]) / 255;
+  return {
+    bg,
+    bgCss,
+    text: get("--text-primary", "#ffffff"),
+    textSecondary: get("--text-secondary", "#d1d1d1"),
+    focus: get("--text-primary", "#ffffff"),
+    font: getComputedStyle(document.body).fontFamily || "Segoe UI, sans-serif",
+    isLight: luminance > 0.5,
+  };
+};
+
+type TileKind = "header" | "tile" | "inner";
+
+/** Fill colour for a tile: its hue blended into the background by kind. */
+const tileFill = (theme: CanvasTheme, hue: string, kind: TileKind, hovered = false): string => {
+  const strength = theme.isLight
+    ? { header: 0.45, tile: 0.34, inner: 0.26 }[kind]
+    : { header: 0.66, tile: 0.52, inner: 0.4 }[kind];
+  return mix(parseColor(hue, [0, 120, 212]), theme.bg, Math.min(1, strength + (hovered ? 0.16 : 0)));
+};
+
+const hueFor = (node: { color: string; data: StorageTreeNode }) => (node.data.is_dir ? node.color : FILE_HUE);
+
+/** Cuts text with an ellipsis so it fits maxWidth, instead of squeezing it. */
+const fitText = (ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string => {
+  if (maxWidth <= 0) return "";
+  if (ctx.measureText(text).width <= maxWidth) return text;
+  let lo = 0;
+  let hi = text.length;
+  while (lo < hi) {
+    const mid = Math.ceil((lo + hi) / 2);
+    if (ctx.measureText(text.slice(0, mid) + "…").width <= maxWidth) lo = mid;
+    else hi = mid - 1;
+  }
+  return lo > 0 ? text.slice(0, lo) + "…" : "";
+};
 
 export const TreemapCanvas: React.FC<TreemapCanvasProps> = ({
   data,
   onSelectNode,
   onOpenExplorer,
 }) => {
+  const { t } = useI18nStore();
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const [theme, setTheme] = useState<CanvasTheme>(() => readTheme());
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [nodes, setNodes] = useState<RectNode[]>([]);
   const [hoveredNode, setHoveredNode] = useState<RectNode | null>(null);
@@ -64,6 +145,19 @@ export const TreemapCanvas: React.FC<TreemapCanvasProps> = ({
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
   };
+
+  // Re-read the colour tokens when the app theme or the system theme changes
+  useEffect(() => {
+    const refresh = () => setTheme(readTheme());
+    const observer = new MutationObserver(refresh);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme", "class", "style"] });
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    media.addEventListener("change", refresh);
+    return () => {
+      observer.disconnect();
+      media.removeEventListener("change", refresh);
+    };
+  }, []);
 
   // ResizeObserver to maintain responsive canvas size
   useEffect(() => {
@@ -204,9 +298,11 @@ export const TreemapCanvas: React.FC<TreemapCanvasProps> = ({
     ctx.save();
     ctx.scale(dpr, dpr);
 
-    // Deep dark background
-    ctx.fillStyle = "#121212";
+    // Background matches the card the canvas sits in
+    ctx.fillStyle = theme.bgCss;
     ctx.fillRect(0, 0, width, height);
+
+    const font = theme.font;
 
     // Draw all rectangles
     for (const node of nodes) {
@@ -215,53 +311,39 @@ export const TreemapCanvas: React.FC<TreemapCanvasProps> = ({
       if (w <= 0 || h <= 0) continue;
 
       const isHovered = hoveredNode === node;
+      const kind: TileKind = node.isParentHeader ? "header" : node.depth === 2 ? "inner" : "tile";
+
+      ctx.fillStyle = tileFill(theme, hueFor(node), kind, isHovered);
+      ctx.fillRect(node.x0, node.y0, w, h);
+
+      if (isHovered) {
+        ctx.strokeStyle = theme.focus;
+        ctx.lineWidth = 2;
+        ctx.strokeRect(node.x0 + 1, node.y0 + 1, w - 2, h - 2);
+      }
 
       if (node.isParentHeader) {
         // Parent folder banner header
-        ctx.fillStyle = node.color;
-        ctx.globalAlpha = isHovered ? 0.95 : 0.85;
-        ctx.fillRect(node.x0, node.y0, w, h);
+        ctx.fillStyle = theme.text;
+        ctx.font = `600 12px ${font}`;
+        const label = `${node.data.name}  ${formatBytes(node.data.size_bytes)}`;
+        ctx.fillText(fitText(ctx, label, w - 10), node.x0 + 5, node.y0 + 14);
+      } else if (w > 45 && h > 20) {
+        // Regular tile (direct child or inner sub-tile): labels if sufficient room
+        ctx.fillStyle = theme.text;
+        ctx.font = `600 12px ${font}`;
+        ctx.fillText(fitText(ctx, node.data.name, w - 10), node.x0 + 5, node.y0 + 15);
 
-        ctx.strokeStyle = isHovered ? "#ffffff" : "rgba(0,0,0,0.4)";
-        ctx.lineWidth = isHovered ? 2 : 1;
-        ctx.strokeRect(node.x0, node.y0, w, h);
-
-        ctx.globalAlpha = 1.0;
-        ctx.fillStyle = "#ffffff";
-        ctx.font = "bold 10.5px Inter, sans-serif";
-        const label = `📁 ${node.data.name} (${formatBytes(node.data.size_bytes)})`;
-        ctx.fillText(label, node.x0 + 4, node.y0 + 14, w - 8);
-      } else {
-        // Regular tile (direct child or inner sub-tile)
-        ctx.fillStyle = isHovered ? "#38bdf8" : node.color;
-        ctx.globalAlpha = node.depth === 2 ? (isHovered ? 0.95 : 0.65) : (isHovered ? 0.95 : 0.85);
-        ctx.fillRect(node.x0, node.y0, w, h);
-
-        ctx.strokeStyle = isHovered ? "#ffffff" : "rgba(0,0,0,0.35)";
-        ctx.lineWidth = isHovered ? 2 : 1;
-        ctx.strokeRect(node.x0, node.y0, w, h);
-
-        // Labels if sufficient room
-        if (w > 45 && h > 20) {
-          ctx.globalAlpha = 1.0;
-          ctx.fillStyle = "#ffffff";
-          ctx.font = w > 70 ? "bold 11px Inter, sans-serif" : "bold 10px Inter, sans-serif";
-
-          const icon = node.data.is_dir ? "📁 " : "📄 ";
-          const label = `${icon}${node.data.name}`;
-          ctx.fillText(label, node.x0 + 4, node.y0 + 13, w - 8);
-
-          if (h > 36) {
-            ctx.fillStyle = "rgba(255, 255, 255, 0.85)";
-            ctx.font = "10px JetBrains Mono, monospace";
-            ctx.fillText(formatBytes(node.data.size_bytes), node.x0 + 4, node.y0 + 26, w - 8);
-          }
+        if (h > 34) {
+          ctx.fillStyle = theme.textSecondary;
+          ctx.font = `12px ${font}`;
+          ctx.fillText(fitText(ctx, formatBytes(node.data.size_bytes), w - 10), node.x0 + 5, node.y0 + 30);
         }
       }
     }
 
     ctx.restore();
-  }, [dimensions, nodes, hoveredNode]);
+  }, [dimensions, nodes, hoveredNode, theme]);
 
   useEffect(() => {
     draw();
@@ -304,14 +386,17 @@ export const TreemapCanvas: React.FC<TreemapCanvasProps> = ({
     const colorScale = d3.scaleOrdinal(PALETTE);
     return sorted.slice(0, 5).map((item, idx) => ({
       ...item,
-      color: colorScale(String(idx)),
+      color: tileFill(theme, item.is_dir ? colorScale(String(idx)) : FILE_HUE, "tile"),
       percentage: data.size_bytes > 0 ? ((item.size_bytes / data.size_bytes) * 100).toFixed(1) : "0",
     }));
-  }, [data]);
+  }, [data, theme]);
+
+  const fillVars = (template: string, vars: Record<string, string | number>) =>
+    template.replace(/\{(\w+)\}/g, (m, k: string) => (k in vars ? String(vars[k]) : m));
 
   return (
-    <div ref={containerRef} className="relative w-full space-y-2">
-      <div className="rounded-[4px] overflow-hidden border border-[var(--border-subtle)] bg-[#121212] shadow-inner relative">
+    <div ref={containerRef} className="relative w-full space-y-3">
+      <div className="rounded-md overflow-hidden bg-[var(--bg-card)] relative">
         <canvas
           ref={canvasRef}
           onMouseMove={handleMouseMove}
@@ -322,31 +407,26 @@ export const TreemapCanvas: React.FC<TreemapCanvasProps> = ({
         />
 
         {nodes.length === 0 && (
-          <div className="absolute inset-0 flex items-center justify-center text-xs text-[var(--text-muted)] font-ibm-mono">
-            No files or folders to display in current view
+          <div className="absolute inset-0 flex items-center justify-center text-sm text-[var(--text-muted)]">
+            {t.storage.emptyView}
           </div>
         )}
       </div>
 
       {/* Top Items Legend Strip */}
       {topLegendItems.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2 pt-1 px-1 text-xs">
-          <span className="text-xs text-[var(--text-muted)] font-medium">Top Items:</span>
+        <div className="flex flex-wrap items-center gap-1.5 text-xs">
+          <span className="text-xs text-[var(--text-muted)] mr-1">{t.storage.topItems}</span>
           {topLegendItems.map((item) => (
             <button
               key={item.path}
               onClick={() => onSelectNode(item)}
-              className="flex items-center gap-1.5 px-2 py-0.5 rounded-[3px] bg-black/20 hover:bg-white/[0.05] border border-[var(--border-card)] transition-colors cursor-pointer text-xs"
+              className="h-7 flex items-center gap-1.5 px-2 rounded-md hover:bg-[var(--fill-subtle)] border border-[var(--border-card)] transition-colors cursor-pointer text-xs"
             >
-              <span
-                className="w-2 h-2 rounded-xs shrink-0"
-                style={{ backgroundColor: item.color }}
-              />
-              <span className="font-ibm-mono text-[var(--text-primary)] truncate max-w-[120px]">
-                {item.name}
-              </span>
-              <span className="font-ibm-mono text-[var(--text-secondary)]">
-                {formatBytes(item.size_bytes)} ({item.percentage}%)
+              <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
+              <span className="text-[var(--text-primary)] truncate max-w-[140px]">{item.name}</span>
+              <span className="font-ibm-mono text-[var(--text-muted)] whitespace-nowrap tabular-nums">
+                {formatBytes(item.size_bytes)} · {item.percentage}%
               </span>
             </button>
           ))}
@@ -356,47 +436,53 @@ export const TreemapCanvas: React.FC<TreemapCanvasProps> = ({
       {/* Screen-Clamped Hover Tooltip */}
       {hoveredNode && (
         <div
-          className="fixed z-50 pointer-events-none p-3 bg-[#1e1e1e]/95 border border-[#0078d4]/60 rounded-[6px] shadow-2xl text-xs backdrop-blur-md space-y-1 max-w-sm"
+          className="fixed z-50 pointer-events-none p-3 bg-[var(--bg-card)] border border-[var(--border-card)] rounded-lg shadow-lg text-xs space-y-1 max-w-sm"
           style={{
             left: `${Math.min(window.innerWidth - 320, mousePos.x + 14)}px`,
             top: `${Math.min(window.innerHeight - 150, mousePos.y + 14)}px`,
           }}
         >
-          <div className="font-semibold text-white flex items-center gap-2">
+          <div className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2">
             <span
-              className="w-3 h-3 rounded-xs inline-block shrink-0"
-              style={{ backgroundColor: hoveredNode.color }}
+              className="w-3 h-3 rounded-sm inline-block shrink-0"
+              style={{
+                backgroundColor: tileFill(
+                  theme,
+                  hueFor(hoveredNode),
+                  hoveredNode.isParentHeader ? "header" : hoveredNode.depth === 2 ? "inner" : "tile"
+                ),
+              }}
             />
             <span className="truncate">{hoveredNode.data.name}</span>
             {hoveredNode.data.is_system_protected && (
-              <span className="px-1.5 py-0.2 rounded-[3px] text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 shrink-0">
-                Protected
+              <span className="inline-flex items-center h-5 px-2 rounded text-xs font-medium bg-[color-mix(in_srgb,var(--brand-amber)_16%,transparent)] text-[var(--brand-amber)] shrink-0">
+                {t.storage.protected}
               </span>
             )}
           </div>
 
-          <div className="font-ibm-mono text-cyan-300 font-bold flex items-center gap-2">
-            <span>{formatBytes(hoveredNode.data.size_bytes)}</span>
+          <div className="font-ibm-mono text-[var(--text-primary)] font-semibold flex items-center gap-2 tabular-nums">
+            <span className="whitespace-nowrap">{formatBytes(hoveredNode.data.size_bytes)}</span>
             {data.size_bytes > 0 && (
-              <span className="text-[var(--text-muted)] font-normal">
-                ({((hoveredNode.data.size_bytes / data.size_bytes) * 100).toFixed(1)}% of view)
+              <span className="text-[var(--text-muted)] font-normal whitespace-nowrap">
+                {fillVars(t.storage.tipOfView, {
+                  pct: ((hoveredNode.data.size_bytes / data.size_bytes) * 100).toFixed(1),
+                })}
               </span>
             )}
           </div>
 
-          <div className="text-xs text-[var(--text-secondary)] font-ibm-mono">
-            {hoveredNode.data.is_dir ? "📁 Directory" : "📄 File"}
+          <div className="text-xs text-[var(--text-secondary)]">
+            {hoveredNode.data.is_dir ? t.storage.tipFolder : t.storage.tipFile}
             {hoveredNode.data.is_dir && (
-              <span> • {hoveredNode.data.file_count.toLocaleString()} files</span>
+              <span> · {fillVars(t.storage.tipFiles, { count: hoveredNode.data.file_count.toLocaleString() })}</span>
             )}
           </div>
 
-          <div className="font-ibm-mono text-xs text-[var(--text-muted)] truncate pt-0.5 border-t border-[var(--border-divider)] mt-1">
+          <div className="font-code text-xs text-[var(--text-muted)] truncate pt-1 border-t border-[var(--border-divider)] mt-1">
             {hoveredNode.data.path}
           </div>
-          <div className="text-xs text-[#0078d4] pt-0.5">
-            Click to drill in • Right-click to open in Explorer
-          </div>
+          <div className="text-xs text-[var(--text-secondary)]">{t.storage.tipHint}</div>
         </div>
       )}
     </div>

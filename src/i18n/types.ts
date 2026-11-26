@@ -45,6 +45,25 @@ export interface TranslationSchema {
     goToDashboard: string;
     collapseSidebar: string;
     expandSidebar: string;
+    errorTitle: string;
+    errorDesc: string;
+    errorDetails: string;
+    reload: string;
+    globalErrorTitle: string;
+    globalErrorDesc: string;
+    undoRecent: string;
+    exportDiagnostic: string;
+    copied: string;
+    recoveryMessage: string;
+    recoveryRestore: string;
+    scanRunning: string;
+    scanCurrentPath: string;
+    scanItems: string;
+    scanFound: string;
+    scanStarting: string;
+    scanDefaultTitle: string;
+    readyToScan: string;
+    readyToScanDesc: string;
   };
   common: {
     scan: string;
@@ -364,6 +383,37 @@ export interface TranslationSchema {
     noHeavyDesc: string;
     treemapTip: string;
     parentFolder: string;
+    pageDesc: string;
+    depthTitle: string;
+    driveUsage: string;
+    viewTreemap: string;
+    viewHeavy: string;
+    heavyAtLeast: string;
+    heavyTitle: string;
+    heavyDesc: string;
+    upOneLevel: string;
+    filterPlaceholder: string;
+    sortSizeDesc: string;
+    sortSizeAsc: string;
+    sortName: string;
+    sortItems: string;
+    folderTotal: string;
+    contents: string;
+    protected: string;
+    export: string;
+    scanPath: string;
+    scanDrive: string;
+    preparingScan: string;
+    itemsChecked: string;
+    bytesFound: string;
+    emptyView: string;
+    topItems: string;
+    tipFolder: string;
+    tipFile: string;
+    tipFiles: string;
+    tipOfView: string;
+    tipHint: string;
+    emptyFolder: string;
   };
   largeFiles: {
     title: string;
@@ -649,6 +699,8 @@ export interface TranslationSchema {
     noTasksRunYet: string;
     tasksSucceeded: string;
     tasksFailed: string;
+    availableTasksHint: string;
+    tasksListTitle: string;
   };
   optimization: {
     title: string;
@@ -787,6 +839,9 @@ export interface TranslationSchema {
     totalSize: string;
     virtualSize: string;
     reclaimable: string;
+    dockerEngine: string;
+    dockerDriver: string;
+    operationInProgress: string;
   };
   history: {
     title: string;
@@ -813,6 +868,18 @@ export interface TranslationSchema {
     sqliteJournalBadge: string;
     lockedQueueBadge: string;
     clearConfirmText: string;
+    pageDesc: string;
+    statRecords: string;
+    statPending: string;
+    failedHint: string;
+    allCleanHint: string;
+    queuedCount: string;
+    filterAll: string;
+    clearConfirmWarning: string;
+    clearFailed: string;
+    cancelRebootFailed: string;
+    historyTitle: string;
+    noFilterMatch: string;
   };
   aiAndToolchains: {
     title: string;
@@ -885,5 +952,25 @@ export interface TranslationSchema {
     themeNight: string;
     themeNightDesc: string;
     autoUpdateDesc: string;
+    pageDesc: string;
+    appearanceSection: string;
+    updatesSection: string;
+    autoCheckTitle: string;
+    currentVersionDesc: string;
+    upToDate: string;
+    updateAvailableMsg: string;
+    themeDarkDesc: string;
+    themeLightDesc: string;
+    thresholdTitle: string;
+    exclusionsTitle: string;
+    exclusionsDesc: string;
+    builtWith: string;
+    badgeSafety: string;
+    badgeCore: string;
+    badgeOffline: string;
+    releaseNotes: string;
+    reportIssue: string;
+    license: string;
+    thresholdDesc: string;
   };
 }

@@ -17,7 +17,7 @@ export const WinUICard: React.FC<WinUICardProps> = ({ children, className = "", 
     <div
       id={id}
       onClick={onClick}
-      className={`bg-[var(--bg-card)] border border-[var(--border-card)] rounded-lg overflow-hidden shadow-[0_2px_4px_rgba(0,0,0,0.06)] transition-all ${className}`}
+      className={`bg-[var(--bg-card)] border border-[var(--border-card)] rounded-lg overflow-hidden shadow-[var(--shadow-card)] transition-all ${className}`}
     >
       {children}
     </div>
@@ -58,26 +58,26 @@ export const WinUISettingRow: React.FC<WinUISettingRowProps> = ({
         divided ? "border-t border-[var(--border-divider)] first:border-t-0" : ""
       } ${
         isClickable
-          ? "cursor-pointer hover:bg-white/[0.03] active:bg-white/[0.02]"
+          ? "cursor-pointer hover:bg-[var(--fill-subtle)] active:bg-[var(--fill-subtle-hover)]"
           : ""
       } ${className}`}
     >
       {/* Left: Icon + Title + Description */}
       <div className="flex items-center gap-3.5 min-w-0 flex-1">
         {icon && (
-          <div className="w-9 h-9 rounded-md bg-white/[0.04] border border-white/[0.06] flex items-center justify-center text-white/90 shrink-0">
+          <div className="w-8 h-8 rounded-md bg-[var(--fill-subtle)] flex items-center justify-center text-[var(--text-secondary)] shrink-0">
             {icon}
           </div>
         )}
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <span className="text-[13px] font-semibold text-[var(--text-primary)] tracking-tight truncate">
+            <span className="text-sm text-[var(--text-primary)] truncate">
               {title}
             </span>
             {badge}
           </div>
           {subtitle && (
-            <p className="text-[12px] text-[var(--text-secondary)] mt-0.5 leading-snug">
+            <p className="text-xs text-[var(--text-secondary)] mt-0.5 leading-snug">
               {subtitle}
             </p>
           )}
@@ -119,28 +119,28 @@ export const WinUIExpander: React.FC<WinUIExpanderProps> = ({
 
   return (
     <div
-      className={`bg-[var(--bg-card)] border border-[var(--border-card)] rounded-lg overflow-hidden shadow-[0_2px_4px_rgba(0,0,0,0.06)] transition-all ${className}`}
+      className={`bg-[var(--bg-card)] border border-[var(--border-card)] rounded-lg overflow-hidden shadow-[var(--shadow-card)] transition-all ${className}`}
     >
       {/* Expander Header */}
       <div
         onClick={() => setExpanded(!expanded)}
-        className="px-4 py-3.5 flex items-center justify-between gap-4 cursor-pointer hover:bg-white/[0.03] transition-colors select-none"
+        className="px-4 py-3.5 flex items-center justify-between gap-4 cursor-pointer hover:bg-[var(--fill-subtle)] transition-colors select-none"
       >
         <div className="flex items-center gap-3.5 min-w-0 flex-1">
           {icon && (
-            <div className="w-9 h-9 rounded-md bg-white/[0.04] border border-white/[0.06] flex items-center justify-center text-white/90 shrink-0">
+            <div className="w-8 h-8 rounded-md bg-[var(--fill-subtle)] flex items-center justify-center text-[var(--text-secondary)] shrink-0">
               {icon}
             </div>
           )}
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <span className="text-[13px] font-semibold text-[var(--text-primary)] tracking-tight">
+              <span className="text-sm text-[var(--text-primary)]">
                 {title}
               </span>
               {badge}
             </div>
             {subtitle && (
-              <p className="text-[12px] text-[var(--text-secondary)] mt-0.5">
+              <p className="text-xs text-[var(--text-secondary)] mt-0.5">
                 {subtitle}
               </p>
             )}
@@ -151,7 +151,7 @@ export const WinUIExpander: React.FC<WinUIExpanderProps> = ({
           {headerAction && (
             <div onClick={(e) => e.stopPropagation()}>{headerAction}</div>
           )}
-          <div className="p-1 rounded text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors">
+          <div className="p-1 rounded-md text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors">
             {expanded ? (
               <ChevronDown16Regular className="w-4 h-4" />
             ) : (
@@ -163,7 +163,7 @@ export const WinUIExpander: React.FC<WinUIExpanderProps> = ({
 
       {/* Expander Body */}
       {expanded && (
-        <div className="border-t border-[var(--border-divider)] bg-black/10">
+        <div className="border-t border-[var(--border-divider)]">
           {children}
         </div>
       )}
