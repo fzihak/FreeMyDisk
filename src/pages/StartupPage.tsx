@@ -2,18 +2,20 @@ import React, { useEffect, useState, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { useI18nStore } from "@/i18n";
-import { WinUICard } from "@/components/winui/WinUICard";
 import { WinUIButton } from "@/components/winui/WinUIButton";
 import { WinUIToggle } from "@/components/winui/WinUIToggle";
+import { Page, PageHeader, Card, StatCard, Badge, ProgressBar, FilterTabs, EmptyState } from "@/components/ui";
 import {
-  Flash24Filled,
   Flash20Regular,
   Delete20Regular,
   ArrowClockwise20Regular,
   FolderOpen20Regular,
+  Shield20Regular,
   Shield20Filled,
   Warning20Filled,
   CheckmarkCircle20Filled,
+  CheckmarkCircle20Regular,
+  Gauge20Regular,
   Search20Regular,
 } from "@fluentui/react-icons";
 
@@ -28,6 +30,11 @@ export interface StartupItem {
   target_path: string | null;
 }
 
+type FilterMode = "all" | "enabled" | "disabled" | "high" | "critical";
+
+const controlClass =
+  "h-8 rounded-md bg-[var(--bg-input)] border border-[var(--border-card)] text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] disabled:opacity-50";
+
 export const StartupPage: React.FC = () => {
   const { t } = useI18nStore();
   const [items, setItems] = useState<StartupItem[]>([]);
@@ -36,7 +43,7 @@ export const StartupPage: React.FC = () => {
   const [errorBanner, setErrorBanner] = useState<string | null>(null);
   const [itemToDelete, setItemToDelete] = useState<StartupItem | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterMode, setFilterMode] = useState<"all" | "enabled" | "disabled" | "high" | "critical">("all");
+  const [filterMode, setFilterMode] = useState<FilterMode>("all");
 
   const loadStartupItems = async () => {
     setLoading(true);
@@ -144,292 +151,241 @@ export const StartupPage: React.FC = () => {
   const highImpactCount = useMemo(() => items.filter((i) => i.impact === "high" && i.enabled).length, [items]);
   const criticalCount = useMemo(() => items.filter((i) => i.is_critical).length, [items]);
 
+  const impactBadge = (impact: StartupItem["impact"]) =>
+    impact === "high" ? (
+      <Badge tone="danger">{t.startup.impactHigh}</Badge>
+    ) : impact === "medium" ? (
+      <Badge tone="warning">{t.startup.impactMedium}</Badge>
+    ) : (
+      <Badge>{t.startup.impactLow}</Badge>
+    );
+
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-4 select-none font-sans text-[var(--text-primary)] pb-24">
-      {/* WinUI 3 Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-[4px] bg-white/[0.04] border border-[var(--border-subtle)] flex items-center justify-center text-amber-400 shrink-0">
-            <Flash24Filled className="w-6 h-6" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl font-semibold tracking-tight text-[var(--text-primary)]">
-                {t.startup.title}
-              </h1>
-              <span className="px-2 py-0.5 rounded-[4px] text-[10px] font-ibm-mono uppercase tracking-wider bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                {t.startup.filterCritical}
-              </span>
-            </div>
-            <p className="text-xs text-[var(--text-secondary)]">
-              {t.startup.subtitle}
-            </p>
-          </div>
-        </div>
-
-        <WinUIButton
-          variant="primary"
-          onClick={loadStartupItems}
-          disabled={loading}
-          className="flex items-center gap-1.5 self-start sm:self-auto"
-        >
-          <ArrowClockwise20Regular className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
-          <span>{loading ? t.common.scanning : t.common.refresh}</span>
-        </WinUIButton>
-      </div>
-
-      {/* Notifications */}
-      {actionSuccess && (
-        <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-[4px] flex items-center justify-between shadow-xs">
-          <div className="flex items-center gap-2.5">
-            <CheckmarkCircle20Filled className="w-4 h-4 text-emerald-400 shrink-0" />
-            <span className="text-xs text-emerald-400 font-medium">{actionSuccess}</span>
-          </div>
-          <button
-            onClick={() => setActionSuccess(null)}
-            className="text-xs text-emerald-400 hover:text-white px-2 py-0.5 rounded-[3px] bg-emerald-500/20 font-medium cursor-pointer"
+    <Page className="select-none">
+      <PageHeader
+        icon={<Flash20Regular />}
+        title={t.startup.title}
+        description={t.startup.pageDesc}
+        actions={
+          <WinUIButton
+            variant="standard"
+            onClick={loadStartupItems}
+            disabled={loading}
+            icon={<ArrowClockwise20Regular className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />}
           >
+            {loading ? t.common.scanning : t.common.refresh}
+          </WinUIButton>
+        }
+      />
+
+      {/* Notices */}
+      {actionSuccess && (
+        <Card className="py-2.5 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <CheckmarkCircle20Filled className="w-4 h-4 shrink-0 text-[var(--success)]" />
+            <span className="text-sm text-[var(--text-primary)] truncate" title={actionSuccess}>
+              {actionSuccess}
+            </span>
+          </div>
+          <WinUIButton variant="subtle" size="sm" onClick={() => setActionSuccess(null)}>
             {t.common.close}
-          </button>
-        </div>
+          </WinUIButton>
+        </Card>
       )}
 
       {errorBanner && (
-        <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-[4px] flex items-center justify-between shadow-xs">
-          <div className="flex items-center gap-2.5">
-            <Warning20Filled className="w-4 h-4 text-rose-400 shrink-0" />
-            <span className="text-xs text-rose-400 font-medium">{errorBanner}</span>
+        <Card className="py-2.5 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <Warning20Filled className="w-4 h-4 shrink-0 text-[var(--danger)]" />
+            <span className="text-sm text-[var(--danger)] truncate" title={errorBanner}>
+              {errorBanner}
+            </span>
           </div>
-          <button
-            onClick={() => setErrorBanner(null)}
-            className="text-xs text-rose-400 hover:text-white px-2 py-0.5 rounded-[3px] bg-rose-500/20 font-medium cursor-pointer"
-          >
+          <WinUIButton variant="subtle" size="sm" onClick={() => setErrorBanner(null)}>
             {t.common.close}
-          </button>
-        </div>
+          </WinUIButton>
+        </Card>
       )}
 
-      {/* 4-Tile Stat Strip */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 font-ibm-mono">
-        <WinUICard className="p-3.5">
-          <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] mb-1 font-sans">
-            <span className="font-medium text-[11px]">{t.startup.filterAll}</span>
-            <Flash20Regular className="w-3.5 h-3.5 text-[#0078d4]" />
-          </div>
-          <div className="text-xl font-bold text-[var(--text-primary)] tabular-nums">{items.length}</div>
-          <div className="text-[10px] text-[var(--text-muted)] mt-0.5 font-sans">{t.startup.statAllDesc}</div>
-        </WinUICard>
-
-        <WinUICard className="p-3.5">
-          <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] mb-1 font-sans">
-            <span className="font-medium text-[11px]">{t.startup.filterEnabled}</span>
-            <CheckmarkCircle20Filled className="w-3.5 h-3.5 text-emerald-400" />
-          </div>
-          <div className="text-xl font-bold text-emerald-400 tabular-nums">{enabledCount}</div>
-          <div className="text-[10px] text-[var(--text-muted)] mt-0.5 font-sans">{t.startup.statEnabledDesc}</div>
-        </WinUICard>
-
-        <WinUICard className="p-3.5">
-          <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] mb-1 font-sans">
-            <span className="font-medium text-[11px]">{t.startup.filterHigh}</span>
-            <Flash20Regular className="w-3.5 h-3.5 text-rose-400" />
-          </div>
-          <div className="text-xl font-bold text-rose-400 tabular-nums">{highImpactCount}</div>
-          <div className="text-[10px] text-[var(--text-muted)] mt-0.5 font-sans">{t.startup.statHighDesc}</div>
-        </WinUICard>
-
-        <WinUICard className="p-3.5">
-          <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] mb-1 font-sans">
-            <span className="font-medium text-[11px]">{t.startup.criticalSystem}</span>
-            <Shield20Filled className="w-3.5 h-3.5 text-cyan-400" />
-          </div>
-          <div className="text-xl font-bold text-cyan-400 tabular-nums">{criticalCount}</div>
-          <div className="text-[10px] text-[var(--text-muted)] mt-0.5 font-sans">{t.startup.statCriticalDesc}</div>
-        </WinUICard>
+      {/* Stat row */}
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard
+          label={t.startup.filterAll}
+          value={items.length}
+          hint={t.startup.statAllDesc}
+          icon={<Flash20Regular />}
+        />
+        <StatCard
+          label={t.common.enabled}
+          value={enabledCount}
+          hint={t.startup.statEnabledDesc}
+          icon={<CheckmarkCircle20Regular />}
+        />
+        <StatCard
+          label={t.startup.filterHigh}
+          value={highImpactCount}
+          hint={t.startup.statHighDesc}
+          icon={<Gauge20Regular />}
+          tone={highImpactCount > 0 ? "warning" : "neutral"}
+        />
+        <StatCard
+          label={t.startup.statProtected}
+          value={criticalCount}
+          hint={t.startup.statCriticalDesc}
+          icon={<Shield20Regular />}
+        />
       </div>
 
-      {/* Search & Filter Bar */}
-      <WinUICard className="p-3 flex flex-col lg:flex-row items-center justify-between gap-3">
-        <div className="relative w-full lg:w-72">
-          <Search20Regular className="w-3.5 h-3.5 absolute left-2.5 top-2 text-[var(--text-muted)]" />
+      {/* Filter tabs and search */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+        <FilterTabs<FilterMode>
+          items={[
+            { id: "all", label: t.startup.filterAll, count: items.length },
+            { id: "enabled", label: t.common.enabled, count: enabledCount },
+            { id: "disabled", label: t.common.disabled, count: items.length - enabledCount },
+            { id: "high", label: t.startup.filterHigh, count: highImpactCount },
+            { id: "critical", label: t.startup.filterCritical, count: criticalCount },
+          ]}
+          value={filterMode}
+          onChange={setFilterMode}
+          className="min-w-0"
+        />
+        <div className="relative shrink-0 lg:w-56">
+          <Search20Regular className="w-4 h-4 absolute left-2.5 top-2 text-[var(--text-muted)] pointer-events-none" />
           <input
             type="text"
             placeholder={t.startup.searchPlaceholder}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-8 pr-3 py-1 bg-black/20 border border-[var(--border-card)] rounded-[4px] text-xs font-ibm-mono text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-amber-500"
+            className={`${controlClass} w-full pl-8 pr-3 placeholder-[var(--text-muted)] select-text`}
           />
         </div>
+      </div>
 
-        <div className="flex items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden w-full lg:w-auto font-sans">
-          {(["all", "enabled", "disabled", "high", "critical"] as const).map((mode) => (
-            <button
-              key={mode}
-              onClick={() => setFilterMode(mode)}
-              className={`px-3 py-1 rounded-[4px] text-xs font-medium whitespace-nowrap transition-all cursor-pointer ${
-                filterMode === mode
-                  ? "bg-amber-600 text-white shadow-xs"
-                  : "bg-black/20 text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border-card)]"
-              }`}
-            >
-              {mode === "all"
-                ? `${t.startup.filterAll} (${items.length})`
-                : mode === "enabled"
-                ? `${t.startup.filterEnabled} (${enabledCount})`
-                : mode === "disabled"
-                ? `${t.startup.filterDisabled} (${items.length - enabledCount})`
-                : mode === "high"
-                ? `${t.startup.filterHigh} (${highImpactCount})`
-                : `${t.startup.filterCritical} (${criticalCount})`}
-            </button>
-          ))}
-        </div>
-      </WinUICard>
-
-      {/* Startup Items List */}
+      {/* Startup items list */}
       {loading ? (
-        <WinUICard className="p-8 text-center space-y-3">
-          <div className="flex items-center justify-center gap-2 text-xs font-semibold text-[var(--text-primary)]">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
-            </span>
-            <span>{t.common.scanning}</span>
-          </div>
-          <div className="max-w-xs mx-auto h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
-            <div className="h-full bg-amber-500 rounded-full animate-pulse w-3/4" />
-          </div>
-          <p className="text-[11px] text-[var(--text-muted)]">
-            Querying Windows Run registry entries, Startup folders, and Task Scheduler triggers...
-          </p>
-        </WinUICard>
+        <Card className="space-y-3">
+          <div className="text-sm font-semibold text-[var(--text-primary)]">{t.common.scanning}</div>
+          <ProgressBar value={75} className="animate-pulse" />
+          <p className="text-xs text-[var(--text-muted)]">{t.startup.loadingDesc}</p>
+        </Card>
       ) : filteredItems.length > 0 ? (
-        <WinUICard className="overflow-hidden">
+        <Card padded={false} className="overflow-hidden">
           <div className="divide-y divide-[var(--border-divider)]">
             {filteredItems.map((item) => (
               <div
                 key={item.id}
-                className="px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-white/[0.02] transition-colors"
+                className="px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-3 hover:bg-[var(--fill-subtle)] transition-colors"
               >
-                <div className="space-y-0.5 flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-semibold text-[var(--text-primary)] text-xs truncate select-all">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap min-w-0">
+                    <span className="text-sm font-semibold text-[var(--text-primary)] truncate select-all" title={item.name}>
                       {item.name}
                     </span>
+                    {impactBadge(item.impact)}
                     {item.is_critical && (
-                      <span className="flex items-center gap-1 px-1.5 py-0.2 rounded-[3px] text-[10px] font-ibm-mono bg-rose-500/10 text-rose-400 border border-rose-500/20 font-bold">
-                        <Shield20Filled className="w-3 h-3" /> System Critical
-                      </span>
+                      <Badge tone="accent">
+                        <Shield20Filled className="w-3 h-3" />
+                        {t.startup.systemCritical}
+                      </Badge>
                     )}
-                    <span
-                      className={`px-1.5 py-0.2 rounded-[3px] text-[10px] font-ibm-mono font-bold uppercase tracking-wider ${
-                        item.impact === "high"
-                          ? "bg-rose-500/10 text-rose-400 border border-rose-500/20"
-                          : item.impact === "medium"
-                          ? "bg-amber-500/10 text-amber-400 border border-amber-500/20"
-                          : "bg-black/20 text-[var(--text-muted)]"
-                      }`}
-                    >
-                      {item.impact === "high" ? t.startup.impactHigh : item.impact === "medium" ? t.startup.impactMedium : t.startup.impactLow}
-                    </span>
-                    <span className="text-[10px] px-1.5 py-0.2 rounded-[3px] bg-black/20 text-[var(--text-muted)] font-ibm-mono">
-                      {item.location}
-                    </span>
+                    <Badge className="font-code">{item.location}</Badge>
                   </div>
-
-                  <div className="text-[11px] font-ibm-mono text-[var(--text-secondary)] truncate max-w-3xl select-all">
+                  <div
+                    className="font-code text-xs text-[var(--text-muted)] truncate mt-1 select-all"
+                    title={item.command}
+                  >
                     {item.command}
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3 shrink-0">
-                  {/* Show in File Explorer */}
-                  {item.target_path && (
-                    <button
-                      onClick={() => handleRevealInExplorer(item.target_path!)}
-                      title={t.common.openInExplorer}
-                      className="p-1.5 bg-black/20 hover:bg-[#0078d4] hover:text-white text-[var(--text-secondary)] rounded-[4px] transition-all cursor-pointer border border-[var(--border-card)]"
-                    >
-                      <FolderOpen20Regular className="w-3.5 h-3.5" />
-                    </button>
+                <div className="flex items-center gap-2 shrink-0">
+                  {item.target_path ? (
+                    <span title={t.startup.openLocation}>
+                      <WinUIButton
+                        variant="subtle"
+                        size="sm"
+                        className="w-8 !px-0"
+                        aria-label={t.startup.openLocation}
+                        onClick={() => handleRevealInExplorer(item.target_path!)}
+                        icon={<FolderOpen20Regular className="w-4 h-4 text-[var(--text-secondary)]" />}
+                      />
+                    </span>
+                  ) : (
+                    <span className="w-8" />
                   )}
 
-                  {/* WinUI 3 Native Toggle Switch */}
-                  <WinUIToggle
-                    checked={item.enabled}
-                    disabled={item.is_critical}
-                    onChange={() => handleToggle(item)}
-                    labelOn={t.common.enabled}
-                    labelOff={t.common.disabled}
-                  />
+                  <span
+                    title={item.is_critical ? t.startup.cannotDisableCritical : undefined}
+                    className="w-[92px] flex"
+                  >
+                    <WinUIToggle
+                      checked={item.enabled}
+                      disabled={item.is_critical}
+                      onChange={() => handleToggle(item)}
+                      labelOn={t.common.enabled}
+                      labelOff={t.common.disabled}
+                    />
+                  </span>
 
-                  {/* Delete Button */}
-                  {!item.is_critical && (
-                    <button
-                      onClick={() => setItemToDelete(item)}
-                      title={t.startup.deleteItem}
-                      className="p-1.5 text-[var(--text-muted)] hover:text-rose-400 hover:bg-rose-500/10 rounded-[4px] transition-all cursor-pointer"
-                    >
-                      <Delete20Regular className="w-3.5 h-3.5" />
-                    </button>
+                  {!item.is_critical ? (
+                    <span title={t.startup.deleteItem}>
+                      <WinUIButton
+                        variant="subtle"
+                        size="sm"
+                        className="w-8 !px-0"
+                        aria-label={t.startup.deleteItem}
+                        onClick={() => setItemToDelete(item)}
+                        icon={<Delete20Regular className="w-4 h-4 text-[var(--text-secondary)]" />}
+                      />
+                    </span>
+                  ) : (
+                    <span className="w-8" />
                   )}
                 </div>
               </div>
             ))}
           </div>
-        </WinUICard>
+        </Card>
       ) : (
-        <WinUICard className="p-12 text-center space-y-2">
-          <Flash24Filled className="w-10 h-10 text-[var(--text-muted)] mx-auto" />
-          <h3 className="font-semibold text-[var(--text-primary)] text-sm">{t.startup.noItemsFound}</h3>
-          <p className="text-xs text-[var(--text-secondary)] max-w-md mx-auto">
-            {t.startup.noItemsDesc}
-          </p>
-        </WinUICard>
+        <EmptyState
+          icon={items.length > 0 ? <Search20Regular /> : <Flash20Regular />}
+          title={t.startup.noItemsFound}
+          description={t.startup.noItemsDesc}
+        />
       )}
 
-      {/* Delete Confirmation Modal */}
+      {/* Delete confirmation */}
       {itemToDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fadeIn">
-          <WinUICard className="max-w-md w-full p-5 space-y-3 shadow-2xl relative">
-            <div className="flex items-center gap-2.5 text-rose-400">
-              <div className="p-1.5 rounded-[4px] bg-rose-500/10 border border-rose-500/30">
-                <Warning20Filled className="w-4 h-4" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fadeIn">
+          <Card className="max-w-md w-full p-5 space-y-4 shadow-2xl">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-lg bg-[color-mix(in_srgb,var(--danger)_14%,transparent)] flex items-center justify-center text-[var(--danger)] shrink-0">
+                <Delete20Regular className="w-5 h-5" />
               </div>
-              <div>
-                <h3 className="font-semibold text-[var(--text-primary)] text-sm">{t.startup.confirmDeleteTitle}</h3>
-                <p className="text-[11px] text-[var(--text-secondary)]">
-                  {t.startup.confirmDeleteDesc}
-                </p>
+              <div className="space-y-1 min-w-0">
+                <h3 className="text-base font-semibold text-[var(--text-primary)]">{t.startup.confirmDeleteTitle}</h3>
+                <p className="text-sm text-[var(--text-secondary)]">{t.startup.confirmDeleteDesc}</p>
               </div>
             </div>
 
-            <p className="text-xs text-[var(--text-primary)] font-semibold">
-              {itemToDelete.name}
-            </p>
-
-            <div className="p-2.5 bg-black/30 rounded-[4px] text-xs font-ibm-mono text-[var(--text-muted)] break-all border border-[var(--border-card)]">
-              {itemToDelete.command}
+            <div className="rounded-md border border-[var(--border-card)] bg-[var(--bg-input)] px-3 py-2 space-y-1">
+              <div className="text-sm font-semibold text-[var(--text-primary)]">{itemToDelete.name}</div>
+              <div className="font-code text-xs text-[var(--text-muted)] break-all select-text">{itemToDelete.command}</div>
             </div>
 
-            <div className="flex justify-end gap-2 pt-2">
-              <WinUIButton
-                variant="subtle"
-                onClick={() => setItemToDelete(null)}
-              >
+            <div className="flex justify-end gap-2 pt-1">
+              <WinUIButton variant="standard" onClick={() => setItemToDelete(null)}>
                 {t.common.cancel}
               </WinUIButton>
-              <WinUIButton
-                variant="danger"
-                onClick={handleDelete}
-              >
+              <WinUIButton variant="danger" onClick={handleDelete} icon={<Delete20Regular className="w-4 h-4" />}>
                 {t.common.delete}
               </WinUIButton>
             </div>
-          </WinUICard>
+          </Card>
         </div>
       )}
-    </div>
+    </Page>
   );
 };
 

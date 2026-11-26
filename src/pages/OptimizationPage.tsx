@@ -1,27 +1,29 @@
 import React, { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useI18nStore } from "@/i18n";
-import { WinUICard } from "@/components/winui/WinUICard";
 import { WinUIButton } from "@/components/winui/WinUIButton";
 import { WinUIToggle } from "@/components/winui/WinUIToggle";
+import { Page, PageHeader, SectionTitle, Card, StatCard, Badge, FilterTabs } from "@/components/ui";
 import {
-  Gauge24Filled,
-  Flash20Filled,
-  Sparkle20Filled,
+  Gauge20Regular,
+  Flash20Regular,
+  Sparkle20Regular,
   HardDrive20Regular,
   Layer20Regular,
   ArrowClockwise20Regular,
+  ArrowDownload20Regular,
   CheckmarkCircle20Filled,
   ShieldError20Filled,
   Delete20Regular,
   Info20Regular,
+  Info16Regular,
+  Shield16Regular,
   Folder20Regular,
   DocumentText20Regular,
   Search20Regular,
-  Settings20Regular,
   Clock20Regular,
   ShieldCheckmark20Regular,
-  Server20Filled,
+  WeatherMoon20Regular,
 } from "@fluentui/react-icons";
 import { VirtualizationView } from "@/components/optimization/VirtualizationView";
 
@@ -60,7 +62,6 @@ interface ExplorerTweakItem {
   desc: string;
   footnote: string;
   icon: React.ReactNode;
-  iconColor: string;
 }
 
 export const OptimizationPage: React.FC = () => {
@@ -76,6 +77,7 @@ export const OptimizationPage: React.FC = () => {
   } | null>(null);
   const [togglingExplorer, setTogglingExplorer] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"system" | "virtualization">("system");
+  const [virtRefreshToken, setVirtRefreshToken] = useState(0);
 
   const formatBytes = (bytes: number): string => {
     if (bytes === 0) return "0 B";
@@ -210,8 +212,7 @@ export const OptimizationPage: React.FC = () => {
       regName: "HideFileExt",
       desc: t.optimization.showFileExtensionsDesc,
       footnote: t.optimization.showFileExtensionsFootnote,
-      icon: <DocumentText20Regular className="w-5 h-5 text-blue-400" />,
-      iconColor: "bg-blue-500/10 border-blue-500/20 text-blue-400",
+      icon: <DocumentText20Regular />,
     },
     {
       key: "show_hidden_files",
@@ -220,8 +221,7 @@ export const OptimizationPage: React.FC = () => {
       regName: "Hidden = 1",
       desc: t.optimization.showHiddenFilesDesc,
       footnote: t.optimization.showHiddenFilesFootnote,
-      icon: <Folder20Regular className="w-5 h-5 text-teal-400" />,
-      iconColor: "bg-teal-500/10 border-teal-500/20 text-teal-400",
+      icon: <Folder20Regular />,
     },
     {
       key: "launch_this_pc",
@@ -230,8 +230,7 @@ export const OptimizationPage: React.FC = () => {
       regName: "LaunchTo = 1",
       desc: t.optimization.launchThisPcDesc,
       footnote: t.optimization.launchThisPcFootnote,
-      icon: <HardDrive20Regular className="w-5 h-5 text-indigo-400" />,
-      iconColor: "bg-indigo-500/10 border-indigo-500/20 text-indigo-400",
+      icon: <HardDrive20Regular />,
     },
     {
       key: "disable_bing_search",
@@ -240,8 +239,7 @@ export const OptimizationPage: React.FC = () => {
       regName: "DisableSearchBoxSuggestions",
       desc: t.optimization.disableBingSearchDesc,
       footnote: t.optimization.disableBingSearchFootnote,
-      icon: <Search20Regular className="w-5 h-5 text-cyan-400" />,
-      iconColor: "bg-cyan-500/10 border-cyan-500/20 text-cyan-400",
+      icon: <Search20Regular />,
     },
     {
       key: "classic_context_menu",
@@ -250,8 +248,7 @@ export const OptimizationPage: React.FC = () => {
       regName: "ClassicShellClsid",
       desc: t.optimization.classicContextMenuDesc,
       footnote: t.optimization.classicContextMenuFootnote,
-      icon: <Layer20Regular className="w-5 h-5 text-violet-400" />,
-      iconColor: "bg-violet-500/10 border-violet-500/20 text-violet-400",
+      icon: <Layer20Regular />,
     },
     {
       key: "enable_end_task",
@@ -260,8 +257,7 @@ export const OptimizationPage: React.FC = () => {
       regName: "TaskbarEndTask",
       desc: t.optimization.enableEndTaskDesc,
       footnote: t.optimization.enableEndTaskFootnote,
-      icon: <Flash20Filled className="w-5 h-5 text-rose-400" />,
-      iconColor: "bg-rose-500/10 border-rose-500/20 text-rose-400",
+      icon: <Flash20Regular />,
     },
     {
       key: "show_seconds",
@@ -270,8 +266,7 @@ export const OptimizationPage: React.FC = () => {
       regName: "ShowSecondsInSystemClock",
       desc: t.optimization.showSecondsDesc,
       footnote: t.optimization.showSecondsFootnote,
-      icon: <Clock20Regular className="w-5 h-5 text-emerald-400" />,
-      iconColor: "bg-emerald-500/10 border-emerald-500/20 text-emerald-400",
+      icon: <Clock20Regular />,
     },
     {
       key: "disable_advertising_id",
@@ -280,8 +275,7 @@ export const OptimizationPage: React.FC = () => {
       regName: "AdvertisingInfo\\Enabled = 0",
       desc: t.optimization.disableAdvertisingIdDesc,
       footnote: t.optimization.disableAdvertisingIdFootnote,
-      icon: <ShieldCheckmark20Regular className="w-5 h-5 text-sky-400" />,
-      iconColor: "bg-sky-500/10 border-sky-500/20 text-sky-400",
+      icon: <ShieldCheckmark20Regular />,
     },
     {
       key: "disable_activity_upload",
@@ -290,8 +284,7 @@ export const OptimizationPage: React.FC = () => {
       regName: "PublishUserActivities = 0",
       desc: t.optimization.disableActivityUploadDesc,
       footnote: t.optimization.disableActivityUploadFootnote,
-      icon: <Info20Regular className="w-5 h-5 text-slate-400" />,
-      iconColor: "bg-slate-500/10 border-slate-500/20 text-slate-400",
+      icon: <Info20Regular />,
     },
     {
       key: "enable_long_paths",
@@ -300,8 +293,7 @@ export const OptimizationPage: React.FC = () => {
       regName: "LongPathsEnabled = 1",
       desc: t.optimization.enableLongPathsDesc,
       footnote: t.optimization.enableLongPathsFootnote,
-      icon: <Folder20Regular className="w-5 h-5 text-amber-400" />,
-      iconColor: "bg-amber-500/10 border-amber-500/20 text-amber-400",
+      icon: <Folder20Regular />,
     },
     {
       key: "reduce_menu_delay",
@@ -310,8 +302,7 @@ export const OptimizationPage: React.FC = () => {
       regName: "MenuShowDelay = 20ms",
       desc: t.optimization.reduceMenuDelayDesc,
       footnote: t.optimization.reduceMenuDelayFootnote,
-      icon: <Flash20Filled className="w-5 h-5 text-lime-400" />,
-      iconColor: "bg-lime-500/10 border-lime-500/20 text-lime-400",
+      icon: <Flash20Regular />,
     },
     {
       key: "disable_game_dvr",
@@ -320,8 +311,7 @@ export const OptimizationPage: React.FC = () => {
       regName: "GameDVR_Enabled = 0",
       desc: t.optimization.disableGameDvrDesc,
       footnote: t.optimization.disableGameDvrFootnote,
-      icon: <Sparkle20Filled className="w-5 h-5 text-fuchsia-400" />,
-      iconColor: "bg-fuchsia-500/10 border-fuchsia-500/20 text-fuchsia-400",
+      icon: <Sparkle20Regular />,
     },
     {
       key: "disable_copilot",
@@ -330,8 +320,7 @@ export const OptimizationPage: React.FC = () => {
       regName: "TurnOffWindowsCopilot = 1",
       desc: t.optimization.disableCopilotDesc,
       footnote: t.optimization.disableCopilotFootnote,
-      icon: <Sparkle20Filled className="w-5 h-5 text-orange-400" />,
-      iconColor: "bg-orange-500/10 border-orange-500/20 text-orange-400",
+      icon: <Sparkle20Regular />,
     },
     {
       key: "disable_ntfs_last_access",
@@ -340,441 +329,285 @@ export const OptimizationPage: React.FC = () => {
       regName: "NtfsDisableLastAccessUpdate",
       desc: t.optimization.disableNtfsLastAccessDesc,
       footnote: t.optimization.disableNtfsLastAccessFootnote,
-      icon: <HardDrive20Regular className="w-5 h-5 text-emerald-400" />,
-      iconColor: "bg-emerald-500/10 border-emerald-500/20 text-emerald-400",
+      icon: <HardDrive20Regular />,
     },
   ];
 
-  return (
-    <div className="p-6 max-w-5xl mx-auto space-y-4 select-none font-sans text-[var(--text-primary)] pb-24">
-      {/* WinUI Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-3 min-w-0">
-          <div
-            className={`w-10 h-10 rounded-[4px] bg-white/[0.04] border border-[var(--border-subtle)] flex items-center justify-center shrink-0 ${
-              activeTab === "system" ? "text-amber-400" : "text-blue-400"
-            }`}
-          >
-            {activeTab === "system" ? (
-              <Gauge24Filled className="w-6 h-6" />
-            ) : (
-              <Server20Filled className="w-6 h-6" />
-            )}
-          </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl font-semibold tracking-tight text-[var(--text-primary)]">
-                {activeTab === "system" ? t.optimization.title : t.virtualization.title}
-              </h1>
-              <span
-                className={`px-2 py-0.5 rounded-[4px] text-[10px] font-ibm-mono uppercase tracking-wider border ${
-                  activeTab === "system"
-                    ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
-                    : "bg-blue-500/10 text-blue-400 border-blue-500/20"
-                }`}
-              >
-                {activeTab === "system" ? t.optimization.windowsFeatures : "WSL2 • DOCKER • VM"}
-              </span>
-            </div>
-            <p className="text-xs text-[var(--text-secondary)] mt-0.5">
-              {activeTab === "system" ? t.optimization.subtitle : t.virtualization.subtitle}
-            </p>
-          </div>
-        </div>
+  const isSystemTab = activeTab === "system";
 
-        {activeTab === "system" && (
+  return (
+    <Page className="select-none">
+      <PageHeader
+        icon={<Gauge20Regular />}
+        title={t.optimization.title}
+        description={isSystemTab ? t.optimization.subtitle : t.virtualization.subtitle}
+        actions={
           <WinUIButton
             variant="standard"
-            onClick={loadOverview}
-            disabled={loading}
-            className="flex items-center gap-1.5 self-start sm:self-auto shrink-0"
+            onClick={isSystemTab ? loadOverview : () => setVirtRefreshToken((n) => n + 1)}
+            disabled={isSystemTab && loading}
+            icon={<ArrowClockwise20Regular className={`w-4 h-4 ${isSystemTab && loading ? "animate-spin" : ""}`} />}
           >
-            <ArrowClockwise20Regular className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
-            <span>{loading ? t.common.scanning : t.common.refresh}</span>
+            {isSystemTab && loading ? t.common.scanning : t.common.refresh}
           </WinUIButton>
-        )}
-      </div>
+        }
+      />
 
-      {/* Sub-Navigation Tabs */}
-      <div className="flex border-b border-[var(--border-subtle)] gap-2">
-        <button
-          onClick={() => setActiveTab("system")}
-          className={`flex items-center gap-2 pb-3 px-3 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
-            activeTab === "system"
-              ? "border-amber-400 text-[var(--text-primary)]"
-              : "border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-          }`}
-        >
-          <Gauge24Filled className="w-4 h-4 text-amber-400" />
-          <span>{t.virtualization.tabSystem}</span>
-        </button>
-        <button
-          onClick={() => setActiveTab("virtualization")}
-          className={`flex items-center gap-2 pb-3 px-3 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
-            activeTab === "virtualization"
-              ? "border-blue-400 text-[var(--text-primary)]"
-              : "border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-          }`}
-        >
-          <Server20Filled className="w-4 h-4 text-blue-400" />
-          <span>{t.virtualization.tabVirtualization}</span>
-        </button>
-      </div>
+      <FilterTabs<"system" | "virtualization">
+        items={[
+          { id: "system", label: t.virtualization.tabSystem },
+          { id: "virtualization", label: t.virtualization.tabVirtualization },
+        ]}
+        value={activeTab}
+        onChange={setActiveTab}
+      />
 
-      {activeTab === "system" ? (
+      {isSystemTab ? (
         <>
-          {/* Notification Banner */}
-      {statusMessage && (
-        <div
-          className={`p-4 rounded-lg flex items-center justify-between animate-fadeIn border shadow-sm ${
-            statusMessage.type === "success"
-              ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
-              : "bg-rose-500/10 border-rose-500/30 text-rose-400"
-          }`}
-        >
-          <div className="flex items-center gap-3 text-xs font-medium">
-            {statusMessage.type === "success" ? (
-              <CheckmarkCircle20Filled className="w-5 h-5 text-emerald-400 shrink-0" />
-            ) : (
-              <ShieldError20Filled className="w-5 h-5 text-rose-400 shrink-0" />
-            )}
-            <span>{statusMessage.text}</span>
-          </div>
-          <button
-            onClick={() => setStatusMessage(null)}
-            className="text-xs hover:underline cursor-pointer ml-4 shrink-0 opacity-80 hover:opacity-100"
-          >
-            {t.common.close}
-          </button>
-        </div>
-      )}
-
-      {/* 4-Tile Stat Strip */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 font-ibm-mono">
-        <WinUICard className="p-5 flex flex-col justify-between space-y-3">
-          <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] font-sans">
-            <span className="font-medium">{t.optimization.hibernationTitle}</span>
-            <Flash20Filled className="w-4 h-4 text-amber-400 shrink-0" />
-          </div>
-          <div>
-            <div className="text-2xl font-bold text-amber-400 tabular-nums">
-              {overview?.hibernation_enabled
-                ? formatBytes(overview.hibernation_size_bytes || 0)
-                : "0 B"}
-            </div>
-            <div className="text-xs text-[var(--text-muted)] mt-1 font-sans">
-              {overview?.hibernation_enabled ? t.optimization.hibernationReserved : t.optimization.hibernationDisabledSaved}
-            </div>
-          </div>
-        </WinUICard>
-
-        <WinUICard className="p-5 flex flex-col justify-between space-y-3">
-          <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] font-sans">
-            <span className="font-medium">{t.optimization.storageSenseTitle}</span>
-            <Sparkle20Filled className="w-4 h-4 text-cyan-400 shrink-0" />
-          </div>
-          <div>
-            <div className={`text-2xl font-bold font-sans ${overview?.storage_sense_enabled ? "text-cyan-400" : "text-[var(--text-muted)]"}`}>
-              {overview?.storage_sense_enabled ? t.common.enabled : t.common.disabled}
-            </div>
-            <div className="text-xs text-[var(--text-muted)] mt-1 font-sans">
-              {t.optimization.storageSenseCurrentStatus}
-            </div>
-          </div>
-        </WinUICard>
-
-        <WinUICard className="p-5 flex flex-col justify-between space-y-3">
-          <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] font-sans">
-            <span className="font-medium">{t.optimization.deliveryTitle}</span>
-            <HardDrive20Regular className="w-4 h-4 text-purple-400 shrink-0" />
-          </div>
-          <div>
-            <div className="text-2xl font-bold text-purple-400 tabular-nums">
-              {formatBytes(overview?.delivery_cache_bytes || 0)}
-            </div>
-            <div className="text-xs text-[var(--text-muted)] mt-1 font-sans">
-              {t.optimization.deliveryCachedData}
-            </div>
-          </div>
-        </WinUICard>
-
-        <WinUICard className="p-5 flex flex-col justify-between space-y-3">
-          <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] font-sans">
-            <span className="font-medium">{t.optimization.pagefileTitle}</span>
-            <Layer20Regular className="w-4 h-4 text-emerald-400 shrink-0" />
-          </div>
-          <div>
-            <div className="text-2xl font-bold text-emerald-400 tabular-nums">
-              {formatBytes(overview?.paging_total_bytes || 0)}
-            </div>
-            <div className="text-xs text-[var(--text-muted)] mt-1 font-sans">
-              {t.optimization.pagefileManaged}
-            </div>
-          </div>
-        </WinUICard>
-      </div>
-
-      {/* Main Feature Settings */}
-      <div className="space-y-3 pt-2">
-        <h2 className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider px-1">
-          {t.optimization.systemFeatureControls}
-        </h2>
-
-        <WinUICard className="divide-y divide-[var(--border-divider)]">
-          {/* 1. Hibernation Manager */}
-          <div className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 hover:bg-white/[0.015] transition-colors">
-            <div className="flex items-start gap-4 flex-1 min-w-0">
-              <div className="w-10 h-10 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center justify-center shrink-0 mt-0.5">
-                <Flash20Filled className="w-5 h-5" />
-              </div>
-              <div className="space-y-1.5 flex-1 min-w-0">
-                <div className="flex items-center gap-2.5 flex-wrap">
-                  <h3 className="font-semibold text-[var(--text-primary)] text-sm">
-                    {t.optimization.hibernationTitle}
-                  </h3>
-                  <span className="text-[10px] font-ibm-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 font-medium">
-                    {t.optimization.adminNotice}
-                  </span>
-                  <span className="text-xs text-[var(--text-muted)] font-ibm-mono">
-                    C:\hiberfil.sys
-                  </span>
-                </div>
-                <p className="text-xs text-[var(--text-secondary)] leading-relaxed max-w-2xl">
-                  {t.optimization.hibernationDesc}
-                </p>
-                <div className="text-[11px] text-[var(--text-muted)] flex items-center gap-1.5 pt-1">
-                  <Info20Regular className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                  <span>{t.optimization.hibernationFootnote}</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-6 shrink-0 self-end md:self-center">
-              <div className="text-right font-ibm-mono">
-                <div className="text-xs text-[var(--text-muted)] font-sans">{t.optimization.hibernationCurrentFootprint}</div>
-                <div className="text-sm font-bold text-amber-400 tabular-nums">
-                  {overview?.hibernation_size_bytes ? formatBytes(overview.hibernation_size_bytes) : "0 B"}
-                </div>
-              </div>
-              <div className="pl-2 border-l border-[var(--border-divider)]">
-                <WinUIToggle
-                  checked={overview?.hibernation_enabled || false}
-                  disabled={togglingHiber || !overview}
-                  onChange={handleToggleHibernation}
-                  labelOn={t.common.enabled}
-                  labelOff={t.common.disabled}
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* 2. Storage Sense Automated Cleaner */}
-          <div className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 hover:bg-white/[0.015] transition-colors">
-            <div className="flex items-start gap-4 flex-1 min-w-0">
-              <div className="w-10 h-10 rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 flex items-center justify-center shrink-0 mt-0.5">
-                <Sparkle20Filled className="w-5 h-5" />
-              </div>
-              <div className="space-y-1.5 flex-1 min-w-0">
-                <div className="flex items-center gap-2.5 flex-wrap">
-                  <h3 className="font-semibold text-[var(--text-primary)] text-sm">
-                    {t.optimization.storageSenseTitle}
-                  </h3>
-                  <span className="text-[10px] font-ibm-mono px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-medium">
-                    Windows
-                  </span>
-                </div>
-                <p className="text-xs text-[var(--text-secondary)] leading-relaxed max-w-2xl">
-                  {t.optimization.storageSenseDesc}
-                </p>
-                <div className="text-[11px] text-[var(--text-muted)] flex items-center gap-1.5 pt-1">
-                  <Info20Regular className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-                  <span>{t.optimization.storageSenseFootnote}</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-6 shrink-0 self-end md:self-center">
-              <div className="text-right font-sans">
-                <div className="text-xs text-[var(--text-muted)]">{t.optimization.storageSenseCurrentStatus}</div>
-                <div className={`text-sm font-semibold ${overview?.storage_sense_enabled ? "text-cyan-400" : "text-[var(--text-muted)]"}`}>
-                  {overview?.storage_sense_enabled ? t.optimization.storageSenseActive : t.optimization.storageSenseOff}
-                </div>
-              </div>
-              <div className="pl-2 border-l border-[var(--border-divider)]">
-                <WinUIToggle
-                  checked={overview?.storage_sense_enabled || false}
-                  disabled={togglingSense || !overview}
-                  onChange={handleToggleStorageSense}
-                  labelOn={t.common.enabled}
-                  labelOff={t.common.disabled}
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* 3. Delivery Optimization Cache */}
-          <div className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 hover:bg-white/[0.015] transition-colors">
-            <div className="flex items-start gap-4 flex-1 min-w-0">
-              <div className="w-10 h-10 rounded-lg bg-purple-500/10 text-purple-400 border border-purple-500/20 flex items-center justify-center shrink-0 mt-0.5">
-                <HardDrive20Regular className="w-5 h-5" />
-              </div>
-              <div className="space-y-1.5 flex-1 min-w-0">
-                <div className="flex items-center gap-2.5 flex-wrap">
-                  <h3 className="font-semibold text-[var(--text-primary)] text-sm">
-                    {t.optimization.deliveryTitle}
-                  </h3>
-                  <span className="text-[10px] font-ibm-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 font-medium">
-                    {t.optimization.adminNotice}
-                  </span>
-                </div>
-                <p className="text-xs text-[var(--text-secondary)] leading-relaxed max-w-2xl">
-                  {t.optimization.deliveryDesc}
-                </p>
-                <div className="text-[11px] text-[var(--text-muted)] font-ibm-mono truncate pt-1">
-                  SoftwareDistribution\DeliveryOptimization
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-6 shrink-0 self-end md:self-center">
-              <div className="text-right font-ibm-mono">
-                <div className="text-xs text-[var(--text-muted)] font-sans">{t.optimization.deliveryCachedData}</div>
-                <div className="text-sm font-bold text-purple-400 tabular-nums">
-                  {formatBytes(overview?.delivery_cache_bytes || 0)}
-                </div>
-              </div>
-              <div className="pl-2 border-l border-[var(--border-divider)]">
-                <WinUIButton
-                  variant="primary"
-                  onClick={handleCleanDeliveryCache}
-                  disabled={cleaningDelivery || (overview?.delivery_cache_bytes || 0) === 0}
-                  className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white"
+          {/* Notice */}
+          {statusMessage && (
+            <Card className="py-2.5 flex items-center justify-between gap-3 animate-fadeIn">
+              <div className="flex items-center gap-2 min-w-0">
+                {statusMessage.type === "success" ? (
+                  <CheckmarkCircle20Filled className="w-4 h-4 shrink-0 text-[var(--success)]" />
+                ) : (
+                  <ShieldError20Filled className="w-4 h-4 shrink-0 text-[var(--danger)]" />
+                )}
+                <span
+                  className={`text-sm ${
+                    statusMessage.type === "success" ? "text-[var(--text-primary)]" : "text-[var(--danger)]"
+                  }`}
                 >
-                  <Delete20Regular className="w-4 h-4" />
-                  <span>{cleaningDelivery ? t.common.deleting : t.optimization.deliveryClean}</span>
-                </WinUIButton>
-              </div>
-            </div>
-          </div>
-
-          {/* 4. Virtual Memory & Paging File */}
-          <div className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 hover:bg-white/[0.015] transition-colors">
-            <div className="flex items-start gap-4 flex-1 min-w-0">
-              <div className="w-10 h-10 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center shrink-0 mt-0.5">
-                <Layer20Regular className="w-5 h-5" />
-              </div>
-              <div className="space-y-1.5 flex-1 min-w-0">
-                <div className="flex items-center gap-2.5 flex-wrap">
-                  <h3 className="font-semibold text-[var(--text-primary)] text-sm">
-                    {t.optimization.pagefileTitle}
-                  </h3>
-                  <span className="text-xs text-[var(--text-muted)] font-ibm-mono">
-                    pagefile.sys
-                  </span>
-                </div>
-                <p className="text-xs text-[var(--text-secondary)] leading-relaxed max-w-2xl">
-                  {t.optimization.pagefileDesc}
-                </p>
-                <div className="text-[11px] text-[var(--text-muted)] font-ibm-mono pt-1">
-                  {t.optimization.pagefileLocations} {overview?.paging_files.join(", ") || "C:\\pagefile.sys"}
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-6 shrink-0 self-end md:self-center">
-              <div className="text-right font-ibm-mono">
-                <div className="text-xs text-[var(--text-muted)] font-sans">{t.optimization.pagefileAllocated}</div>
-                <div className="text-sm font-bold text-emerald-400 tabular-nums">
-                  {formatBytes(overview?.paging_total_bytes || 0)}
-                </div>
-              </div>
-              <div className="pl-2 border-l border-[var(--border-divider)]">
-                <span className="px-3 py-1.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-semibold font-ibm-mono">
-                  {t.optimization.pagefileManaged}
+                  {statusMessage.text}
                 </span>
               </div>
-            </div>
+              <WinUIButton variant="subtle" size="sm" onClick={() => setStatusMessage(null)}>
+                {t.common.close}
+              </WinUIButton>
+            </Card>
+          )}
+
+          {/* Stat row */}
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <StatCard
+              label={t.optimization.hibernationTitle}
+              value={overview?.hibernation_enabled ? formatBytes(overview.hibernation_size_bytes || 0) : "0 B"}
+              hint={overview?.hibernation_enabled ? t.optimization.hibernationReserved : t.optimization.hibernationDisabledSaved}
+              icon={<WeatherMoon20Regular />}
+            />
+            <StatCard
+              label={t.optimization.storageSenseTitle}
+              value={
+                <span className="font-sans">
+                  {overview?.storage_sense_enabled ? t.common.enabled : t.common.disabled}
+                </span>
+              }
+              hint={t.optimization.storageSenseCurrentStatus}
+              icon={<Sparkle20Regular />}
+              tone={overview?.storage_sense_enabled ? "success" : "neutral"}
+            />
+            <StatCard
+              label={t.optimization.deliveryTitle}
+              value={formatBytes(overview?.delivery_cache_bytes || 0)}
+              hint={t.optimization.deliveryCachedData}
+              icon={<ArrowDownload20Regular />}
+            />
+            <StatCard
+              label={t.optimization.pagefileTitle}
+              value={formatBytes(overview?.paging_total_bytes || 0)}
+              hint={t.optimization.pagefileManaged}
+              icon={<Layer20Regular />}
+            />
           </div>
-        </WinUICard>
-      </div>
 
-      {/* Windows Explorer & Shell Tweaks */}
-      <div className="space-y-3 pt-2">
-        <div className="flex items-center justify-between px-1">
-          <div className="flex items-center gap-2">
-            <Settings20Regular className="w-4 h-4 text-blue-400" />
-            <h2 className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">
-              {t.optimization.explorerTweaksTitle}
-            </h2>
-          </div>
-          <span className="text-[11px] text-[var(--text-muted)] font-ibm-mono">
-            {t.optimization.registryTuning}
-          </span>
-        </div>
-
-        <WinUICard className="divide-y divide-[var(--border-divider)]">
-          {explorerTweaks.map((item) => {
-            const isEnabled = Boolean(overview?.explorer_settings?.[item.key]);
-
-            return (
-              <div
-                key={item.key}
-                className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 hover:bg-white/[0.015] transition-colors"
-              >
-                <div className="flex items-start gap-4 flex-1 min-w-0">
-                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 mt-0.5 border ${item.iconColor}`}>
-                    {item.icon}
-                  </div>
-                  <div className="space-y-1.5 flex-1 min-w-0">
-                    <div className="flex items-center gap-2.5 flex-wrap">
-                      <h3 className="font-semibold text-[var(--text-primary)] text-sm">
-                        {item.title}
-                      </h3>
-                      <span className="text-[10px] font-ibm-mono px-2 py-0.5 rounded bg-white/[0.06] text-[var(--text-secondary)] border border-[var(--border-subtle)] font-medium">
-                        {item.badge}
-                      </span>
-                      <span className="text-xs text-[var(--text-muted)] font-ibm-mono">
-                        {item.regName}
-                      </span>
-                    </div>
-                    <p className="text-xs text-[var(--text-secondary)] leading-relaxed max-w-2xl">
-                      {item.desc}
-                    </p>
-                    <div className="text-[11px] text-[var(--text-muted)] flex items-center gap-1.5 pt-1">
-                      <Info20Regular className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                      <span>{item.footnote}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-6 shrink-0 self-end md:self-center">
-                  <div className="text-right font-sans">
-                    <div className="text-xs text-[var(--text-muted)]">{t.optimization.currentState}</div>
-                    <div className={`text-sm font-semibold ${isEnabled ? "text-emerald-400" : "text-[var(--text-muted)]"}`}>
-                      {isEnabled ? t.common.enabled : t.common.disabled}
-                    </div>
-                  </div>
-                  <div className="pl-2 border-l border-[var(--border-divider)]">
+          {/* System features */}
+          <SectionTitle>{t.optimization.systemFeatureControls}</SectionTitle>
+          <Card padded={false} className="overflow-hidden">
+            <div className="divide-y divide-[var(--border-divider)]">
+              <SettingRow
+                icon={<WeatherMoon20Regular />}
+                title={t.optimization.hibernationTitle}
+                meta="C:\hiberfil.sys"
+                description={t.optimization.hibernationDesc}
+                footnote={t.optimization.hibernationFootnote}
+                adminNote={t.optimization.adminNotice}
+                valueLabel={t.optimization.hibernationCurrentFootprint}
+                value={overview?.hibernation_size_bytes ? formatBytes(overview.hibernation_size_bytes) : "0 B"}
+                control={
+                  <span className="w-[92px] flex">
                     <WinUIToggle
-                      checked={isEnabled}
-                      disabled={togglingExplorer === item.key || !overview}
-                      onChange={() => handleToggleExplorerSetting(item.key, item.title)}
-                      labelOn={t.common.enabled}
-                      labelOff={t.common.disabled}
-                    />
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </WinUICard>
-      </div>
-      </>
+                    checked={overview?.hibernation_enabled || false}
+                    disabled={togglingHiber || !overview}
+                    onChange={handleToggleHibernation}
+                    labelOn={t.common.enabled}
+                    labelOff={t.common.disabled}
+                  />
+                  </span>
+                }
+              />
+
+              <SettingRow
+                icon={<Sparkle20Regular />}
+                title={t.optimization.storageSenseTitle}
+                description={t.optimization.storageSenseDesc}
+                footnote={t.optimization.storageSenseFootnote}
+                valueLabel={t.optimization.storageSenseCurrentStatus}
+                value={
+                  <span
+                    className={`font-sans ${
+                      overview?.storage_sense_enabled ? "text-[var(--success)]" : "text-[var(--text-secondary)]"
+                    }`}
+                  >
+                    {overview?.storage_sense_enabled ? t.optimization.storageSenseActive : t.optimization.storageSenseOff}
+                  </span>
+                }
+                control={
+                  <span className="w-[92px] flex">
+                    <WinUIToggle
+                    checked={overview?.storage_sense_enabled || false}
+                    disabled={togglingSense || !overview}
+                    onChange={handleToggleStorageSense}
+                    labelOn={t.common.enabled}
+                    labelOff={t.common.disabled}
+                  />
+                  </span>
+                }
+              />
+
+              <SettingRow
+                icon={<ArrowDownload20Regular />}
+                title={t.optimization.deliveryTitle}
+                description={t.optimization.deliveryDesc}
+                path="SoftwareDistribution\DeliveryOptimization"
+                adminNote={t.optimization.adminNotice}
+                valueLabel={t.optimization.deliveryCachedData}
+                value={formatBytes(overview?.delivery_cache_bytes || 0)}
+                control={
+                  <WinUIButton
+                    variant="standard"
+                    onClick={handleCleanDeliveryCache}
+                    disabled={cleaningDelivery || (overview?.delivery_cache_bytes || 0) === 0}
+                    icon={
+                      cleaningDelivery ? (
+                        <ArrowClockwise20Regular className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Delete20Regular className="w-4 h-4" />
+                      )
+                    }
+                  >
+                    {cleaningDelivery ? t.common.deleting : t.optimization.deliveryClean}
+                  </WinUIButton>
+                }
+              />
+
+              <SettingRow
+                icon={<Layer20Regular />}
+                title={t.optimization.pagefileTitle}
+                meta="pagefile.sys"
+                description={t.optimization.pagefileDesc}
+                path={`${t.optimization.pagefileLocations} ${overview?.paging_files.join(", ") || "C:\\pagefile.sys"}`}
+                valueLabel={t.optimization.pagefileAllocated}
+                value={formatBytes(overview?.paging_total_bytes || 0)}
+                control={<Badge>{t.optimization.pagefileManaged}</Badge>}
+              />
+            </div>
+          </Card>
+
+          {/* Explorer and shell tweaks */}
+          <SectionTitle
+            action={<span className="text-xs text-[var(--text-muted)]">{t.optimization.registryTuning}</span>}
+          >
+            {t.optimization.explorerTweaksTitle}
+          </SectionTitle>
+          <Card padded={false} className="overflow-hidden">
+            <div className="divide-y divide-[var(--border-divider)]">
+              {explorerTweaks.map((item) => {
+                const isEnabled = Boolean(overview?.explorer_settings?.[item.key]);
+                return (
+                  <SettingRow
+                    key={item.key}
+                    icon={item.icon}
+                    title={item.title}
+                    badge={item.badge}
+                    meta={item.regName}
+                    description={item.desc}
+                    footnote={item.footnote}
+                    control={
+                      <span title={t.optimization.currentState} className="w-[92px] flex">
+                        <WinUIToggle
+                          checked={isEnabled}
+                          disabled={togglingExplorer === item.key || !overview}
+                          onChange={() => handleToggleExplorerSetting(item.key, item.title)}
+                          labelOn={t.common.enabled}
+                          labelOff={t.common.disabled}
+                        />
+                      </span>
+                    }
+                  />
+                );
+              })}
+            </div>
+          </Card>
+        </>
       ) : (
-        <VirtualizationView />
+        <VirtualizationView refreshToken={virtRefreshToken} />
       )}
-    </div>
+    </Page>
   );
 };
+
+/* A Windows-Settings style row: icon tile, title and description, the current value and a control on the right. */
+const SettingRow: React.FC<{
+  icon: React.ReactNode;
+  title: React.ReactNode;
+  badge?: React.ReactNode;
+  meta?: React.ReactNode;
+  description: React.ReactNode;
+  footnote?: React.ReactNode;
+  path?: React.ReactNode;
+  adminNote?: React.ReactNode;
+  valueLabel?: React.ReactNode;
+  value?: React.ReactNode;
+  control: React.ReactNode;
+}> = ({ icon, title, badge, meta, description, footnote, path, adminNote, valueLabel, value, control }) => (
+  <div className="px-4 py-3 flex flex-col md:flex-row md:items-center gap-3 hover:bg-[var(--fill-subtle)] transition-colors">
+    <div className="flex items-start gap-3 flex-1 min-w-0">
+      <div className="w-9 h-9 rounded-md bg-[var(--fill-subtle)] border border-[var(--border-card)] flex items-center justify-center shrink-0 text-[var(--text-secondary)] [&_svg]:w-5 [&_svg]:h-5">
+        {icon}
+      </div>
+      <div className="flex-1 min-w-0 space-y-0.5">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-sm font-semibold text-[var(--text-primary)]">{title}</span>
+          {badge && <Badge>{badge}</Badge>}
+          {meta && <span className="font-code text-xs text-[var(--text-muted)]">{meta}</span>}
+        </div>
+        <p className="text-xs text-[var(--text-secondary)] leading-relaxed">{description}</p>
+        {path && <div className="font-code text-xs text-[var(--text-muted)] truncate">{path}</div>}
+        {footnote && (
+          <div className="flex items-start gap-1.5 text-xs text-[var(--text-muted)] pt-0.5">
+            <Info16Regular className="w-3.5 h-3.5 shrink-0 mt-px" />
+            <span>{footnote}</span>
+          </div>
+        )}
+        {adminNote && (
+          <div className="flex items-start gap-1.5 text-xs text-[var(--brand-amber)] pt-0.5">
+            <Shield16Regular className="w-3.5 h-3.5 shrink-0 mt-px" />
+            <span>{adminNote}</span>
+          </div>
+        )}
+      </div>
+    </div>
+
+    <div className="flex items-center gap-4 shrink-0 self-end md:self-center">
+      {value !== undefined && (
+        <div className="text-right">
+          {valueLabel && <div className="text-xs text-[var(--text-muted)]">{valueLabel}</div>}
+          <div className="text-sm font-semibold font-ibm-mono text-[var(--text-primary)]">{value}</div>
+        </div>
+      )}
+      {control}
+    </div>
+  </div>
+);
 
 export default OptimizationPage;

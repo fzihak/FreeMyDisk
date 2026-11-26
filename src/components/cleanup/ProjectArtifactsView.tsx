@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
-import { WinUICard } from "@/components/winui/WinUICard";
 import { WinUIButton } from "@/components/winui/WinUIButton";
 import { LiveScanProgressWidget } from "@/components/shared/LiveScanProgressWidget";
 import { toast } from "@/stores/toast-store";
@@ -19,6 +18,11 @@ import {
   ChevronRight16Regular,
 } from "@fluentui/react-icons";
 import { describeDisposal } from "@/utils/disposal";
+import { Card, StatCard, Badge, FilterTabs, EmptyState, ActionBar } from "@/components/ui";
+
+/** Fills `{name}` placeholders in a translated string. */
+const fill = (template: string, vars: Record<string, string | number>): string =>
+  template.replace(/\{(\w+)\}/g, (m, k: string) => (k in vars ? String(vars[k]) : m));
 
 export interface ProjectArtifact {
   path: string;
@@ -232,159 +236,125 @@ export const ProjectArtifactsView: React.FC = () => {
     : [];
 
   return (
-    <div className="space-y-4">
-      {/* Action Header Card */}
-      <WinUICard className="p-4 space-y-3">
+    <div className="space-y-5">
+      {/* Controls */}
+      <Card className="space-y-3">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-[6px] bg-[#0078d4]/10 border border-[#0078d4]/20 flex items-center justify-center shrink-0">
-              <Code20Regular className="w-5 h-5 text-[#0078d4]" />
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-9 h-9 rounded-lg bg-[var(--fill-subtle)] border border-[var(--border-card)] flex items-center justify-center shrink-0">
+              <Code20Regular className="w-5 h-5 text-[var(--accent-text)]" />
             </div>
-            <div>
-              <h3 className="text-sm font-semibold text-[var(--text-primary)]">
-                {t.projectArtifacts.title}
-              </h3>
-              <p className="text-xs text-[var(--text-secondary)]">
-                {t.projectArtifacts.subtitle}
-              </p>
+            <div className="min-w-0">
+              <h3 className="text-sm font-semibold text-[var(--text-primary)]">{t.projectArtifacts.title}</h3>
+              <p className="text-xs text-[var(--text-secondary)]">{t.projectArtifacts.subtitle}</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-[4px] bg-black/20 border border-[var(--border-card)] text-xs text-[var(--text-secondary)]">
+          <div className="flex items-center gap-2 shrink-0">
+            <label className="h-8 flex items-center gap-2 px-2.5 rounded-md bg-[var(--bg-input)] border border-[var(--border-card)] text-sm text-[var(--text-secondary)]">
               <span>{t.projectArtifacts.threshold}</span>
               <select
                 value={minSizeMb}
                 onChange={(e) => setMinSizeMb(Number(e.target.value))}
-                className="bg-transparent text-[var(--text-primary)] font-ibm-mono text-xs focus:outline-none cursor-pointer"
+                className="bg-transparent text-[var(--text-primary)] font-ibm-mono text-sm focus:outline-none cursor-pointer"
               >
-                <option value={1} className="bg-[#202020] text-white">≥ 1 MB</option>
-                <option value={5} className="bg-[#202020] text-white">≥ 5 MB</option>
-                <option value={20} className="bg-[#202020] text-white">≥ 20 MB</option>
-                <option value={100} className="bg-[#202020] text-white">≥ 100 MB</option>
+                <option value={1} className="bg-[var(--bg-card)] text-[var(--text-primary)]">≥ 1 MB</option>
+                <option value={5} className="bg-[var(--bg-card)] text-[var(--text-primary)]">≥ 5 MB</option>
+                <option value={20} className="bg-[var(--bg-card)] text-[var(--text-primary)]">≥ 20 MB</option>
+                <option value={100} className="bg-[var(--bg-card)] text-[var(--text-primary)]">≥ 100 MB</option>
               </select>
-            </div>
+            </label>
 
             <WinUIButton
-              variant="primary"
+              variant={selectedArtifacts.length > 0 ? "standard" : "primary"}
               onClick={handleScan}
               disabled={scanning || cleaning}
-              className="flex items-center gap-1.5"
+              icon={<ArrowClockwise20Regular className={`w-4 h-4 ${scanning ? "animate-spin" : ""}`} />}
             >
-              <ArrowClockwise20Regular className={`w-3.5 h-3.5 ${scanning ? "animate-spin" : ""}`} />
-              <span>{scanning ? t.projectArtifacts.scanning : t.projectArtifacts.scanButton}</span>
+              {scanning ? t.projectArtifacts.scanning : t.projectArtifacts.scanButton}
             </WinUIButton>
-
-            {selectedArtifacts.length > 0 && (
-              <WinUIButton
-                variant="danger"
-                onClick={handleCleanSelected}
-                disabled={cleaning || scanning}
-                className="flex items-center gap-1.5"
-              >
-                <Delete20Regular className="w-3.5 h-3.5" />
-                <span>
-                  {cleaning
-                    ? t.common.deleting
-                    : `${t.projectArtifacts.cleanSelected} (${selectedArtifacts.length}) • ${formatBytes(totalSelectedBytes)}`}
-                </span>
-              </WinUIButton>
-            )}
           </div>
         </div>
 
-        {/* Quick Selection Toolbar (when results exist) */}
+        {/* Quick selection and type filter (when results exist) */}
         {scanResult && scanResult.projects.length > 0 && (
-          <div className="pt-2 border-t border-[var(--border-card)] flex flex-wrap items-center justify-between gap-2 text-xs">
-            <div className="flex items-center gap-2">
-              <span className="text-[var(--text-secondary)]">{t.common.filter}</span>
-              <button
+          <div className="pt-3 border-t border-[var(--border-divider)] flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-1">
+              <WinUIButton
+                variant="subtle"
+                size="sm"
                 onClick={() => selectStaleOnly(30)}
-                className="px-2 py-0.5 rounded-[3px] bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 font-medium cursor-pointer transition-colors"
+                icon={<Clock20Regular className="w-4 h-4 text-[var(--text-secondary)]" />}
               >
                 {t.projectArtifacts.selectDormant}
-              </button>
-              <button
-                onClick={selectAllSafe}
-                className="px-2 py-0.5 rounded-[3px] bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 font-medium cursor-pointer transition-colors"
-              >
+              </WinUIButton>
+              <WinUIButton variant="subtle" size="sm" onClick={selectAllSafe}>
                 {t.projectArtifacts.selectAll}
-              </button>
-              <button
-                onClick={deselectAll}
-                className="px-2 py-0.5 rounded-[3px] bg-white/[0.06] hover:bg-white/[0.1] text-[var(--text-secondary)] cursor-pointer transition-colors"
-              >
+              </WinUIButton>
+              <WinUIButton variant="subtle" size="sm" onClick={deselectAll}>
                 {t.projectArtifacts.clearSelection}
-              </button>
+              </WinUIButton>
             </div>
 
             {projectTypes.length > 1 && (
-              <div className="flex items-center gap-1.5">
-                <span className="text-[var(--text-secondary)]">{t.common.filter}:</span>
-                <select
-                  value={filterType}
-                  onChange={(e) => setFilterType(e.target.value)}
-                  className="bg-black/20 border border-[var(--border-card)] rounded-[3px] px-2 py-0.5 text-xs text-[var(--text-primary)] focus:outline-none cursor-pointer"
-                >
-                  <option value="all" className="bg-[#202020]">{t.projectArtifacts.filterAll} ({scanResult.projects.length})</option>
-                  {projectTypes.map((tItem) => (
-                    <option key={tItem} value={tItem} className="bg-[#202020]">
-                      {tItem.replace("project_", "").toUpperCase()}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <FilterTabs
+                items={[
+                  { id: "all", label: t.projectArtifacts.filterAll, count: scanResult.projects.length },
+                  ...projectTypes.map((tItem) => ({
+                    id: tItem,
+                    label: tItem.replace("project_", "").toUpperCase(),
+                  })),
+                ]}
+                value={filterType}
+                onChange={setFilterType}
+                className="min-w-0"
+              />
             )}
           </div>
         )}
-      </WinUICard>
+      </Card>
 
-      {/* Disposal Summary Notification */}
+      {/* Result of the last cleanup */}
       {disposalSummary && (
-        <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-[4px] flex items-center justify-between shadow-xs">
-          <div className="flex items-center gap-2.5">
-            <CheckmarkCircle20Filled className="w-4 h-4 text-emerald-400 shrink-0" />
-            <div>
-              <div className="text-xs font-semibold text-emerald-400">{t.projectArtifacts.cleanupCompleteTitle}</div>
-              <div className="text-[11px] text-emerald-400/80 font-ibm-mono tabular-nums">
-                {disposalSummary.successful_items} {t.common.items} • {describeDisposal(disposalSummary, t, formatBytes)}
+        <Card className="py-3 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <CheckmarkCircle20Filled className="w-5 h-5 text-[var(--success)] shrink-0" />
+            <div className="min-w-0">
+              <div className="text-sm font-semibold text-[var(--text-primary)]">{t.projectArtifacts.cleanupCompleteTitle}</div>
+              <div className="text-xs text-[var(--text-secondary)] font-ibm-mono tabular-nums">
+                {disposalSummary.successful_items} {t.common.items} · {describeDisposal(disposalSummary, t, formatBytes)}
               </div>
             </div>
           </div>
-          <button
-            onClick={() => setDisposalSummary(null)}
-            className="text-xs text-emerald-400 hover:text-white px-2 py-0.5 rounded-[3px] bg-emerald-500/20 font-medium cursor-pointer"
-          >
+          <WinUIButton variant="subtle" size="sm" onClick={() => setDisposalSummary(null)}>
             {t.common.dismiss}
-          </button>
-        </div>
+          </WinUIButton>
+        </Card>
       )}
 
-      {/* Stats Summary Bar */}
+      {/* Stats */}
       {scanResult && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <WinUICard className="p-3">
-            <div className="text-xs text-[var(--text-secondary)]">{t.projectArtifacts.discoveredProjects}</div>
-            <div className="text-xl font-bold font-ibm-mono text-[var(--text-primary)] mt-1">
-              {scanResult.total_projects}
-            </div>
-          </WinUICard>
-          <WinUICard className="p-3">
-            <div className="text-xs text-[var(--text-secondary)]">{t.projectArtifacts.reclaimableArtifacts}</div>
-            <div className="text-xl font-bold font-ibm-mono text-[#0078d4] mt-1">
-              {scanResult.total_artifacts}
-            </div>
-          </WinUICard>
-          <WinUICard className="p-3">
-            <div className="text-xs text-[var(--text-secondary)]">{t.projectArtifacts.totalReclaimableSpace}</div>
-            <div className="text-xl font-bold font-ibm-mono text-emerald-400 mt-1">
-              {formatBytes(scanResult.total_reclaimable_bytes)}
-            </div>
-          </WinUICard>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <StatCard
+            label={t.projectArtifacts.discoveredProjects}
+            value={scanResult.total_projects}
+            icon={<Folder20Regular />}
+          />
+          <StatCard
+            label={t.projectArtifacts.reclaimableArtifacts}
+            value={scanResult.total_artifacts}
+            icon={<Wrench20Regular />}
+          />
+          <StatCard
+            label={t.projectArtifacts.totalReclaimableSpace}
+            value={formatBytes(scanResult.total_reclaimable_bytes)}
+            tone={scanResult.total_reclaimable_bytes > 0 ? "accent" : "neutral"}
+            icon={<Delete20Regular />}
+          />
         </div>
       )}
 
-      {/* Progress Telemetry */}
+      {/* Progress */}
       {scanning ? (
         <LiveScanProgressWidget
           scanType="projects"
@@ -400,51 +370,41 @@ export const ProjectArtifactsView: React.FC = () => {
         />
       ) : null}
 
-      {/* Project Matches List */}
+      {/* Project list */}
       {!scanning && scanResult && filteredProjects.length > 0 && (
-        <div className="space-y-2">
+        <Card padded={false} className="overflow-hidden divide-y divide-[var(--border-divider)]">
           {filteredProjects.map((project) => {
             const isExpanded = expandedProjects.has(project.project_root);
             const typeLabel = project.project_type.replace("project_", "").toUpperCase();
 
             return (
-              <WinUICard key={project.project_root} className="overflow-hidden">
+              <div key={project.project_root}>
                 <div
                   onClick={() => toggleExpand(project.project_root)}
-                  className="p-3 flex items-center justify-between cursor-pointer hover:bg-white/[0.02] transition-colors"
+                  className="px-4 py-3 flex items-center justify-between gap-3 cursor-pointer hover:bg-[var(--fill-subtle)] transition-colors"
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    <button className="text-[var(--text-secondary)] p-0.5">
-                      {isExpanded ? (
-                        <ChevronDown16Regular className="w-4 h-4" />
-                      ) : (
-                        <ChevronRight16Regular className="w-4 h-4" />
-                      )}
-                    </button>
-                    <Folder20Regular className="w-4 h-4 text-[#0078d4] shrink-0" />
+                    <span className="text-[var(--text-secondary)] shrink-0">
+                      {isExpanded ? <ChevronDown16Regular className="w-4 h-4" /> : <ChevronRight16Regular className="w-4 h-4" />}
+                    </span>
+                    <Folder20Regular className="w-5 h-5 text-[var(--text-secondary)] shrink-0" />
                     <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-semibold text-[var(--text-primary)] truncate">
-                          {project.project_name}
-                        </span>
-                        <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded-[3px] bg-white/[0.08] text-[var(--text-secondary)]">
-                          {typeLabel}
-                        </span>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-medium text-[var(--text-primary)] truncate">{project.project_name}</span>
+                        <Badge>{typeLabel}</Badge>
                         {project.last_modified_days_ago > 30 && (
-                          <span className="flex items-center gap-1 text-[10px] text-amber-300 bg-amber-500/10 px-1.5 py-0.5 rounded-[3px]">
-                            <Clock20Regular className="w-3 h-3" />
+                          <Badge tone="warning">
+                            <Clock20Regular className="w-3.5 h-3.5" />
                             {project.last_modified_days_ago} {t.projectArtifacts.daysAgo} ({t.projectArtifacts.dormantBadge})
-                          </span>
+                          </Badge>
                         )}
                       </div>
-                      <div className="text-[11px] text-[var(--text-secondary)] font-ibm-mono truncate mt-0.5 opacity-80">
-                        {project.project_root}
-                      </div>
+                      <div className="text-xs text-[var(--text-muted)] font-code truncate mt-0.5">{project.project_root}</div>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-3 shrink-0">
-                    <span className="text-xs font-ibm-mono font-semibold text-emerald-400">
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-sm font-ibm-mono font-semibold text-[var(--text-primary)] tabular-nums">
                       {formatBytes(project.total_reclaimable_bytes)}
                     </span>
                     <button
@@ -452,7 +412,7 @@ export const ProjectArtifactsView: React.FC = () => {
                         e.stopPropagation();
                         handleReveal(project.project_root);
                       }}
-                      className="p-1 text-[var(--text-secondary)] hover:text-white rounded-[3px] hover:bg-white/[0.06] transition-colors"
+                      className="p-1.5 rounded-md text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--fill-subtle-hover)] transition-colors cursor-pointer"
                       title={t.projectArtifacts.revealInExplorer}
                     >
                       <FolderOpen16Regular className="w-4 h-4" />
@@ -461,66 +421,83 @@ export const ProjectArtifactsView: React.FC = () => {
                 </div>
 
                 {isExpanded && (
-                  <div className="border-t border-[var(--border-card)] bg-black/20 p-2 space-y-1.5">
+                  <div className="border-t border-[var(--border-divider)] bg-[var(--fill-subtle)] divide-y divide-[var(--border-divider)]">
                     {project.artifacts.map((art) => (
                       <div
                         key={art.path}
                         onClick={() => toggleArtifactSelected(project.project_root, art.path)}
-                        className="flex items-center justify-between p-2 rounded-[4px] hover:bg-white/[0.03] text-xs cursor-pointer transition-colors"
+                        className="pl-11 pr-4 py-2 flex items-center justify-between gap-3 hover:bg-[var(--fill-subtle-hover)] cursor-pointer transition-colors"
                       >
-                        <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="flex items-center gap-3 min-w-0">
                           <input
                             type="checkbox"
                             checked={art.selected}
                             onChange={() => {}}
-                            className="rounded-[3px] accent-[#0078d4] cursor-pointer"
+                            className="accent-[var(--accent)] w-4 h-4 shrink-0 cursor-pointer"
                           />
                           <div className="min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span className="font-ibm-mono font-semibold text-[var(--text-primary)]">
-                                {art.relative_path}
-                              </span>
-                              <span className="text-[10px] px-1 py-0.2 rounded-[2px] bg-white/[0.05] text-[var(--text-secondary)] capitalize">
-                                {art.category}
-                              </span>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-code text-xs font-semibold text-[var(--text-primary)]">{art.relative_path}</span>
+                              <Badge className="capitalize">{art.category}</Badge>
                               {art.rebuild_command && (
-                                <span
-                                  className="flex items-center gap-1 text-[10px] text-blue-300 font-ibm-mono bg-blue-500/10 px-1 py-0.2 rounded-[2px]"
-                                  title={t.projectArtifacts.rebuildCommand}
-                                >
-                                  <Wrench20Regular className="w-2.5 h-2.5" />
-                                  {art.rebuild_command}
+                                <span title={t.projectArtifacts.rebuildCommand}>
+                                  <Badge className="font-code">
+                                    <Wrench20Regular className="w-3.5 h-3.5" />
+                                    {art.rebuild_command}
+                                  </Badge>
                                 </span>
                               )}
                             </div>
-                            <div className="text-[10px] text-[var(--text-secondary)] font-ibm-mono truncate mt-0.5">
-                              {art.item_count} {t.common.files} • {art.staleness_days} {t.projectArtifacts.daysAgo}
+                            <div className="text-xs text-[var(--text-muted)] truncate mt-0.5">
+                              {art.item_count} {t.common.files} · {art.staleness_days} {t.projectArtifacts.daysAgo}
                             </div>
                           </div>
                         </div>
 
-                        <div className="text-xs font-ibm-mono text-[var(--text-primary)] shrink-0">
+                        <div className="text-sm font-ibm-mono text-[var(--text-primary)] tabular-nums shrink-0">
                           {formatBytes(art.size_bytes)}
                         </div>
                       </div>
                     ))}
                   </div>
                 )}
-              </WinUICard>
+              </div>
             );
           })}
-        </div>
+        </Card>
       )}
 
-      {/* Empty State */}
+      {/* Empty state */}
       {!scanning && (!scanResult || scanResult.projects.length === 0) && (
-        <WinUICard className="p-8 text-center space-y-2">
-          <Code20Regular className="w-10 h-10 text-[var(--text-secondary)] mx-auto opacity-40" />
-          <h4 className="text-sm font-semibold text-[var(--text-primary)]">{t.projectArtifacts.readyTitle}</h4>
-          <p className="text-xs text-[var(--text-secondary)] max-w-md mx-auto">
-            {t.projectArtifacts.readyDesc}
-          </p>
-        </WinUICard>
+        <EmptyState icon={<Code20Regular />} title={t.projectArtifacts.readyTitle} description={t.projectArtifacts.readyDesc} />
+      )}
+
+      {/* Selection action bar */}
+      {selectedArtifacts.length > 0 && (
+        <ActionBar
+          summary={
+            <span className="text-[var(--text-primary)] font-medium">
+              {fill(t.cleanup.selectedSummary, {
+                count: selectedArtifacts.length,
+                size: formatBytes(totalSelectedBytes),
+              })}
+            </span>
+          }
+        >
+          <WinUIButton variant="subtle" onClick={deselectAll}>
+            {t.projectArtifacts.clearSelection}
+          </WinUIButton>
+          <WinUIButton
+            variant="primary"
+            onClick={handleCleanSelected}
+            disabled={cleaning || scanning}
+            icon={<Delete20Regular className="w-4 h-4" />}
+          >
+            {cleaning
+              ? t.common.deleting
+              : `${t.projectArtifacts.cleanSelected} (${selectedArtifacts.length}) · ${formatBytes(totalSelectedBytes)}`}
+          </WinUIButton>
+        </ActionBar>
       )}
     </div>
   );

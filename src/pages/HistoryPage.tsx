@@ -1,16 +1,15 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useI18nStore } from "@/i18n";
-import { WinUICard } from "@/components/winui/WinUICard";
 import { WinUIButton } from "@/components/winui/WinUIButton";
+import { Page, PageHeader, Card, StatCard, Badge, FilterTabs, EmptyState } from "@/components/ui";
 import {
-  History24Filled,
+  History20Regular,
   Delete20Regular,
   Clock20Regular,
   CheckmarkCircle20Filled,
+  CheckmarkCircle20Regular,
   Warning20Filled,
-  DismissCircle20Filled,
-  Info20Filled,
   DocumentText20Regular,
   ArrowClockwise20Regular,
 } from "@fluentui/react-icons";
@@ -46,6 +45,11 @@ export const formatDisplayPath = (raw: string): string => {
   return path;
 };
 
+type StatusFilter = "all" | "completed" | "failed";
+
+const isSuccessStatus = (status: string) => status === "completed" || status === "resolved_manual";
+const isFailedStatus = (status: string) => status.startsWith("failed");
+
 export const HistoryPage: React.FC = () => {
   const { t } = useI18nStore();
   const [historyRecords, setHistoryRecords] = useState<HistoryRecord[]>([]);
@@ -54,6 +58,7 @@ export const HistoryPage: React.FC = () => {
   const [clearing, setClearing] = useState(false);
   const [confirmClearOpen, setConfirmClearOpen] = useState(false);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
 
   const fetchAll = async () => {
     setLoading(true);
@@ -85,7 +90,7 @@ export const HistoryPage: React.FC = () => {
       setTimeout(() => setActionMessage(null), 4000);
     } catch (e) {
       console.error("Failed to clear history:", e);
-      setActionMessage("Failed to clear history.");
+      setActionMessage(t.history.clearFailed);
     } finally {
       setClearing(false);
     }
@@ -99,7 +104,7 @@ export const HistoryPage: React.FC = () => {
       setTimeout(() => setActionMessage(null), 4000);
     } catch (e) {
       console.error("Failed to cancel reboot deletion:", e);
-      setActionMessage("Failed to cancel scheduled reboot deletion.");
+      setActionMessage(t.history.cancelRebootFailed);
     }
   };
 
@@ -114,262 +119,267 @@ export const HistoryPage: React.FC = () => {
   };
 
   const completedCount = historyRecords.filter((r) => r.status === "completed").length;
-  const failedCount = historyRecords.filter((r) => r.status.startsWith("failed")).length;
+  const failedCount = historyRecords.filter((r) => isFailedStatus(r.status)).length;
+  const successCount = historyRecords.filter((r) => isSuccessStatus(r.status)).length;
+
+  const visibleRecords = useMemo(
+    () =>
+      historyRecords.filter((r) =>
+        statusFilter === "completed"
+          ? isSuccessStatus(r.status)
+          : statusFilter === "failed"
+          ? isFailedStatus(r.status)
+          : true
+      ),
+    [historyRecords, statusFilter]
+  );
+
+  const actionIsError = actionMessage !== null && actionMessage !== t.common.success;
+
+  const statusBadge = (status: string) =>
+    isSuccessStatus(status) ? (
+      <Badge tone="success">{t.history.statusCompleted}</Badge>
+    ) : isFailedStatus(status) ? (
+      <Badge tone="danger">{t.history.statusFailed}</Badge>
+    ) : (
+      <Badge>{status.replace(/_/g, " ")}</Badge>
+    );
+
+  const thClass = "sticky top-0 z-[1] bg-[var(--bg-card)] px-4 py-2.5 text-xs font-medium text-[var(--text-secondary)] border-b border-[var(--border-divider)]";
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-4 select-none font-sans text-[var(--text-primary)] pb-24">
-      {/* WinUI 3 Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-[4px] bg-white/[0.04] border border-[var(--border-subtle)] flex items-center justify-center text-[#0078d4] shrink-0">
-            <History24Filled className="w-6 h-6" />
-          </div>
-          <div>
-            <h1 className="text-xl font-semibold tracking-tight text-[var(--text-primary)]">{t.history.title}</h1>
-            <p className="text-xs text-[var(--text-secondary)]">
-              {t.history.subtitle}
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2.5 shrink-0">
-          {historyRecords.length > 0 && (
-            <WinUIButton
-              variant="subtle"
-              onClick={() => setConfirmClearOpen(true)}
-              disabled={clearing || loading}
-              className="flex items-center gap-1.5 text-rose-400"
-            >
-              <Delete20Regular className="w-3.5 h-3.5" />
-              <span>{clearing ? t.history.clearing : t.history.clearHistory}</span>
-            </WinUIButton>
-          )}
-
-          <WinUIButton
-            variant="primary"
-            onClick={fetchAll}
-            disabled={loading}
-            className="flex items-center gap-1.5"
-          >
-            <ArrowClockwise20Regular className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
-            <span>{loading ? t.common.scanning : t.common.refresh}</span>
-          </WinUIButton>
-        </div>
-      </div>
-
-      {actionMessage && (
-        <div className="p-3 bg-[#0078d4]/10 border border-[#0078d4]/30 rounded-[4px] flex items-center justify-between text-xs text-[#0078d4] animate-fadeIn">
-          <span>{actionMessage}</span>
-          <button onClick={() => setActionMessage(null)} className="text-[#0078d4] hover:underline cursor-pointer">
-            {t.common.close}
-          </button>
-        </div>
-      )}
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 font-ibm-mono">
-        <WinUICard className="p-3.5">
-          <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] mb-1 font-sans">
-            <span className="font-medium text-[11px]">{t.history.journalTitle}</span>
-            <DocumentText20Regular className="w-3.5 h-3.5 text-[#0078d4]" />
-          </div>
-          <div className="text-xl font-bold text-[var(--text-primary)] tabular-nums">{historyRecords.length}</div>
-          <div className="text-[10px] text-[var(--text-muted)] mt-0.5 font-sans">Recorded in SQLite journal</div>
-        </WinUICard>
-
-        <WinUICard className="p-3.5">
-          <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] mb-1 font-sans">
-            <span className="font-medium text-[11px]">{t.history.statusCompleted}</span>
-            <CheckmarkCircle20Filled className="w-3.5 h-3.5 text-emerald-400" />
-          </div>
-          <div className="text-xl font-bold text-emerald-400 tabular-nums">{completedCount}</div>
-          <div className="text-[10px] text-[var(--text-muted)] mt-0.5 font-sans">
-            {failedCount > 0 ? `${failedCount} failed items` : "All files cleanly removed"}
-          </div>
-        </WinUICard>
-
-        <WinUICard className="p-3.5">
-          <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] mb-1 font-sans">
-            <span className="font-medium text-[11px]">{t.history.pendingRebootTitle}</span>
-            <Clock20Regular className="w-3.5 h-3.5 text-amber-400" />
-          </div>
-          <div className="text-xl font-bold text-amber-400 tabular-nums">{pendingReboots.length}</div>
-          <div className="text-[10px] text-[var(--text-muted)] mt-0.5 font-sans">Locked system files queue</div>
-        </WinUICard>
-      </div>
-
-      {/* Section 1: Pending on Next Restart (if any) */}
-      {pendingReboots.length > 0 && (
-        <WinUICard className="p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <div className="p-1.5 rounded-[4px] bg-amber-500/10 border border-amber-500/20 text-amber-400">
-                <Warning20Filled className="w-4 h-4" />
-              </div>
-              <div>
-                <h2 className="text-xs font-semibold text-[var(--text-primary)]">{t.history.pendingRebootTitle}</h2>
-                <p className="text-[11px] text-[var(--text-secondary)]">
-                  {t.history.pendingRebootDesc}
-                </p>
-              </div>
-            </div>
-            <span className="px-2 py-0.5 rounded-[3px] text-xs font-semibold bg-amber-500/10 border border-amber-500/30 text-amber-300 font-ibm-mono">
-              {pendingReboots.length} queued
-            </span>
-          </div>
-
-          <div className="rounded-[4px] overflow-hidden border border-[var(--border-card)]">
-            <table className="w-full text-left text-xs font-ibm-mono">
-              <thead className="bg-black/20 text-[var(--text-secondary)] uppercase tracking-wider text-[10px]">
-                <tr>
-                  <th className="p-2.5">{t.history.targetPath}</th>
-                  <th className="p-2.5">{t.common.size}</th>
-                  <th className="p-2.5 text-right">{t.history.plannedAction}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--border-divider)]">
-                {pendingReboots.map((item, idx) => (
-                  <tr key={idx} className="hover:bg-white/[0.02] transition-colors">
-                    <td className="p-2.5 text-[var(--text-primary)] break-all text-[11px] select-all" title={item.path}>{formatDisplayPath(item.path)}</td>
-                    <td className="p-2.5 text-[var(--text-secondary)] font-medium tabular-nums">
-                      {item.size_bytes ? `${Math.round(item.size_bytes / 1024)} KB` : "—"}
-                    </td>
-                    <td className="p-2.5 text-right">
-                      <WinUIButton
-                        variant="subtle"
-                        onClick={() => handleCancelRebootDeletion(item.path)}
-                        className="text-xs text-rose-400 py-0.5 px-2"
-                      >
-                        {t.history.cancelRebootAction}
-                      </WinUIButton>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </WinUICard>
-      )}
-
-      {/* Section 2: Recent Cleanup Timeline */}
-      <WinUICard className="p-4 space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="p-1.5 rounded-[4px] bg-[#0078d4]/10 border border-[#0078d4]/20 text-[#0078d4]">
-              <Clock20Regular className="w-4 h-4" />
-            </div>
-            <div>
-              <h2 className="text-xs font-semibold text-[var(--text-primary)]">{t.history.journalTitle}</h2>
-              <p className="text-[11px] text-[var(--text-secondary)]">{t.history.subtitle}</p>
-            </div>
-          </div>
-          <span className="text-xs text-[var(--text-muted)] font-ibm-mono">
-            {historyRecords.length} record{historyRecords.length === 1 ? "" : "s"}
-          </span>
-        </div>
-
-        {historyRecords.length === 0 ? (
-          <div className="p-10 text-center text-xs text-[var(--text-muted)] border border-dashed border-[var(--border-card)] rounded-[4px] bg-black/10 space-y-1.5">
-            <CheckmarkCircle20Filled className="w-6 h-6 text-[var(--text-muted)] mx-auto" />
-            <p className="font-semibold text-[var(--text-primary)]">{t.history.noHistoryFound}</p>
-            <p className="text-[11px] text-[var(--text-secondary)] max-w-sm mx-auto">
-              {t.history.noHistoryDesc}
-            </p>
-          </div>
-        ) : (
-          <div className="rounded-[4px] overflow-hidden border border-[var(--border-card)]">
-            <table className="w-full text-left text-xs font-ibm-mono">
-              <thead className="bg-black/20 text-[var(--text-secondary)] uppercase tracking-wider text-[10px]">
-                <tr>
-                  <th className="p-2.5">{t.history.timestamp}</th>
-                  <th className="p-2.5">{t.history.targetPath}</th>
-                  <th className="p-2.5">{t.history.plannedAction}</th>
-                  <th className="p-2.5 text-right">{t.history.status}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--border-divider)]">
-                {historyRecords.map((rec) => {
-                  const isSuccess = rec.status === "completed" || rec.status === "resolved_manual";
-                  const isFail = rec.status.startsWith("failed");
-
-                  return (
-                    <tr key={rec.id} className="hover:bg-white/[0.02] transition-colors">
-                      <td className="p-2.5 text-[var(--text-secondary)] whitespace-nowrap text-[11px] font-medium tabular-nums">
-                        {formatDate(rec.timestamp)}
-                      </td>
-                      <td className="p-2.5 text-[var(--text-primary)] text-[11px] break-all select-all">
-                        {formatDisplayPath(rec.target_path)}
-                      </td>
-                      <td className="p-2.5 text-[var(--text-secondary)] whitespace-nowrap">
-                        <span className="px-1.5 py-0.2 rounded-[3px] bg-black/20 text-[10px] uppercase font-ibm-mono text-[var(--text-secondary)]">
-                          {rec.planned_action.replace(/_/g, " ")}
-                        </span>
-                      </td>
-                      <td className="p-2.5 text-right whitespace-nowrap">
-                        {isSuccess ? (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-400 font-sans">
-                            <CheckmarkCircle20Filled className="w-3.5 h-3.5" />
-                            {t.history.statusCompleted}
-                          </span>
-                        ) : isFail ? (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-rose-400 font-sans">
-                            <DismissCircle20Filled className="w-3.5 h-3.5" />
-                            {t.history.statusFailed}
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-400 font-sans">
-                            <Info20Filled className="w-3.5 h-3.5" />
-                            {rec.status}
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </WinUICard>
-
-      {/* Confirmation Modal */}
-      {confirmClearOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fadeIn">
-          <WinUICard className="p-5 max-w-md w-full shadow-2xl space-y-3">
-            <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-[4px] bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 shrink-0">
-                <Warning20Filled className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="text-sm font-semibold text-[var(--text-primary)]">{t.history.clearHistory}</h3>
-                <p className="text-xs text-[var(--text-secondary)] mt-0.5">Are you sure you want to clear past cleanup logs?</p>
-              </div>
-            </div>
-            <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
-              This action will permanently erase your audit trail of cleaned items and crash recovery journals. This cannot be undone.
-            </p>
-            <div className="flex items-center justify-end gap-2 pt-2">
+    <Page className="select-none">
+      <PageHeader
+        icon={<History20Regular />}
+        title={t.history.title}
+        description={t.history.pageDesc}
+        actions={
+          <>
+            {historyRecords.length > 0 && (
               <WinUIButton
                 variant="subtle"
-                onClick={() => setConfirmClearOpen(false)}
-                disabled={clearing}
+                onClick={() => setConfirmClearOpen(true)}
+                disabled={clearing || loading}
+                className="!text-[var(--danger)]"
+                icon={<Delete20Regular className="w-4 h-4" />}
               >
+                {clearing ? t.history.clearing : t.history.clearHistory}
+              </WinUIButton>
+            )}
+            <WinUIButton
+              variant="standard"
+              onClick={fetchAll}
+              disabled={loading}
+              icon={<ArrowClockwise20Regular className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />}
+            >
+              {loading ? t.common.scanning : t.common.refresh}
+            </WinUIButton>
+          </>
+        }
+      />
+
+      {actionMessage && (
+        <Card className="py-2.5 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 min-w-0">
+            {actionIsError ? (
+              <Warning20Filled className="w-4 h-4 shrink-0 text-[var(--danger)]" />
+            ) : (
+              <CheckmarkCircle20Filled className="w-4 h-4 shrink-0 text-[var(--success)]" />
+            )}
+            <span
+              className={`text-sm truncate ${actionIsError ? "text-[var(--danger)]" : "text-[var(--text-primary)]"}`}
+              title={actionMessage}
+            >
+              {actionMessage}
+            </span>
+          </div>
+          <WinUIButton variant="subtle" size="sm" onClick={() => setActionMessage(null)}>
+            {t.common.close}
+          </WinUIButton>
+        </Card>
+      )}
+
+      {/* Stat row */}
+      <div className="grid gap-3 sm:grid-cols-3">
+        <StatCard
+          label={t.history.statRecords}
+          value={historyRecords.length}
+          hint={t.history.sqliteJournalBadge}
+          icon={<DocumentText20Regular />}
+        />
+        <StatCard
+          label={t.history.statusCompleted}
+          value={completedCount}
+          hint={
+            failedCount > 0
+              ? t.history.failedHint.replace("{count}", String(failedCount))
+              : t.history.allCleanHint
+          }
+          icon={<CheckmarkCircle20Regular />}
+          tone={failedCount > 0 ? "warning" : "neutral"}
+        />
+        <StatCard
+          label={t.history.statPending}
+          value={pendingReboots.length}
+          hint={t.history.lockedQueueBadge}
+          icon={<Clock20Regular />}
+        />
+      </div>
+
+      {/* Pending reboot deletions */}
+      {pendingReboots.length > 0 && (
+        <Card padded={false} className="overflow-hidden">
+          <div className="px-4 py-3 flex items-start justify-between gap-3 border-b border-[var(--border-divider)]">
+            <div className="min-w-0">
+              <h2 className="text-sm font-semibold text-[var(--text-primary)]">{t.history.pendingRebootTitle}</h2>
+              <p className="text-xs text-[var(--text-secondary)] mt-0.5">{t.history.pendingRebootDesc}</p>
+            </div>
+            <Badge tone="warning">{t.history.queuedCount.replace("{count}", String(pendingReboots.length))}</Badge>
+          </div>
+          <div className="divide-y divide-[var(--border-divider)]">
+            {pendingReboots.map((item, idx) => {
+              const display = formatDisplayPath(item.path);
+              return (
+                <div
+                  key={idx}
+                  className="px-4 py-3 flex items-center gap-3 hover:bg-[var(--fill-subtle)] transition-colors"
+                >
+                  <div
+                    className="flex-1 min-w-0 font-code text-xs text-[var(--text-secondary)] truncate select-all"
+                    title={display}
+                  >
+                    {display}
+                  </div>
+                  <span className="w-20 shrink-0 text-right text-xs text-[var(--text-secondary)] font-ibm-mono">
+                    {item.size_bytes ? `${Math.round(item.size_bytes / 1024)} KB` : "—"}
+                  </span>
+                  <span title={t.history.cancelRebootAction}>
+                    <WinUIButton
+                      variant="subtle"
+                      size="sm"
+                      onClick={() => handleCancelRebootDeletion(item.path)}
+                      className="!text-[var(--danger)]"
+                      aria-label={t.history.cancelRebootAction}
+                    >
+                      {t.common.cancel}
+                    </WinUIButton>
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      )}
+
+      {/* Cleanup history */}
+      {historyRecords.length === 0 ? (
+        <EmptyState
+          icon={<History20Regular />}
+          title={t.history.noHistoryFound}
+          description={t.history.noHistoryDesc}
+        />
+      ) : (
+        <>
+          <div className="flex items-center justify-between gap-3">
+            <FilterTabs<StatusFilter>
+              items={[
+                { id: "all", label: t.history.filterAll, count: historyRecords.length },
+                { id: "completed", label: t.history.statusCompleted, count: successCount },
+                { id: "failed", label: t.history.statusFailed, count: failedCount },
+              ]}
+              value={statusFilter}
+              onChange={setStatusFilter}
+              className="min-w-0"
+            />
+          </div>
+
+          <Card padded={false} className="overflow-hidden">
+            <div className="max-h-[560px] overflow-auto">
+              <table className="w-full table-fixed text-left">
+                <colgroup>
+                  <col className="w-[150px]" />
+                  <col />
+                  <col className="w-[150px]" />
+                  <col className="w-[120px]" />
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th className={thClass}>{t.history.timestamp}</th>
+                    <th className={thClass}>{t.history.targetPath}</th>
+                    <th className={thClass}>{t.history.plannedAction}</th>
+                    <th className={`${thClass} text-right`}>{t.history.status}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--border-divider)]">
+                  {visibleRecords.map((rec) => {
+                    const display = formatDisplayPath(rec.target_path);
+                    return (
+                      <tr key={rec.id} className="hover:bg-[var(--fill-subtle)] transition-colors">
+                        <td className="px-4 py-3 text-xs text-[var(--text-muted)] whitespace-nowrap font-ibm-mono">
+                          {formatDate(rec.timestamp)}
+                        </td>
+                        <td className="px-4 py-3 min-w-0">
+                          <div
+                            className="font-code text-xs text-[var(--text-secondary)] truncate select-all"
+                            title={display}
+                          >
+                            {display}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <Badge className="max-w-full overflow-hidden">
+                            <span className="truncate">{rec.planned_action.replace(/_/g, " ")}</span>
+                          </Badge>
+                        </td>
+                        <td className="px-4 py-3 text-right">{statusBadge(rec.status)}</td>
+                      </tr>
+                    );
+                  })}
+                  {visibleRecords.length === 0 && (
+                    <tr>
+                      <td colSpan={4} className="px-4 py-8 text-center text-sm text-[var(--text-secondary)]">
+                        {t.history.noFilterMatch}
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        </>
+      )}
+
+      {/* Clear confirmation */}
+      {confirmClearOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fadeIn">
+          <Card className="max-w-md w-full p-5 space-y-4 shadow-2xl">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-lg bg-[color-mix(in_srgb,var(--danger)_14%,transparent)] flex items-center justify-center text-[var(--danger)] shrink-0">
+                <Warning20Filled className="w-5 h-5" />
+              </div>
+              <div className="space-y-1 min-w-0">
+                <h3 className="text-base font-semibold text-[var(--text-primary)]">{t.history.clearHistory}</h3>
+                <p className="text-sm text-[var(--text-secondary)]">{t.history.clearConfirmText}</p>
+              </div>
+            </div>
+            <p className="text-sm text-[var(--text-secondary)]">{t.history.clearConfirmWarning}</p>
+            <div className="flex justify-end gap-2 pt-1">
+              <WinUIButton variant="standard" onClick={() => setConfirmClearOpen(false)} disabled={clearing}>
                 {t.common.cancel}
               </WinUIButton>
               <WinUIButton
                 variant="danger"
                 onClick={handleClearHistory}
                 disabled={clearing}
-                className="flex items-center gap-1.5"
+                icon={<Delete20Regular className="w-4 h-4" />}
               >
-                <Delete20Regular className="w-3.5 h-3.5" />
-                <span>{clearing ? t.history.clearing : t.history.clearHistory}</span>
+                {clearing ? t.history.clearing : t.history.clearHistory}
               </WinUIButton>
             </div>
-          </WinUICard>
+          </Card>
         </div>
       )}
-    </div>
+    </Page>
   );
 };
 

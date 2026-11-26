@@ -1,14 +1,14 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { useI18nStore } from "@/i18n";
 import { useSettingsStore } from "@/stores/settings-store";
 import { toast } from "@/stores/toast-store";
-import { WinUICard } from "@/components/winui/WinUICard";
+import { useScanProgress, useScanProgressStore } from "@/stores/scan-progress-store";
 import { WinUIButton } from "@/components/winui/WinUIButton";
-import { LiveScanProgressWidget } from "@/components/shared/LiveScanProgressWidget";
+import { Page, PageHeader, Card, StatCard, Badge, ProgressBar, FilterTabs, EmptyState, ActionBar } from "@/components/ui";
 import {
-  DocumentFolder24Filled,
+  DocumentFolder20Regular,
   Delete20Regular,
   ArrowClockwise20Regular,
   MoviesAndTv20Regular,
@@ -19,10 +19,10 @@ import {
   Search20Regular,
   ArrowSort20Regular,
   HardDrive20Regular,
-  CheckmarkCircle20Filled,
-  Checkmark16Filled,
+  Info20Regular,
   FolderOpen20Regular,
   Folder20Regular,
+  DismissCircle20Regular,
 } from "@fluentui/react-icons";
 import { describeDisposal } from "@/utils/disposal";
 
@@ -81,6 +81,30 @@ const PROTECTED_SYSTEM_FILES = new Set([
 const isProtectedSystemFile = (path: string): boolean =>
   PROTECTED_SYSTEM_FILES.has((path.split(/[\\/]/).pop() || "").toLowerCase());
 
+/** Fills `{name}` placeholders in a translated string. */
+const fill = (template: string, vars: Record<string, string | number>): string =>
+  template.replace(/\{(\w+)\}/g, (m, k: string) => (k in vars ? String(vars[k]) : m));
+
+/** Short size for drive chips: "21 GB", "1.8 TB". */
+const compactBytes = (bytes: number): string => {
+  if (!bytes || bytes <= 0) return "0 GB";
+  const gb = bytes / (1024 * 1024 * 1024);
+  if (gb >= 1024) return `${(gb / 1024).toFixed(1)} TB`;
+  return gb >= 10 ? `${Math.round(gb)} GB` : `${gb.toFixed(1)} GB`;
+};
+
+const MIN_SIZE_OPTIONS: Array<{ mb: number; label: string }> = [
+  { mb: 50, label: "50 MB" },
+  { mb: 100, label: "100 MB" },
+  { mb: 250, label: "250 MB" },
+  { mb: 500, label: "500 MB" },
+  { mb: 1024, label: "1 GB" },
+  { mb: 2048, label: "2 GB" },
+];
+
+const controlClass =
+  "h-8 rounded-md bg-[var(--bg-input)] border border-[var(--border-card)] text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] disabled:opacity-50";
+
 export const LargeFilesPage: React.FC = () => {
   const { t } = useI18nStore();
   const { confirmBeforeDelete } = useSettingsStore();
@@ -128,10 +152,10 @@ export const LargeFilesPage: React.FC = () => {
     } catch (e: any) {
       const errStr = String(e || "");
       if (errStr.toLowerCase().includes("cancel") || errStr.toLowerCase().includes("aborted")) {
-        setNotification("Scan was cancelled by user.");
+        setNotification(t.largeFiles.scanCancelledByUser);
       } else {
         console.error("Large files scan failed:", e);
-        setNotification(`Scan failed: ${errStr}`);
+        setNotification(fill(t.largeFiles.scanFailed, { error: errStr }));
       }
     } finally {
       setScanning(false);
@@ -142,7 +166,7 @@ export const LargeFilesPage: React.FC = () => {
     try {
       await invoke("cancel_active_scan", { kind: "large_files" });
       setScanning(false);
-      setNotification("Scan cancelled.");
+      setNotification(t.largeFiles.scanCancelled);
       setTimeout(() => setNotification(null), 4000);
     } catch (e) {
       console.error("Failed to cancel scan:", e);
@@ -183,14 +207,15 @@ export const LargeFilesPage: React.FC = () => {
           setSelectedPaths(nextSelected);
         }
         const fileName = path.split(/[\\/]/).pop() || path;
-        setNotification(`Moved "${fileName}" to Recycle Bin (${formatBytes(res.bytes_freed)} freed).`);
-        toast.success("File Recycled", `Moved "${fileName}" to Recycle Bin (${formatBytes(res.bytes_freed)} freed).`);
+        const message = fill(t.largeFiles.fileRecycledDesc, { name: fileName, size: formatBytes(res.bytes_freed) });
+        setNotification(message);
+        toast.success(t.largeFiles.fileRecycledTitle, message);
         setTimeout(() => setNotification(null), 5000);
       } else {
-        toast.error("Failed to Recycle File", res.error || "Unknown error");
+        toast.error(t.largeFiles.recycleFailedTitle, res.error || t.largeFiles.unknownError);
       }
     } catch (e) {
-      toast.error("Error Trashing File", String(e));
+      toast.error(t.largeFiles.trashErrorTitle, String(e));
     } finally {
       setTrashingPath(null);
     }
@@ -223,20 +248,17 @@ export const LargeFilesPage: React.FC = () => {
 
       if (summary.successful_items > 0) {
         toast.success(
-          "Files Recycled",
+          t.largeFiles.filesRecycledTitle,
           `${summary.successful_items} ${t.common.files} · ${describeDisposal(summary, t, formatBytes)}`
         );
       }
       if (summary.failed_items > 0) {
-        toast.error(
-          "Some Files Failed",
-          `${summary.failed_items} file(s) could not be recycled (may be in use or locked).`
-        );
+        toast.error(t.largeFiles.someFailedTitle, fill(t.largeFiles.someFailedDesc, { count: summary.failed_items }));
       }
       setShowConfirmModal(false);
     } catch (e: any) {
       console.error("Batch trash failed:", e);
-      toast.error("Batch Recycle Failed", String(e));
+      toast.error(t.largeFiles.batchFailedTitle, String(e));
     } finally {
       setBatchTrashing(false);
     }
@@ -255,15 +277,15 @@ export const LargeFilesPage: React.FC = () => {
   const getCategoryIcon = (cat: string) => {
     switch (cat) {
       case "Media":
-        return <MoviesAndTv20Regular className="w-4 h-4 text-purple-400" />;
+        return <MoviesAndTv20Regular className="w-4 h-4" />;
       case "Archives":
-        return <Archive20Regular className="w-4 h-4 text-amber-400" />;
+        return <Archive20Regular className="w-4 h-4" />;
       case "Documents":
-        return <DocumentText20Regular className="w-4 h-4 text-blue-400" />;
+        return <DocumentText20Regular className="w-4 h-4" />;
       case "Binaries":
-        return <AppFolder20Regular className="w-4 h-4 text-rose-400" />;
+        return <AppFolder20Regular className="w-4 h-4" />;
       default:
-        return <QuestionCircle20Regular className="w-4 h-4 text-[var(--text-muted)]" />;
+        return <QuestionCircle20Regular className="w-4 h-4" />;
     }
   };
 
@@ -433,69 +455,87 @@ export const LargeFilesPage: React.FC = () => {
         : t.common.allDrives
       : selectedDrive;
 
+  // Live progress from the backend (large_files scan and disposal events).
+  const { initProgressListener } = useScanProgressStore();
+  useEffect(() => {
+    let unlisten: (() => void) | null = null;
+    initProgressListener().then((u) => {
+      unlisten = u;
+    });
+    return () => {
+      if (unlisten) unlisten();
+    };
+  }, [initProgressListener]);
+
+  // Master checkbox shows a dash when only part of the list is selected.
+  const masterRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (masterRef.current) masterRef.current.indeterminate = isSomeFilteredSelected;
+  }, [isSomeFilteredSelected]);
+
+  const busy = scanning || batchTrashing || Boolean(trashingPath);
+  const isCustomTarget = selectedDrive !== "ALL" && !volumes.some((v) => v.mount_point === selectedDrive);
+
+  const chipClass = (active: boolean) =>
+    `h-9 px-3 rounded-md border text-sm inline-flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+      active
+        ? "border-[var(--accent)] bg-[var(--fill-subtle)] text-[var(--text-primary)]"
+        : "border-[var(--border-card)] text-[var(--text-secondary)] hover:bg-[var(--fill-subtle)] hover:text-[var(--text-primary)] cursor-pointer"
+    }`;
+
+  const quickSelect: Array<{ label: string; onClick: () => void }> = [
+    { label: t.common.selectAll, onClick: handleSelectAllFiltered },
+    { label: t.common.deselectAll, onClick: handleDeselectAll },
+    { label: t.largeFiles.invertSelection, onClick: handleInvertFiltered },
+    { label: "> 1 GB", onClick: () => handleSelectGreaterThan(1024 * 1024 * 1024) },
+    { label: "> 500 MB", onClick: () => handleSelectGreaterThan(500 * 1024 * 1024) },
+    { label: t.largeFiles.olderThan30Days, onClick: () => handleSelectOlderThanDays(30) },
+  ];
+
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-4 select-none font-sans text-[var(--text-primary)] pb-32">
-      {/* WinUI 3 Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-[4px] bg-white/[0.04] border border-[var(--border-subtle)] flex items-center justify-center text-[#0078d4] shrink-0">
-            <DocumentFolder24Filled className="w-6 h-6" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl font-semibold tracking-tight text-[var(--text-primary)]">
-                {t.largeFiles.title}
-              </h1>
-              <span className="px-2 py-0.5 rounded-[4px] text-[10px] font-ibm-mono uppercase tracking-wider bg-[#0078d4]/10 text-[#0078d4] border border-[#0078d4]/20">
-                {t.largeFiles.scannerBadge}
-              </span>
-            </div>
-            <p className="text-xs text-[var(--text-secondary)]">
-              {t.largeFiles.subtitle}
-            </p>
-          </div>
-        </div>
-
-        {/* Quick Controls */}
-        <div className="flex flex-wrap items-center gap-2.5">
-          <div className="flex items-center gap-2 bg-black/20 px-2.5 py-1 rounded-[4px] border border-[var(--border-card)]">
-            <span className="text-[11px] text-[var(--text-secondary)] font-medium">{t.largeFiles.minSize}</span>
-            <select
-              value={minSizeMb}
-              disabled={scanning || batchTrashing || Boolean(trashingPath)}
-              onChange={(e) => {
-                const val = Number(e.target.value);
-                setMinSizeMb(val);
-                handleScan(selectedDrive, val);
-              }}
-              className="bg-transparent text-[var(--text-primary)] text-xs font-ibm-mono font-semibold focus:outline-none cursor-pointer disabled:opacity-50"
+    <Page className="select-none">
+      <PageHeader
+        icon={<DocumentFolder20Regular />}
+        title={t.largeFiles.title}
+        description={t.largeFiles.pageDesc}
+        actions={
+          <>
+            <label className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+              <span className="whitespace-nowrap">{t.largeFiles.minSize}</span>
+              <select
+                value={minSizeMb}
+                disabled={busy}
+                onChange={(e) => {
+                  const val = Number(e.target.value);
+                  setMinSizeMb(val);
+                  handleScan(selectedDrive, val);
+                }}
+                className={`${controlClass} px-2 font-ibm-mono cursor-pointer`}
+              >
+                {MIN_SIZE_OPTIONS.map((o) => (
+                  <option key={o.mb} value={o.mb} className="bg-[var(--bg-card)] text-[var(--text-primary)]">
+                    {fill(t.largeFiles.minSizeOption, { size: o.label })}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <WinUIButton
+              variant="primary"
+              onClick={() => handleScan()}
+              disabled={busy}
+              icon={<ArrowClockwise20Regular className={`w-4 h-4 ${scanning ? "animate-spin" : ""}`} />}
             >
-              <option value={50} className="bg-[#202020] text-[var(--text-primary)]">≥ 50 MB</option>
-              <option value={100} className="bg-[#202020] text-[var(--text-primary)]">≥ 100 MB</option>
-              <option value={250} className="bg-[#202020] text-[var(--text-primary)]">≥ 250 MB</option>
-              <option value={500} className="bg-[#202020] text-[var(--text-primary)]">≥ 500 MB</option>
-              <option value={1024} className="bg-[#202020] text-[var(--text-primary)]">≥ 1 GB</option>
-              <option value={2048} className="bg-[#202020] text-[var(--text-primary)]">≥ 2 GB</option>
-            </select>
-          </div>
+              {scanning ? t.common.scanning : scanResult ? t.common.rescan : t.common.scan}
+            </WinUIButton>
+          </>
+        }
+      />
 
-          <WinUIButton
-            variant="primary"
-            onClick={() => handleScan()}
-            disabled={scanning || batchTrashing || Boolean(trashingPath)}
-            className="flex items-center gap-1.5"
-          >
-            <ArrowClockwise20Regular className={`w-3.5 h-3.5 ${scanning ? "animate-spin" : ""}`} />
-            <span>{scanning ? t.common.scanning : t.common.rescan}</span>
-          </WinUIButton>
-        </div>
-      </div>
-
-      {/* Drive Selection Pills */}
+      {/* Drive picker */}
       {volumes.length > 0 && (
-        <WinUICard className="p-3 space-y-2">
-          <div className="flex items-center gap-2 text-xs font-medium text-[var(--text-secondary)]">
-            <HardDrive20Regular className="w-4 h-4 text-[#0078d4]" />
+        <Card className="space-y-3">
+          <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]">
+            <HardDrive20Regular className="w-4 h-4 text-[var(--text-secondary)]" />
             <span>{t.largeFiles.selectDrive}</span>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -504,31 +544,16 @@ export const LargeFilesPage: React.FC = () => {
                 setSelectedDrive("ALL");
                 handleScan("ALL", minSizeMb);
               }}
-              disabled={scanning || batchTrashing || Boolean(trashingPath)}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-[4px] text-xs transition-all ${
-                scanning || batchTrashing || Boolean(trashingPath) ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
-              } ${
-                selectedDrive === "ALL"
-                  ? "bg-[#0078d4] text-white shadow-xs"
-                  : "bg-black/20 hover:bg-white/[0.05] text-[var(--text-primary)] border border-[var(--border-card)]"
-              }`}
+              disabled={busy}
+              className={chipClass(selectedDrive === "ALL")}
             >
-              <HardDrive20Regular className="w-3.5 h-3.5" />
-              <span className="font-semibold">{t.common.allDrives}</span>
-              <span
-                className={`text-[10px] px-1.5 py-0.5 rounded-[3px] font-ibm-mono tabular-nums ${
-                  selectedDrive === "ALL" ? "bg-white/20 text-white" : "bg-black/30 text-[var(--text-secondary)]"
-                }`}
-              >
-                {volumes.length}
-              </span>
+              <HardDrive20Regular className="w-4 h-4" />
+              <span className="font-medium">{t.common.allDrives}</span>
+              <span className="text-xs text-[var(--text-muted)] font-ibm-mono">{volumes.length}</span>
             </button>
 
             {volumes.map((vol) => {
               const isSelected = selectedDrive === vol.mount_point;
-              const freeGb = (vol.available_bytes / (1024 * 1024 * 1024)).toFixed(1);
-              const totalGb = (vol.total_bytes / (1024 * 1024 * 1024)).toFixed(1);
-
               return (
                 <button
                   key={vol.mount_point}
@@ -536,23 +561,18 @@ export const LargeFilesPage: React.FC = () => {
                     setSelectedDrive(vol.mount_point);
                     handleScan(vol.mount_point, minSizeMb);
                   }}
-                  disabled={scanning || batchTrashing || Boolean(trashingPath)}
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded-[4px] text-xs transition-all ${
-                    scanning || batchTrashing || Boolean(trashingPath) ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
-                  } ${
-                    isSelected
-                      ? "bg-[#0078d4] text-white shadow-xs"
-                      : "bg-black/20 hover:bg-white/[0.05] text-[var(--text-primary)] border border-[var(--border-card)]"
-                  }`}
+                  disabled={busy}
+                  title={vol.volume_name || t.common.drive}
+                  className={chipClass(isSelected)}
                 >
-                  <span className="font-ibm-mono font-bold">{vol.mount_point}</span>
-                  <span className="text-[11px] opacity-80">{vol.volume_name || t.common.drive}</span>
-                  <span
-                    className={`text-[10px] px-1.5 py-0.5 rounded-[3px] font-ibm-mono tabular-nums ${
-                      isSelected ? "bg-white/20 text-white" : "bg-black/30 text-[var(--text-secondary)]"
-                    }`}
-                  >
-                    {freeGb} GB {t.common.freeOf} {totalGb} GB
+                  <span className="font-medium font-ibm-mono text-[var(--text-primary)]">
+                    {vol.mount_point.replace(/[\\/]+$/, "")}
+                  </span>
+                  <span className="text-xs text-[var(--text-muted)] font-ibm-mono">
+                    {fill(t.largeFiles.driveFreeOf, {
+                      free: compactBytes(vol.available_bytes),
+                      total: compactBytes(vol.total_bytes),
+                    })}
                   </span>
                 </button>
               );
@@ -566,497 +586,442 @@ export const LargeFilesPage: React.FC = () => {
                   handleScan(custom.trim(), minSizeMb);
                 }
               }}
-              disabled={scanning || batchTrashing || Boolean(trashingPath)}
-              className={`px-3 py-1.5 rounded-[4px] text-xs font-medium bg-black/20 hover:bg-white/[0.05] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border-card)] transition-all flex items-center gap-1.5 ${
-                scanning || batchTrashing || Boolean(trashingPath) ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
-              }`}
+              disabled={busy}
+              title={isCustomTarget ? selectedDrive : undefined}
+              className={chipClass(isCustomTarget)}
             >
-              <Folder20Regular className="w-3.5 h-3.5" />
-              <span>{t.common.showInFolder}...</span>
+              <Folder20Regular className="w-4 h-4" />
+              <span className="max-w-[220px] truncate">
+                {isCustomTarget ? selectedDrive : `${t.common.showInFolder}…`}
+              </span>
             </button>
           </div>
-        </WinUICard>
+        </Card>
       )}
 
-      {/* Notification */}
+      {/* Notice line (cancel, failure, last single recycle) */}
       {notification && (
-        <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-[4px] flex items-center justify-between shadow-xs">
-          <div className="flex items-center gap-2.5">
-            <CheckmarkCircle20Filled className="w-4 h-4 text-emerald-400 shrink-0" />
-            <span className="text-xs text-emerald-400 font-medium">{notification}</span>
+        <Card className="py-2.5 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <Info20Regular className="w-4 h-4 shrink-0 text-[var(--accent-text)]" />
+            <span className="text-sm text-[var(--text-primary)] truncate" title={notification}>
+              {notification}
+            </span>
           </div>
-          <button
-            onClick={() => setNotification(null)}
-            className="text-xs text-emerald-400 hover:text-white px-2 py-0.5 rounded-[3px] bg-emerald-500/20 font-medium cursor-pointer"
-          >
+          <WinUIButton variant="subtle" size="sm" onClick={() => setNotification(null)}>
             {t.common.dismiss}
-          </button>
-        </div>
+          </WinUIButton>
+        </Card>
       )}
 
-      {/* 4-Tile Stat Strip */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <WinUICard className="p-3.5">
-          <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] mb-1">
-            <span className="font-medium text-[11px]">{t.largeFiles.statFiles}</span>
-            <DocumentFolder24Filled className="w-3.5 h-3.5 text-[#0078d4]" />
-          </div>
-          <div className="text-xl font-bold text-[var(--text-primary)] font-ibm-mono tabular-nums">
-            {scanResult ? scanResult.total_files.toLocaleString() : "—"}
-          </div>
-          <div className="text-[10px] text-[var(--text-muted)] font-ibm-mono mt-1">
-            {scanResult ? `≥ ${minSizeMb} MB` : t.common.notScannedYet}
-          </div>
-        </WinUICard>
-
-        <WinUICard className="p-3.5">
-          <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] mb-1">
-            <span className="font-medium text-[11px]">{t.largeFiles.totalSpace}</span>
-            <HardDrive20Regular className="w-3.5 h-3.5 text-indigo-400" />
-          </div>
-          <div className="text-xl font-bold text-indigo-400 font-ibm-mono tabular-nums">
-            {scanResult ? formatBytes(scanResult.total_bytes) : "—"}
-          </div>
-          <div className="text-[10px] text-[var(--text-muted)] font-ibm-mono truncate mt-1" title={scanTargetLabel}>
-            {scanTargetLabel}
-          </div>
-        </WinUICard>
-
-        <WinUICard className="p-3.5">
-          <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] mb-1">
-            <span className="font-medium text-[11px]">{t.largeFiles.categoryMedia}</span>
-            <MoviesAndTv20Regular className="w-3.5 h-3.5 text-purple-400" />
-          </div>
-          <div className="text-xl font-bold text-purple-400 font-ibm-mono tabular-nums">
-            {categoryStats["Media"] ? formatBytes(categoryStats["Media"].bytes) : "0 B"}
-          </div>
-          <div className="text-[10px] text-[var(--text-muted)] font-ibm-mono tabular-nums mt-1">
-            {categoryStats["Media"]?.count || 0} {t.common.files}
-          </div>
-        </WinUICard>
-
-        <WinUICard className="p-3.5">
-          <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] mb-1">
-            <span className="font-medium text-[11px]">{t.largeFiles.categoryArchives}</span>
-            <Archive20Regular className="w-3.5 h-3.5 text-amber-400" />
-          </div>
-          <div className="text-xl font-bold text-amber-400 font-ibm-mono tabular-nums">
-            {categoryStats["Archives"] ? formatBytes(categoryStats["Archives"].bytes) : "0 B"}
-          </div>
-          <div className="text-[10px] text-[var(--text-muted)] font-ibm-mono tabular-nums mt-1">
-            {categoryStats["Archives"]?.count || 0} {t.common.files}
-          </div>
-        </WinUICard>
-      </div>
-
-      {/* Category Filter & Search Bar */}
-      <WinUICard className="p-3 flex flex-col lg:flex-row items-center justify-between gap-3">
-        {/* Category Tabs */}
-        <div className="flex items-center gap-1.5 min-w-0 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden w-full lg:w-auto">
-          {categories.map((cat) => {
-            const count = categoryStats[cat]?.count || 0;
-            const bytes = categoryStats[cat]?.bytes || 0;
-            const isActive = activeCategory === cat;
-
-            return (
-              <button
-                key={cat}
-                onClick={() => setActiveCategory(cat)}
-                className={`px-3 py-1 rounded-[4px] text-xs font-medium transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
-                  isActive
-                    ? "bg-[#0078d4] text-white"
-                    : "bg-black/20 text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border-card)]"
-                }`}
-              >
-                <span>{getCategoryLabel(cat)}</span>
-                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-ibm-mono tabular-nums ${isActive ? "bg-white/20 text-white" : "bg-black/30 text-[var(--text-muted)]"}`}>
-                  {count} • {formatBytes(bytes)}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Search & Sort */}
-        <div className="flex items-center gap-2.5 w-full lg:w-auto justify-end">
-          <div className="relative flex-1 lg:w-56">
-            <Search20Regular className="w-3.5 h-3.5 absolute left-2.5 top-2 text-[var(--text-muted)]" />
-            <input
-              type="text"
-              placeholder={t.largeFiles.searchPlaceholder}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-8 pr-3 py-1 bg-black/20 border border-[var(--border-card)] rounded-[4px] text-xs font-ibm-mono text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-[#0078d4]"
+      {scanning ? (
+        <ScanProgressCard
+          scanType="large_files"
+          title={t.largeFiles.scanning}
+          subtitle={fill(t.largeFiles.scanTarget, { target: scanTargetLabel, size: minSizeMb })}
+          onCancel={handleCancelScan}
+        />
+      ) : !scanResult ? (
+        <EmptyState
+          icon={<HardDrive20Regular />}
+          title={`${t.largeFiles.readyTitle} (${scanTargetLabel})`}
+          description={t.largeFiles.readyDesc}
+          action={
+            <WinUIButton
+              variant="primary"
+              size="lg"
+              onClick={() => handleScan()}
+              icon={<Search20Regular className="w-4 h-4" />}
+            >
+              {t.largeFiles.startScan}
+            </WinUIButton>
+          }
+        />
+      ) : (
+        <>
+          {/* Stat row */}
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <StatCard
+              label={t.largeFiles.statFound}
+              value={scanResult.total_files.toLocaleString()}
+              hint={fill(t.largeFiles.atLeastSize, { size: minSizeMb })}
+              icon={<DocumentFolder20Regular />}
+            />
+            <StatCard
+              label={t.largeFiles.statTotal}
+              value={formatBytes(scanResult.total_bytes)}
+              hint={<span title={scanTargetLabel}>{scanTargetLabel}</span>}
+              icon={<HardDrive20Regular />}
+            />
+            <StatCard
+              label={t.largeFiles.statMedia}
+              value={formatBytes(categoryStats["Media"]?.bytes || 0)}
+              hint={fill(t.largeFiles.fileCount, { count: categoryStats["Media"]?.count || 0 })}
+              icon={<MoviesAndTv20Regular />}
+            />
+            <StatCard
+              label={t.largeFiles.statArchives}
+              value={formatBytes(categoryStats["Archives"]?.bytes || 0)}
+              hint={fill(t.largeFiles.fileCount, { count: categoryStats["Archives"]?.count || 0 })}
+              icon={<Archive20Regular />}
             />
           </div>
 
-          <div className="flex items-center gap-1.5 bg-black/20 px-2 py-1 rounded-[4px] border border-[var(--border-card)]">
-            <ArrowSort20Regular className="w-3.5 h-3.5 text-[var(--text-muted)]" />
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as any)}
-              className="bg-transparent text-[var(--text-primary)] text-xs font-medium focus:outline-none cursor-pointer"
-            >
-              <option value="size-desc" className="bg-[#202020] text-[var(--text-primary)]">{t.largeFiles.sortSizeDesc}</option>
-              <option value="size-asc" className="bg-[#202020] text-[var(--text-primary)]">{t.largeFiles.sortSizeAsc}</option>
-              <option value="date-desc" className="bg-[#202020] text-[var(--text-primary)]">{t.largeFiles.sortDateDesc}</option>
-              <option value="name" className="bg-[#202020] text-[var(--text-primary)]">{t.largeFiles.sortName}</option>
-            </select>
-          </div>
-        </div>
-      </WinUICard>
-
-      {/* Files Table / Progress / Empty States */}
-      {scanning ? (
-        <LiveScanProgressWidget
-          scanType="large_files"
-          title={t.largeFiles.scanning}
-          subtitle={`Target: ${scanTargetLabel} • ${t.largeFiles.minSize} ≥ ${minSizeMb} MB`}
-          onCancel={handleCancelScan}
-        />
-      ) : batchTrashing ? (
-        <LiveScanProgressWidget
-          scanType="disposal"
-          title="Recycling large files..."
-          subtitle="Safely moving selected files to Windows Recycle Bin"
-          showCancel={false}
-        />
-      ) : !scanResult ? (
-        <WinUICard className="p-12 text-center space-y-3">
-          <div className="w-12 h-12 rounded-[4px] bg-white/[0.04] border border-[var(--border-subtle)] flex items-center justify-center mx-auto text-[#0078d4]">
-            <HardDrive20Regular className="w-6 h-6" />
-          </div>
-          <div className="space-y-1">
-            <h3 className="text-sm font-semibold text-[var(--text-primary)]">{t.largeFiles.readyTitle} ({scanTargetLabel})</h3>
-            <p className="text-xs text-[var(--text-secondary)] max-w-md mx-auto">
-              {t.largeFiles.readyDesc}
-            </p>
-          </div>
-          <div className="pt-2">
-            <WinUIButton
-              variant="primary"
-              onClick={() => handleScan()}
-              className="inline-flex items-center gap-1.5"
-            >
-              <Search20Regular className="w-3.5 h-3.5" />
-              <span>{t.largeFiles.startScan}</span>
-            </WinUIButton>
-          </div>
-        </WinUICard>
-      ) : filteredFiles.length > 0 ? (
-        <WinUICard className="overflow-hidden">
-          {/* Quick Batch Selection Preset Toolbar */}
-          <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 bg-black/15 border-b border-[var(--border-divider)] text-xs">
-            <div className="flex flex-wrap items-center gap-1.5">
-              <span className="text-[11px] text-[var(--text-muted)] font-medium mr-1">Select:</span>
-              <button
-                onClick={handleSelectAllFiltered}
-                className="px-2 py-0.5 rounded-[3px] text-[11px] font-medium bg-black/20 hover:bg-white/[0.06] text-[var(--text-secondary)] hover:text-white border border-[var(--border-card)] cursor-pointer transition-colors"
-              >
-                {t.common.selectAll}
-              </button>
-              <button
-                onClick={handleDeselectAll}
-                className="px-2 py-0.5 rounded-[3px] text-[11px] font-medium bg-black/20 hover:bg-white/[0.06] text-[var(--text-secondary)] hover:text-white border border-[var(--border-card)] cursor-pointer transition-colors"
-              >
-                {t.common.deselectAll}
-              </button>
-              <button
-                onClick={handleInvertFiltered}
-                className="px-2 py-0.5 rounded-[3px] text-[11px] font-medium bg-black/20 hover:bg-white/[0.06] text-[var(--text-secondary)] hover:text-white border border-[var(--border-card)] cursor-pointer transition-colors"
-              >
-                Invert
-              </button>
-              <span className="text-[var(--border-subtle)] mx-0.5">|</span>
-              <button
-                onClick={() => handleSelectGreaterThan(1024 * 1024 * 1024)}
-                className="px-2 py-0.5 rounded-[3px] text-[11px] font-medium bg-black/20 hover:bg-white/[0.06] text-[var(--text-secondary)] hover:text-white border border-[var(--border-card)] cursor-pointer transition-colors"
-              >
-                &gt; 1 GB
-              </button>
-              <button
-                onClick={() => handleSelectGreaterThan(500 * 1024 * 1024)}
-                className="px-2 py-0.5 rounded-[3px] text-[11px] font-medium bg-black/20 hover:bg-white/[0.06] text-[var(--text-secondary)] hover:text-white border border-[var(--border-card)] cursor-pointer transition-colors"
-              >
-                &gt; 500 MB
-              </button>
-              <button
-                onClick={() => handleSelectOlderThanDays(30)}
-                className="px-2 py-0.5 rounded-[3px] text-[11px] font-medium bg-black/20 hover:bg-white/[0.06] text-[var(--text-secondary)] hover:text-white border border-[var(--border-card)] cursor-pointer transition-colors"
-              >
-                &gt; 30 Days Old
-              </button>
-            </div>
-            <div className="text-[11px] font-ibm-mono text-[var(--text-muted)]">
-              {selectedPaths.size > 0 ? (
-                <span className="text-[#0078d4] font-semibold">
-                  {selectedPaths.size} selected ({formatBytes(totalSelectedBytes)})
-                </span>
-              ) : (
-                <span>Tip: Shift+Click to select ranges</span>
-              )}
-            </div>
-          </div>
-
-          {/* Table Header with Master Checkbox */}
-          <div className="px-4 py-2.5 bg-black/25 border-b border-[var(--border-divider)] flex items-center justify-between text-[11px] font-semibold text-[var(--text-secondary)] uppercase tracking-wider font-ibm-mono">
-            <div className="flex items-center gap-3">
-              <button
-                onClick={handleToggleMasterCheckbox}
-                title={isAllFilteredSelected ? t.common.deselectAll : t.common.selectAll}
-                className={`w-4 h-4 rounded-[3px] border flex items-center justify-center shrink-0 transition-colors cursor-pointer ${
-                  isAllFilteredSelected || isSomeFilteredSelected
-                    ? "bg-[#0078d4] border-[#0078d4] text-white"
-                    : "border-[var(--border-subtle)] bg-black/20 hover:border-[var(--border-card)]"
-                }`}
-              >
-                {isAllFilteredSelected && <Checkmark16Filled className="w-3 h-3 text-white" />}
-                {isSomeFilteredSelected && <div className="w-2 h-0.5 bg-white rounded-xs" />}
-              </button>
-              <span>{t.common.name} & {t.common.path}</span>
-            </div>
-            <span>{t.common.size} & {t.common.actions}</span>
-          </div>
-
-          {/* File Rows */}
-          <div className="divide-y divide-[var(--border-divider)]">
-            {filteredFiles.map((file, idx) => {
-              const percentage = Math.max(5, Math.round((file.size_bytes / maxFileSize) * 100));
-              const isSelected = selectedPaths.has(file.path);
-              const isProtected = isProtectedSystemFile(file.path);
-
-              return (
-                <div
-                  key={file.path}
-                  onClick={(e) => handleToggleRow(idx, file.path, e)}
-                  title={isProtected ? t.common.protectedSystemFile : undefined}
-                  className={`px-4 py-3 flex items-center justify-between gap-4 transition-colors select-none ${
-                    isProtected ? "cursor-default opacity-70" : "cursor-pointer"
-                  } ${
-                    isSelected
-                      ? "bg-[#0078d4]/10 hover:bg-[#0078d4]/15 border-l-2 border-[#0078d4]"
-                      : "hover:bg-white/[0.02]"
-                  }`}
+          {/* Category tabs, search and sort */}
+          <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3">
+            <FilterTabs
+              items={categories.map((cat) => ({
+                id: cat,
+                label: getCategoryLabel(cat),
+                count: `${categoryStats[cat]?.count || 0} · ${formatBytes(categoryStats[cat]?.bytes || 0)}`,
+              }))}
+              value={activeCategory}
+              onChange={setActiveCategory}
+              className="min-w-0"
+            />
+            <div className="flex items-center gap-2 shrink-0">
+              <div className="relative flex-1 xl:w-56">
+                <Search20Regular className="w-4 h-4 absolute left-2.5 top-2 text-[var(--text-muted)] pointer-events-none" />
+                <input
+                  type="text"
+                  placeholder={t.largeFiles.searchPlaceholder}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className={`${controlClass} w-full pl-8 pr-3 placeholder-[var(--text-muted)] select-text`}
+                />
+              </div>
+              <div className="relative">
+                <ArrowSort20Regular className="w-4 h-4 absolute left-2.5 top-2 text-[var(--text-muted)] pointer-events-none" />
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as any)}
+                  title={t.largeFiles.sortBy}
+                  className={`${controlClass} pl-8 pr-2 cursor-pointer`}
                 >
-                  <div className="flex items-center gap-3 min-w-0 flex-1">
-                    {/* Row Checkbox */}
-                    <div
-                      className={`w-4 h-4 rounded-[3px] border flex items-center justify-center shrink-0 transition-colors ${
-                        isSelected
-                          ? "bg-[#0078d4] border-[#0078d4] text-white"
-                          : "border-[var(--border-subtle)] bg-black/20"
-                      }`}
-                    >
-                      {isSelected && <Checkmark16Filled className="w-3 h-3 text-white" />}
-                    </div>
-
-                    <div className="p-2 rounded-[4px] bg-black/20 border border-[var(--border-subtle)] shrink-0 text-[var(--text-secondary)]">
-                      {getCategoryIcon(file.category)}
-                    </div>
-
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold text-[var(--text-primary)] text-xs font-ibm-mono truncate select-all">
-                          {file.name}
-                        </span>
-                        <span className="text-[10px] font-ibm-mono uppercase px-1.5 py-0.2 rounded-[3px] bg-[#0078d4]/10 text-[#0078d4] border border-[#0078d4]/20">
-                          {file.extension || file.category}
-                        </span>
-                      </div>
-
-                      <div className="text-[11px] font-ibm-mono text-[var(--text-secondary)] truncate mt-0.5 select-all">
-                        {file.path}
-                      </div>
-
-                      <div className="text-[10px] font-ibm-mono text-[var(--text-muted)] mt-0.5 tabular-nums">
-                        {t.common.date}: {new Date(file.modified_at * 1000).toLocaleString()}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Actions: Size bar, Reveal in explorer, Trash */}
-                  <div className="flex items-center gap-3 shrink-0 font-ibm-mono tabular-nums">
-                    <div className="hidden sm:flex flex-col items-end w-28">
-                      <div className="text-xs font-bold text-[var(--text-primary)]">
-                        {formatBytes(file.size_bytes)}
-                      </div>
-                      <div className="w-full bg-black/30 h-1.5 rounded-full overflow-hidden mt-1 border border-[var(--border-subtle)]">
-                        <div
-                          className="bg-[#0078d4] h-full rounded-full"
-                          style={{ width: `${percentage}%` }}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="sm:hidden text-xs font-bold text-[var(--text-primary)]">
-                      {formatBytes(file.size_bytes)}
-                    </div>
-
-                    {/* Show in File Explorer Button */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleRevealInExplorer(file.path);
-                      }}
-                      title={t.common.openInExplorer}
-                      className="p-1.5 bg-black/20 hover:bg-[#0078d4] hover:text-white text-[var(--text-secondary)] rounded-[4px] transition-all cursor-pointer border border-[var(--border-card)]"
-                    >
-                      <FolderOpen20Regular className="w-3.5 h-3.5" />
-                    </button>
-
-                    {/* Quick Trash Button (disabled for protected system files) */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (!isProtected) handleQuickTrash(file.path);
-                      }}
-                      disabled={isProtected || trashingPath === file.path || batchTrashing}
-                      title={isProtected ? t.common.protectedSystemFile : t.largeFiles.trashSelected}
-                      className="p-1.5 bg-black/20 hover:bg-rose-500/20 hover:text-rose-400 text-[var(--text-muted)] rounded-[4px] transition-all cursor-pointer disabled:opacity-50 border border-[var(--border-card)]"
-                    >
-                      <Delete20Regular className={`w-3.5 h-3.5 ${trashingPath === file.path ? "animate-spin text-rose-400" : ""}`} />
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
+                  <option value="size-desc" className="bg-[var(--bg-card)]">{t.largeFiles.sortSizeDesc}</option>
+                  <option value="size-asc" className="bg-[var(--bg-card)]">{t.largeFiles.sortSizeAsc}</option>
+                  <option value="date-desc" className="bg-[var(--bg-card)]">{t.largeFiles.sortDateDesc}</option>
+                  <option value="name" className="bg-[var(--bg-card)]">{t.largeFiles.sortName}</option>
+                </select>
+              </div>
+            </div>
           </div>
-        </WinUICard>
-      ) : scanResult.files.length === 0 ? (
-        <WinUICard className="p-12 text-center space-y-2">
-          <DocumentFolder24Filled className="w-10 h-10 text-[var(--text-muted)] mx-auto" />
-          <h3 className="text-sm font-semibold text-[var(--text-primary)]">{t.largeFiles.noFilesFound}</h3>
-          <p className="text-xs text-[var(--text-secondary)] max-w-md mx-auto">
-            {t.largeFiles.noFilesDesc}
-          </p>
-        </WinUICard>
-      ) : (
-        <WinUICard className="p-12 text-center space-y-2">
-          <DocumentFolder24Filled className="w-10 h-10 text-[var(--text-muted)] mx-auto" />
-          <h3 className="text-sm font-semibold text-[var(--text-primary)]">{t.common.noResults}</h3>
-          <p className="text-xs text-[var(--text-secondary)] max-w-md mx-auto">
-            {t.largeFiles.noFilesDesc}
-          </p>
-        </WinUICard>
+
+          {batchTrashing ? (
+            <ScanProgressCard
+              scanType="disposal"
+              title={t.largeFiles.recyclingTitle}
+              subtitle={t.largeFiles.recyclingDesc}
+            />
+          ) : filteredFiles.length > 0 ? (
+            <Card padded={false} className="overflow-hidden">
+              {/* Quick-select row */}
+              <div className="px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 border-b border-[var(--border-divider)]">
+                <div className="flex flex-wrap items-center gap-1">
+                  <span className="text-xs text-[var(--text-muted)] mr-1">{t.largeFiles.selectLabel}</span>
+                  {quickSelect.map((q, i) => (
+                    <React.Fragment key={q.label}>
+                      {i === 3 && <span className="w-px h-4 mx-1 bg-[var(--border-divider)]" />}
+                      <WinUIButton variant="subtle" size="sm" onClick={q.onClick}>
+                        {q.label}
+                      </WinUIButton>
+                    </React.Fragment>
+                  ))}
+                </div>
+                <span className="text-xs text-[var(--text-muted)]">{t.largeFiles.shiftHint}</span>
+              </div>
+
+              {/* Column header with the master checkbox */}
+              <div className="px-4 py-2 flex items-center gap-3 border-b border-[var(--border-divider)] text-xs text-[var(--text-secondary)]">
+                <input
+                  ref={masterRef}
+                  type="checkbox"
+                  checked={isAllFilteredSelected}
+                  onChange={handleToggleMasterCheckbox}
+                  disabled={selectableFiltered.length === 0}
+                  title={isAllFilteredSelected ? t.common.deselectAll : t.common.selectAll}
+                  className="accent-[var(--accent)] w-4 h-4 shrink-0 cursor-pointer"
+                />
+                <span className="w-8 shrink-0" />
+                <span className="flex-1 min-w-0">{t.common.name}</span>
+                <span className="hidden md:block w-24 shrink-0">{t.common.date}</span>
+                <span className="w-28 shrink-0 text-right">{t.common.size}</span>
+                <span className="w-[68px] shrink-0 text-right">{t.common.actions}</span>
+              </div>
+
+              <div className="divide-y divide-[var(--border-divider)]">
+                {filteredFiles.map((file, idx) => {
+                  const percentage = Math.max(5, Math.round((file.size_bytes / maxFileSize) * 100));
+                  const isSelected = selectedPaths.has(file.path);
+                  const isProtected = isProtectedSystemFile(file.path);
+                  const modified = new Date(file.modified_at * 1000);
+
+                  return (
+                    <div
+                      key={file.path}
+                      onClick={(e) => handleToggleRow(idx, file.path, e)}
+                      title={isProtected ? t.common.protectedSystemFile : undefined}
+                      className={`px-4 py-3 flex items-center gap-3 transition-colors ${
+                        isProtected ? "cursor-default opacity-60" : "cursor-pointer"
+                      } ${isSelected ? "bg-[var(--fill-subtle)]" : "hover:bg-[var(--fill-subtle)]"}`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        disabled={isProtected}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleToggleRow(idx, file.path, e);
+                        }}
+                        onChange={() => {}}
+                        className="accent-[var(--accent)] w-4 h-4 shrink-0 cursor-pointer disabled:cursor-default"
+                      />
+
+                      <span className="w-8 h-8 shrink-0 rounded-md bg-[var(--fill-subtle)] flex items-center justify-center text-[var(--text-secondary)]">
+                        {getCategoryIcon(file.category)}
+                      </span>
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="text-sm text-[var(--text-primary)] truncate select-all" title={file.name}>
+                            {file.name}
+                          </span>
+                          <Badge className="font-ibm-mono shrink-0">{file.extension || file.category}</Badge>
+                        </div>
+                        <div
+                          className="font-code text-xs text-[var(--text-muted)] truncate mt-0.5 select-all"
+                          title={file.path}
+                        >
+                          {file.path}
+                        </div>
+                        <div className="md:hidden text-xs text-[var(--text-muted)] mt-0.5">
+                          {fill(t.largeFiles.modifiedOn, { date: modified.toLocaleDateString() })}
+                        </div>
+                      </div>
+
+                      <span
+                        className="hidden md:block w-24 shrink-0 text-xs text-[var(--text-secondary)] tabular-nums"
+                        title={modified.toLocaleString()}
+                      >
+                        {modified.toLocaleDateString()}
+                      </span>
+
+                      <div className="w-28 shrink-0 flex flex-col items-end gap-1">
+                        <span className="text-sm font-ibm-mono tabular-nums text-[var(--text-primary)]">
+                          {formatBytes(file.size_bytes)}
+                        </span>
+                        <ProgressBar value={percentage} />
+                      </div>
+
+                      <div className="w-[68px] shrink-0 flex items-center justify-end gap-1">
+                        <span title={t.common.openInExplorer}>
+                          <WinUIButton
+                            variant="subtle"
+                            size="sm"
+                            className="w-8 !px-0"
+                            aria-label={t.common.openInExplorer}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRevealInExplorer(file.path);
+                            }}
+                            icon={<FolderOpen20Regular className="w-4 h-4 text-[var(--text-secondary)]" />}
+                          />
+                        </span>
+                        {/* Wrapper keeps the tooltip working while the button is disabled */}
+                        <span
+                          title={isProtected ? t.common.protectedSystemFile : t.largeFiles.trashSelected}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <WinUIButton
+                            variant="subtle"
+                            size="sm"
+                            className="w-8 !px-0"
+                            aria-label={t.largeFiles.trashSelected}
+                            disabled={isProtected || trashingPath === file.path || batchTrashing}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (!isProtected) handleQuickTrash(file.path);
+                            }}
+                            icon={
+                              trashingPath === file.path ? (
+                                <ArrowClockwise20Regular className="w-4 h-4 animate-spin text-[var(--text-secondary)]" />
+                              ) : (
+                                <Delete20Regular className="w-4 h-4 text-[var(--text-secondary)]" />
+                              )
+                            }
+                          />
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+          ) : scanResult.files.length === 0 ? (
+            <EmptyState
+              icon={<DocumentFolder20Regular />}
+              title={t.largeFiles.noFilesFound}
+              description={t.largeFiles.noFilesDesc}
+            />
+          ) : (
+            <EmptyState
+              icon={<Search20Regular />}
+              title={t.common.noResults}
+              description={t.largeFiles.noFilesDesc}
+            />
+          )}
+        </>
       )}
 
-      {/* Floating / Sticky Batch Action Bar */}
+      {/* Sticky selection bar */}
       {selectedPaths.size > 0 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 w-[94%] max-w-4xl p-3.5 bg-[#1c1c1c]/95 backdrop-blur-md border border-[#0078d4]/40 rounded-lg shadow-2xl flex flex-col sm:flex-row items-center justify-between gap-3 animate-fadeIn">
-          <div className="flex items-center gap-3 w-full sm:w-auto">
-            <div className="w-8 h-8 rounded-[4px] bg-[#0078d4]/20 border border-[#0078d4]/30 flex items-center justify-center text-[#0078d4] shrink-0">
-              <CheckmarkCircle20Filled className="w-4 h-4" />
-            </div>
-            <div>
-              <div className="text-xs font-semibold text-white flex items-center gap-2">
-                <span>{selectedPaths.size} {t.common.files} selected</span>
-                <span className="text-[#0078d4] font-ibm-mono font-bold">
-                  ({formatBytes(totalSelectedBytes)})
-                </span>
-              </div>
-              <div className="text-[11px] text-[var(--text-secondary)] font-ibm-mono">
-                Ready to safely recycle to Windows Recycle Bin
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-            <WinUIButton
-              variant="standard"
-              onClick={handleDeselectAll}
-              disabled={batchTrashing}
-            >
-              <span>{t.common.deselectAll}</span>
-            </WinUIButton>
-
-            <WinUIButton
-              variant="danger"
-              onClick={() => {
-                if (confirmBeforeDelete) {
-                  setShowConfirmModal(true);
-                } else {
-                  handleBatchTrash();
-                }
-              }}
-              disabled={batchTrashing}
-              className="flex items-center gap-1.5"
-            >
-              {batchTrashing ? (
+        <ActionBar
+          summary={
+            <span>
+              <span className="font-semibold text-[var(--text-primary)]">
+                {fill(t.largeFiles.selectedSummary, {
+                  count: selectedPaths.size,
+                  size: formatBytes(totalSelectedBytes),
+                })}
+              </span>
+            </span>
+          }
+        >
+          <WinUIButton variant="standard" onClick={handleDeselectAll} disabled={batchTrashing}>
+            {t.common.deselectAll}
+          </WinUIButton>
+          <WinUIButton
+            variant="danger"
+            onClick={() => {
+              if (confirmBeforeDelete) {
+                setShowConfirmModal(true);
+              } else {
+                handleBatchTrash();
+              }
+            }}
+            disabled={batchTrashing}
+            icon={
+              batchTrashing ? (
                 <ArrowClockwise20Regular className="w-4 h-4 animate-spin" />
               ) : (
                 <Delete20Regular className="w-4 h-4" />
-              )}
-              <span>
-                {batchTrashing
-                  ? "Recycling..."
-                  : `Recycle Selected (${formatBytes(totalSelectedBytes)})`}
-              </span>
-            </WinUIButton>
-          </div>
-        </div>
+              )
+            }
+          >
+            {batchTrashing ? t.largeFiles.recycling : t.largeFiles.trashSelected}
+          </WinUIButton>
+        </ActionBar>
       )}
 
-      {/* Safety Confirmation Modal */}
+      {/* Safety confirmation */}
       {showConfirmModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fadeIn">
-          <WinUICard className="max-w-lg w-full p-5 space-y-4 shadow-2xl border border-rose-500/30">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fadeIn">
+          <Card className="max-w-lg w-full p-5 space-y-4 shadow-2xl">
             <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-[4px] bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 shrink-0">
+              <div className="w-10 h-10 rounded-lg bg-[color-mix(in_srgb,var(--danger)_14%,transparent)] flex items-center justify-center text-[var(--danger)] shrink-0">
                 <Delete20Regular className="w-5 h-5" />
               </div>
-              <div className="space-y-1">
-                <h3 className="text-sm font-semibold text-[var(--text-primary)]">
-                  Move {selectedPaths.size} large files to Recycle Bin?
+              <div className="space-y-1 min-w-0">
+                <h3 className="text-base font-semibold text-[var(--text-primary)]">
+                  {fill(t.largeFiles.confirmTitle, { count: selectedPaths.size })}
                 </h3>
-                <p className="text-xs text-[var(--text-secondary)]">
-                  A total of <span className="text-rose-400 font-bold font-ibm-mono">{formatBytes(totalSelectedBytes)}</span> will be freed. Files are safely moved to the Windows Recycle Bin and can be restored if needed.
+                <p className="text-sm text-[var(--text-secondary)]">
+                  {fill(t.largeFiles.confirmDesc, { size: formatBytes(totalSelectedBytes) })}
                 </p>
               </div>
             </div>
 
-            {/* Selected Items Preview */}
-            <div className="bg-black/30 border border-[var(--border-subtle)] rounded-[4px] p-2 max-h-48 overflow-y-auto space-y-1">
+            <div className="rounded-md border border-[var(--border-card)] bg-[var(--bg-input)] max-h-48 overflow-y-auto divide-y divide-[var(--border-divider)]">
               {selectedFilesList.slice(0, 10).map((f) => (
-                <div key={f.path} className="flex items-center justify-between text-xs py-1 px-2 hover:bg-white/[0.03] rounded-[3px]">
-                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                <div key={f.path} className="flex items-center justify-between gap-2 px-3 py-1.5 text-xs">
+                  <div className="flex items-center gap-2 min-w-0 flex-1 text-[var(--text-secondary)]">
                     {getCategoryIcon(f.category)}
-                    <span className="truncate font-ibm-mono text-[var(--text-primary)] text-[11px]">{f.name}</span>
+                    <span className="truncate text-[var(--text-primary)]" title={f.path}>
+                      {f.name}
+                    </span>
                   </div>
-                  <span className="font-ibm-mono font-semibold text-[var(--text-secondary)] text-[11px] shrink-0 ml-2">
-                    {formatBytes(f.size_bytes)}
-                  </span>
+                  <span className="font-ibm-mono text-[var(--text-secondary)] shrink-0">{formatBytes(f.size_bytes)}</span>
                 </div>
               ))}
               {selectedFilesList.length > 10 && (
-                <div className="text-[11px] text-[var(--text-muted)] text-center py-1 font-ibm-mono">
-                  + {selectedFilesList.length - 10} more files
+                <div className="text-xs text-[var(--text-muted)] text-center py-1.5">
+                  {fill(t.largeFiles.moreFiles, { count: selectedFilesList.length - 10 })}
                 </div>
               )}
             </div>
 
-            <div className="flex items-center justify-end gap-2.5 pt-2">
-              <WinUIButton
-                variant="standard"
-                onClick={() => setShowConfirmModal(false)}
-                disabled={batchTrashing}
-              >
-                <span>{t.common.cancel}</span>
+            <div className="flex items-center justify-end gap-2 pt-1">
+              <WinUIButton variant="standard" onClick={() => setShowConfirmModal(false)} disabled={batchTrashing}>
+                {t.common.cancel}
               </WinUIButton>
               <WinUIButton
                 variant="danger"
                 onClick={handleBatchTrash}
                 disabled={batchTrashing}
-                className="flex items-center gap-1.5"
+                icon={batchTrashing ? <ArrowClockwise20Regular className="w-4 h-4 animate-spin" /> : undefined}
               >
-                {batchTrashing && <ArrowClockwise20Regular className="w-3.5 h-3.5 animate-spin" />}
-                <span>{batchTrashing ? "Recycling..." : t.largeFiles.trashSelected}</span>
+                {batchTrashing ? t.largeFiles.recycling : t.largeFiles.trashSelected}
               </WinUIButton>
             </div>
-          </WinUICard>
+          </Card>
         </div>
       )}
-    </div>
+    </Page>
   );
 };
 
 export default LargeFilesPage;
+
+/** Live progress of a backend scan or disposal: bar, current path, file count, optional Cancel. */
+const ScanProgressCard: React.FC<{
+  scanType: string;
+  title: string;
+  subtitle?: string;
+  onCancel?: () => void;
+}> = ({ scanType, title, subtitle, onCancel }) => {
+  const { t } = useI18nStore();
+  const progress = useScanProgress(scanType);
+  const percent = Math.max(1, Math.min(100, progress.percent || 1));
+
+  const fmt = (bytes: number): string => {
+    if (!bytes) return "0 B";
+    const k = 1024;
+    const sizes = ["B", "KB", "MB", "GB", "TB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
+  };
+
+  return (
+    <Card className="space-y-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-sm font-semibold text-[var(--text-primary)]">{title}</div>
+          {subtitle && <div className="text-xs text-[var(--text-secondary)] mt-0.5 truncate" title={subtitle}>{subtitle}</div>}
+        </div>
+        <div className="flex items-center gap-3 shrink-0">
+          <span className="text-sm font-semibold font-ibm-mono tabular-nums">{percent}%</span>
+          {onCancel && (
+            <WinUIButton
+              variant="standard"
+              size="sm"
+              onClick={onCancel}
+              icon={<DismissCircle20Regular className="w-4 h-4" />}
+            >
+              {t.common.cancelScan}
+            </WinUIButton>
+          )}
+        </div>
+      </div>
+      <ProgressBar value={percent} />
+      <div className="flex items-center justify-between gap-3 text-xs text-[var(--text-muted)]">
+        <span className="font-code text-xs truncate min-w-0" title={progress.currentPath}>
+          {progress.currentPath || t.largeFiles.preparingScan}
+        </span>
+        <span className="shrink-0 tabular-nums">
+          {fill(t.largeFiles.itemsChecked, { count: progress.itemsScanned.toLocaleString() })}
+          {progress.bytesFound > 0 && ` · ${fill(t.largeFiles.bytesFound, { size: fmt(progress.bytesFound) })}`}
+        </span>
+      </div>
+    </Card>
+  );
+};

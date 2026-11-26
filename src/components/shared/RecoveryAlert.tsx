@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Warning20Filled, Dismiss16Regular } from "@fluentui/react-icons";
 import { invoke } from "@tauri-apps/api/core";
 import { useI18nStore } from "@/i18n";
+import { WinUIButton } from "@/components/winui/WinUIButton";
 
 interface RecoveryStatus {
   has_interrupted: boolean;
@@ -53,41 +54,32 @@ export const RecoveryAlert: React.FC<RecoveryAlertProps> = ({ onNavigateToHistor
   };
 
   return (
-    <div className="bg-amber-500/10 border-b border-amber-500/30 px-4 py-2 text-xs text-amber-300 backdrop-blur-md select-none font-sans">
-      <div className="max-w-5xl mx-auto flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <Warning20Filled className="w-4 h-4 text-amber-400 shrink-0" />
-          <span>
-            The previous cleanup session was interrupted unexpectedly.{" "}
-            <span className="font-semibold text-amber-100 font-ibm-mono">
+    <div className="px-4 pt-3 select-none font-sans">
+      <div className="rounded-lg border border-[var(--border-card)] bg-[color-mix(in_srgb,var(--brand-amber)_10%,var(--bg-card))] px-3 py-2 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5 min-w-0 text-sm text-[var(--text-primary)]">
+          <Warning20Filled className="w-4 h-4 text-[var(--brand-amber)] shrink-0" />
+          <span className="truncate">
+            {t.layout.recoveryMessage}{" "}
+            <span className="font-semibold font-ibm-mono">
               {status.interrupted_count} {t.cleanup.itemsSelected}.
             </span>
           </span>
-          <button
-            onClick={handleRestoreNow}
-            className="bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-500/30 px-2 py-0.5 rounded text-[11px] cursor-pointer ml-1 transition-colors"
-          >
-            Review & Restore
-          </button>
-          <button
-            onClick={onNavigateToHistory}
-            className="text-amber-300 hover:text-amber-100 underline text-xs ml-1 cursor-pointer"
-          >
-            [{t.history.title}]
-          </button>
         </div>
 
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleDismiss}
-            className="text-amber-400 hover:text-amber-200 text-xs px-2 py-1 cursor-pointer transition-colors"
-          >
+        <div className="flex items-center gap-1.5 shrink-0">
+          <WinUIButton variant="standard" size="sm" onClick={handleRestoreNow}>
+            {t.layout.recoveryRestore}
+          </WinUIButton>
+          <WinUIButton variant="subtle" size="sm" onClick={onNavigateToHistory}>
+            {t.history.title}
+          </WinUIButton>
+          <WinUIButton variant="subtle" size="sm" onClick={handleDismiss}>
             {t.common.dismiss}
-          </button>
+          </WinUIButton>
           <button
             onClick={handleDismiss}
             aria-label="Close recovery banner"
-            className="text-amber-400 hover:text-amber-200 p-1 rounded-lg hover:bg-white/[0.08] cursor-pointer transition-colors"
+            className="w-7 h-7 flex items-center justify-center rounded-md text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--fill-subtle)] transition-colors cursor-pointer"
           >
             <Dismiss16Regular className="w-4 h-4" />
           </button>

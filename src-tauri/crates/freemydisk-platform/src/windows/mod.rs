@@ -2,6 +2,7 @@ pub mod applications;
 pub mod maintenance;
 pub mod optimization;
 pub mod privacy;
+pub mod recycle_bin;
 pub mod restart_manager;
 pub mod startup;
 pub mod usn_scan;

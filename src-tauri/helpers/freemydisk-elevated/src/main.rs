@@ -155,6 +155,26 @@ fn handle_request(req: ElevatedRequest, expected_token: Option<&str>) -> Elevate
             }
         }
 
+        "empty_user_recycle_bin" => {
+            // Payload: the SID of the user whose Recycle Bin is emptied. Only
+            // <drive>:\$Recycle.Bin\<SID>\ is touched; desktop.ini is kept.
+            let sid = req.payload.trim();
+            if !is_valid_user_sid(sid) {
+                return ElevatedResponse {
+                    success: false,
+                    message: "Invalid user SID".to_string(),
+                };
+            }
+            let (deleted, failed) = empty_user_bins(sid);
+            ElevatedResponse {
+                success: failed == 0,
+                message: format!(
+                    "Removed {} Recycle Bin entries; {} could not be removed.",
+                    deleted, failed
+                ),
+            }
+        }
+
         "clean_windows_temp" => {
             let mut deleted = 0;
             if let Ok(windir) = std::env::var("WINDIR") {
@@ -680,6 +700,53 @@ fn decode_hex(hex: &str) -> Result<Vec<u8>, String> {
         .collect()
 }
 
+/// True for a user account SID such as `S-1-5-21-111-222-333-1001`: only
+/// digits and dashes, so it can never form `..` or another path.
+fn is_valid_user_sid(sid: &str) -> bool {
+    let mut parts = sid.split('-');
+    parts.next() == Some("S")
+        && sid.len() <= 184
+        && sid.starts_with("S-1-5-21-")
+        && parts.all(|p| !p.is_empty() && p.bytes().all(|b| b.is_ascii_digit()))
+}
+
+/// Deletes every entry in `<drive>:\$Recycle.Bin\<sid>\` on all drives except
+/// the top-level desktop.ini. `remove_dir_all` removes links inside the bin
+/// without following them. Returns (removed, failed) entry counts.
+fn empty_user_bins(sid: &str) -> (u64, u64) {
+    let (mut removed, mut failed) = (0u64, 0u64);
+    for letter in b'A'..=b'Z' {
+        let bin = PathBuf::from(format!("{}:\\$Recycle.Bin\\{}", letter as char, sid));
+        let Ok(entries) = std::fs::read_dir(&bin) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            let name = entry.file_name();
+            if name.to_string_lossy().eq_ignore_ascii_case("desktop.ini") {
+                continue;
+            }
+            let path = entry.path();
+            let is_dir = entry
+                .file_type()
+                .map(|t| t.is_dir() && !t.is_symlink())
+                .unwrap_or(false);
+            let ok = if is_dir {
+                std::fs::remove_dir_all(&path).is_ok()
+            } else {
+                std::fs::remove_file(&path)
+                    .or_else(|_| std::fs::remove_dir(&path))
+                    .is_ok()
+            };
+            if ok {
+                removed += 1;
+            } else {
+                failed += 1;
+            }
+        }
+    }
+    (removed, failed)
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().collect();
 
@@ -741,5 +808,22 @@ fn main() {
                 let _ = io::stdout().write_all(json.as_bytes());
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod sid_tests {
+    use super::is_valid_user_sid;
+
+    #[test]
+    fn only_plain_user_sids_are_accepted() {
+        assert!(is_valid_user_sid(
+            "S-1-5-21-2105648121-1751983684-3216264173-1001"
+        ));
+        assert!(!is_valid_user_sid("S-1-5-18"));
+        assert!(!is_valid_user_sid("S-1-5-21-1-2-3-1001\\..\\.."));
+        assert!(!is_valid_user_sid("S-1-5-21-1-2-3-1001/x"));
+        assert!(!is_valid_user_sid("S-1-5-21--1001"));
+        assert!(!is_valid_user_sid(""));
     }
 }

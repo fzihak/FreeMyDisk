@@ -1,6 +1,9 @@
 import { Component, ErrorInfo, ReactNode } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Warning24Filled, ArrowClockwise20Regular, Copy20Regular, History20Regular } from "@fluentui/react-icons";
+import { useI18nStore } from "@/i18n";
+import { Card } from "@/components/ui";
+import { WinUIButton } from "@/components/winui/WinUIButton";
 
 interface Props {
   children: ReactNode;
@@ -66,49 +69,36 @@ export class GlobalErrorBoundary extends Component<Props, State> {
 
   public render() {
     if (this.state.hasError) {
+      const { t } = useI18nStore.getState();
       return (
-        <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-6 font-sans select-none">
-          <div className="max-w-xl w-full bg-slate-900 border border-amber-500/30 rounded-2xl p-6 shadow-2xl backdrop-blur-xl">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shrink-0">
-                <Warning24Filled className="text-amber-400 w-6 h-6" />
+        <div className="min-h-screen bg-[var(--bg-page)] text-[var(--text-primary)] flex items-center justify-center p-6 font-sans select-none">
+          <Card className="max-w-xl w-full p-6 space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-lg bg-[color-mix(in_srgb,var(--brand-amber)_14%,transparent)] flex items-center justify-center text-[var(--brand-amber)] shrink-0">
+                <Warning24Filled className="w-5 h-5" />
               </div>
-              <div>
-                <h2 className="text-lg font-semibold text-slate-100">FreeMyDisk Interface Interrupted</h2>
-                <p className="text-xs text-slate-400">An unexpected interface error occurred. Your system files and session data remain safe.</p>
+              <div className="min-w-0">
+                <h2 className="text-base font-semibold text-[var(--text-primary)]">{t.layout.globalErrorTitle}</h2>
+                <p className="text-sm text-[var(--text-secondary)] mt-0.5">{t.layout.globalErrorDesc}</p>
               </div>
             </div>
 
-            <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-3 mb-5 font-mono text-xs text-amber-200/90 overflow-x-auto max-h-36">
+            <div className="rounded-md border border-[var(--border-card)] bg-[var(--bg-input)] p-3 font-code text-xs text-[var(--danger)] overflow-x-auto max-h-36 select-text">
               {this.state.error?.toString()}
             </div>
 
-            <div className="flex flex-wrap items-center gap-2.5">
-              <button
-                onClick={this.handleReload}
-                className="flex-1 min-w-[140px] flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-medium text-xs py-2.5 px-4 rounded-xl transition-colors cursor-pointer shadow-sm"
-              >
-                <ArrowClockwise20Regular className="w-4 h-4" />
-                Reload Interface
-              </button>
-
-              <button
-                onClick={this.handleUndoCleanups}
-                className="flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-amber-200 text-xs py-2.5 px-4 rounded-xl transition-colors cursor-pointer"
-              >
-                <History20Regular className="w-4 h-4" />
-                Undo Recent Cleanups
-              </button>
-
-              <button
-                onClick={this.handleCopyDiagnostic}
-                className="flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs py-2.5 px-4 rounded-xl transition-colors cursor-pointer"
-              >
-                <Copy20Regular className="w-4 h-4" />
-                {this.state.copied ? "Copied" : "Export Diagnostic"}
-              </button>
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <WinUIButton variant="standard" onClick={this.handleCopyDiagnostic} icon={<Copy20Regular className="w-4 h-4" />}>
+                {this.state.copied ? t.layout.copied : t.layout.exportDiagnostic}
+              </WinUIButton>
+              <WinUIButton variant="standard" onClick={this.handleUndoCleanups} icon={<History20Regular className="w-4 h-4" />}>
+                {t.layout.undoRecent}
+              </WinUIButton>
+              <WinUIButton variant="primary" onClick={this.handleReload} icon={<ArrowClockwise20Regular className="w-4 h-4" />}>
+                {t.layout.reload}
+              </WinUIButton>
             </div>
-          </div>
+          </Card>
         </div>
       );
     }

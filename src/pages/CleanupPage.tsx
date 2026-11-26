@@ -7,7 +7,7 @@ import { toast } from "@/stores/toast-store";
 import {
   Delete24Filled,
   Delete20Regular,
-  CheckmarkCircle24Filled,
+  CheckmarkCircle20Filled,
   ArrowClockwise20Regular,
   Folder20Regular,
   FolderOpen16Regular,
@@ -16,20 +16,27 @@ import {
   ChevronRight16Regular,
   Warning20Filled,
   Filter20Regular,
-  CheckboxChecked20Filled,
-  CheckboxUnchecked20Regular,
-  Sparkle20Filled,
-  DismissCircle20Regular,
+  CheckboxChecked20Regular,
+  Sparkle20Regular,
   Code20Regular,
+  Broom20Regular,
+  LockClosed20Regular,
+  LockClosed16Regular,
+  LockOpen16Regular,
+  Dismiss16Regular,
 } from "@fluentui/react-icons";
-import { WinUICard } from "@/components/winui/WinUICard";
 import { WinUIButton } from "@/components/winui/WinUIButton";
+import { Page, PageHeader, Card, StatCard, Badge, riskTone, FilterTabs, ActionBar } from "@/components/ui";
 import { LiveScanProgressWidget } from "@/components/shared/LiveScanProgressWidget";
 import { ProjectArtifactsView } from "@/components/cleanup/ProjectArtifactsView";
 import { AiAndToolchainsView } from "@/components/cleanup/AiAndToolchainsView";
 import { useCleanupScanStore } from "@/stores/cleanup-scan-store";
 import type { RuleScanSummary } from "@/types/cleanup";
 import { describeDisposal } from "@/utils/disposal";
+
+/** Fills `{name}` placeholders in a translated string. */
+const fill = (template: string, vars: Record<string, string | number>): string =>
+  template.replace(/\{(\w+)\}/g, (m, k: string) => (k in vars ? String(vars[k]) : m));
 
 interface DisposalItemResult {
   path: string;
@@ -305,91 +312,103 @@ export const CleanupPage: React.FC = () => {
     )
   );
 
+  const rulesWithData = summaries.filter((r) => r.candidates.length > 0 || r.total_bytes > 0).length;
+  const totalCleanableBytes = summaries.reduce((acc, r) => acc + r.total_bytes, 0);
+  const lockedRuleCount = summaries.filter((r) => r.is_locked_by_process).length;
+
+  const riskLabel = (risk: string) =>
+    risk === "safe" ? t.cleanup.riskSafe : risk === "low" ? t.cleanup.riskLow : t.cleanup.riskCache;
+
+  const openConfirmOrClean = () => {
+    if (confirmBeforeDelete) {
+      setShowConfirmModal(true);
+    } else {
+      handleExecuteCleanup();
+    }
+  };
+
+  const cleanLabel = (emptyLabel: string) =>
+    cleaning
+      ? t.common.cleaning
+      : selectedRuleIds.size === 0
+      ? emptyLabel
+      : totalSelectedBytes === 0
+      ? t.cleanup.cleanNow
+      : `${t.cleanup.cleanNow} (${formatBytes(totalSelectedBytes)})`;
+
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-4 select-none font-sans text-[var(--text-primary)] pb-24">
-      {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-[4px] bg-white/[0.04] border border-[var(--border-subtle)] flex items-center justify-center text-[#0078d4] shrink-0">
-            <Delete24Filled className="w-6 h-6" />
-          </div>
-          <div>
-            <h1 className="text-xl font-semibold text-[var(--text-primary)] tracking-tight">
-              {t.cleanup.title}
-            </h1>
-            <p className="text-xs text-[var(--text-secondary)] mt-0.5">
-              {t.cleanup.subtitle}{" "}
-              <span className={alwaysTrashOverride ? "" : "text-amber-400"}>
-                {alwaysTrashOverride ? t.cleanup.routeRecycleBinNote : t.cleanup.routePermanentNote}
-              </span>
-            </p>
-          </div>
-        </div>
+    <Page className="select-none">
+      <PageHeader
+        icon={<Delete24Filled />}
+        title={t.cleanup.title}
+        description={
+          <>
+            {t.cleanup.subtitle}{" "}
+            <span className={alwaysTrashOverride ? "" : "text-[var(--brand-amber)]"}>
+              {alwaysTrashOverride ? t.cleanup.routeRecycleBinNote : t.cleanup.routePermanentNote}
+            </span>
+          </>
+        }
+        actions={
+          mainTab === "system" && (
+            <>
+              <WinUIButton
+                variant="standard"
+                onClick={handleScan}
+                disabled={scanning || cleaning}
+                icon={<ArrowClockwise20Regular className={`w-4 h-4 ${scanning ? "animate-spin" : ""}`} />}
+              >
+                {scanning ? t.common.scanning : t.cleanup.rescan}
+              </WinUIButton>
+              <WinUIButton
+                variant="primary"
+                onClick={openConfirmOrClean}
+                disabled={selectedRuleIds.size === 0 || cleaning || scanning}
+                icon={<Delete20Regular className="w-4 h-4" />}
+              >
+                {cleanLabel(t.cleanup.selectToClean)}
+              </WinUIButton>
+            </>
+          )
+        }
+      />
 
-        {mainTab === "system" && (
-          <div className="flex items-center gap-2 shrink-0">
-            <WinUIButton
-              variant="standard"
-              onClick={handleScan}
-              disabled={scanning || cleaning}
-              icon={<ArrowClockwise20Regular className={`w-3.5 h-3.5 ${scanning ? "animate-spin" : ""}`} />}
-            >
-              {scanning ? t.common.scanning : t.cleanup.rescan}
-            </WinUIButton>
-            <WinUIButton
-              variant="primary"
-              onClick={handleExecuteCleanup}
-              disabled={selectedRuleIds.size === 0 || cleaning || scanning}
-              icon={<Delete20Regular className="w-3.5 h-3.5" />}
-            >
-              {cleaning
-                ? t.common.cleaning
-                : selectedRuleIds.size === 0
-                ? t.cleanup.selectToClean
-                : totalSelectedBytes === 0
-                ? t.cleanup.cleanNow
-                : `${t.cleanup.cleanNow} (${formatBytes(totalSelectedBytes)})`}
-            </WinUIButton>
-          </div>
-        )}
-      </div>
-
-      {/* Primary Section Switcher: System Cleaners vs Developer Projects vs AI & Toolchains */}
-      <div className="flex flex-wrap items-center gap-2 border-b border-[var(--border-subtle)] pb-2">
-        <button
-          onClick={() => setMainTab("system")}
-          className={`px-3.5 py-1.5 text-xs font-semibold rounded-[4px] transition-all cursor-pointer flex items-center gap-1.5 ${
-            mainTab === "system"
-              ? "bg-[#0078d4] text-white shadow-xs"
-              : "bg-white/[0.04] text-[var(--text-secondary)] hover:text-white border border-[var(--border-subtle)]"
-          }`}
-        >
-          <Delete20Regular className="w-3.5 h-3.5" />
-          <span>{t.cleanup.tabSystemCleaners} ({summaries.length})</span>
-        </button>
-        <button
-          onClick={() => setMainTab("projects")}
-          className={`px-3.5 py-1.5 text-xs font-semibold rounded-[4px] transition-all cursor-pointer flex items-center gap-1.5 ${
-            mainTab === "projects"
-              ? "bg-[#0078d4] text-white shadow-xs"
-              : "bg-white/[0.04] text-[var(--text-secondary)] hover:text-white border border-[var(--border-subtle)]"
-          }`}
-        >
-          <Code20Regular className="w-3.5 h-3.5" />
-          <span>{t.cleanup.tabDeveloperProjects}</span>
-        </button>
-        <button
-          onClick={() => setMainTab("aiAndToolchains")}
-          className={`px-3.5 py-1.5 text-xs font-semibold rounded-[4px] transition-all cursor-pointer flex items-center gap-1.5 ${
-            mainTab === "aiAndToolchains"
-              ? "bg-[#0078d4] text-white shadow-xs"
-              : "bg-white/[0.04] text-[var(--text-secondary)] hover:text-white border border-[var(--border-subtle)]"
-          }`}
-        >
-          <Sparkle20Filled className="w-3.5 h-3.5" />
-          <span>{t.cleanup.tabAiAndToolchains}</span>
-        </button>
-      </div>
+      {/* Primary section switcher: System Cleaners / Developer Projects / AI & Toolchains */}
+      <FilterTabs
+        items={[
+          {
+            id: "system",
+            label: (
+              <>
+                <Delete20Regular className="w-4 h-4" />
+                {t.cleanup.tabSystemCleaners}
+              </>
+            ),
+            count: summaries.length,
+          },
+          {
+            id: "projects",
+            label: (
+              <>
+                <Code20Regular className="w-4 h-4" />
+                {t.cleanup.tabDeveloperProjects}
+              </>
+            ),
+          },
+          {
+            id: "aiAndToolchains",
+            label: (
+              <>
+                <Sparkle20Regular className="w-4 h-4" />
+                {t.cleanup.tabAiAndToolchains}
+              </>
+            ),
+          },
+        ]}
+        value={mainTab}
+        onChange={setMainTab}
+        className="border-b border-[var(--border-divider)] pb-3"
+      />
 
       {mainTab === "projects" ? (
         <ProjectArtifactsView />
@@ -397,401 +416,358 @@ export const CleanupPage: React.FC = () => {
         <AiAndToolchainsView />
       ) : (
         <>
-          {/* Recent Cleanup Completion Banner */}
-      {lastDisposal && (
-        <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-3 flex items-center justify-between gap-3 text-xs animate-fadeIn">
-          <div className="flex items-center gap-2.5 text-emerald-400">
-            <CheckmarkCircle24Filled className="w-5 h-5 text-emerald-400 shrink-0" />
-            <span>
-              <strong>{t.cleanup.cleanComplete}:</strong> {describeDisposal(lastDisposal, t, formatBytes)} ({lastDisposal.successful_items} {t.common.files}).
-            </span>
+          {/* Stat row */}
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <StatCard
+              label={t.cleanup.statTotalCleanable}
+              value={formatBytes(totalCleanableBytes)}
+              hint={fill(t.cleanup.statRulesHint, { count: summaries.length })}
+              icon={<Broom20Regular />}
+            />
+            <StatCard
+              label={t.cleanup.statSelected}
+              value={formatBytes(totalSelectedBytes)}
+              tone={selectedRuleIds.size > 0 ? "accent" : "neutral"}
+              hint={fill(t.cleanup.statSelectedHint, {
+                count: selectedRuleIds.size,
+                files: totalSelectedItems.toLocaleString(),
+              })}
+              icon={<CheckboxChecked20Regular />}
+            />
+            <StatCard
+              label={t.cleanup.statRulesWithData}
+              value={rulesWithData}
+              hint={fill(t.cleanup.statRulesWithDataHint, { total: summaries.length })}
+              icon={<Filter20Regular />}
+            />
+            <StatCard
+              label={t.cleanup.statNeedsAttention}
+              value={lockedRuleCount}
+              tone={lockedRuleCount > 0 ? "warning" : "neutral"}
+              hint={lockedRuleCount > 0 ? t.cleanup.statNeedsAttentionHint : t.cleanup.statAllClear}
+              icon={<LockClosed20Regular />}
+            />
           </div>
-          <button
-            onClick={() => setLastDisposal(null)}
-            className="text-[var(--text-muted)] hover:text-[var(--text-primary)] px-2 py-0.5 rounded cursor-pointer transition-colors text-xs"
-          >
-            ✕
-          </button>
-        </div>
-      )}
 
-      {/* Active Applications Warning & 1-Click Unlock Banner */}
-      {lockedActiveApps.length > 0 && (
-        <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs animate-fadeIn">
-          <div className="flex items-center gap-2 text-amber-300">
-            <Warning20Filled className="w-4 h-4 text-amber-400 shrink-0" />
-            <span>
-              <strong>{lockedActiveApps.length} active application(s)</strong> ({lockedActiveApps.join(", ")}) are currently locking cache directories. Close them for complete cleaning.
-            </span>
-          </div>
-          <button
-            onClick={handleCloseAllLockingProcesses}
-            className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-black font-semibold rounded-[4px] cursor-pointer transition-colors shrink-0 text-xs shadow-sm"
-          >
-            Close All & Unlock Cache
-          </button>
-        </div>
-      )}
-
-      {/* Category Filter Pills & Mode Selection */}
-      <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-        <div className="flex items-center gap-1.5 min-w-0 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden py-0.5">
-          <Filter20Regular className="w-3.5 h-3.5 text-[var(--text-muted)] mr-1 shrink-0" />
-          {categories.map((cat) => (
-            <button
-              key={cat}
-              onClick={() => setActiveCategory(cat)}
-              className={`h-7 px-3 text-xs rounded-[4px] transition-all cursor-pointer ${
-                activeCategory === cat
-                  ? "bg-[#0078d4] text-white font-semibold shadow-sm"
-                  : "bg-white/[0.04] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border-subtle)]"
-              }`}
-            >
-              {getCategoryLabel(cat)}
-            </button>
-          ))}
-        </div>
-
-        <div className="flex items-center gap-2 text-xs">
-          <button
-            onClick={selectSmart}
-            className="text-[var(--text-secondary)] hover:text-[#0078d4] transition-colors flex items-center gap-1.5 cursor-pointer font-medium px-2 py-1 rounded-[4px] hover:bg-white/[0.04]"
-          >
-            <Sparkle20Filled className="w-3.5 h-3.5 text-[#0078d4]" />
-            <span>{t.cleanup.smartSelect}</span>
-          </button>
-          <span className="text-[var(--border-divider)]">•</span>
-          <button
-            onClick={selectAll}
-            className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer font-medium px-2 py-1 rounded-[4px] hover:bg-white/[0.04]"
-          >
-            {t.cleanup.selectAll}
-          </button>
-          <span className="text-[var(--border-divider)]">•</span>
-          <button
-            onClick={clearSelection}
-            className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer font-medium px-2 py-1 rounded-[4px] hover:bg-white/[0.04]"
-          >
-            {t.cleanup.clear}
-          </button>
-        </div>
-      </div>
-
-      {/* Disposal Summary Banner if completed */}
-      {lastDisposal && (
-        <WinUICard className="p-4 space-y-3 animate-fadeIn">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-emerald-400 font-semibold text-sm">
-              <CheckmarkCircle24Filled className="w-4 h-4 text-emerald-400" />
-              <span>{t.cleanup.cleanComplete}</span>
-            </div>
-            <div className="text-[11px] text-[var(--text-muted)] font-ibm-mono">
-              Session: {lastDisposal.session_id.substring(0, 8)}...
-            </div>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 font-ibm-mono">
-            <div className="p-2.5 bg-black/20 rounded-[4px] border border-[var(--border-subtle)]">
-              <div className="text-[11px] text-[var(--text-muted)] font-sans">{t.cleanup.reclaimedSpace}</div>
-              <div className="text-lg font-bold text-emerald-400 mt-0.5 tabular-nums">
-                {formatBytes(lastDisposal.total_freed_bytes)}
-              </div>
-            </div>
-            <div className="p-2.5 bg-black/20 rounded-[4px] border border-[var(--border-subtle)]">
-              <div className="text-[11px] text-[var(--text-muted)] font-sans">{t.cleanup.movedToRecycleBin}</div>
-              <div className="text-lg font-bold text-[var(--text-primary)] mt-0.5 tabular-nums">
-                {formatBytes(lastDisposal.recycled_bytes ?? 0)}
-              </div>
-            </div>
-            <div className="p-2.5 bg-black/20 rounded-[4px] border border-[var(--border-subtle)]">
-              <div className="text-[11px] text-[var(--text-muted)] font-sans">{t.cleanup.filesCleaned}</div>
-              <div className="text-lg font-bold text-[var(--text-primary)] mt-0.5 tabular-nums">
-                {lastDisposal.successful_items} / {lastDisposal.total_requested_items}
-              </div>
-            </div>
-            <div className="p-2.5 bg-black/20 rounded-[4px] border border-[var(--border-subtle)]">
-              <div className="text-[11px] text-[var(--text-muted)] font-sans">{t.cleanup.failedTrash}</div>
-              <div
-                className={`text-lg font-bold mt-0.5 tabular-nums ${
-                  lastDisposal.failed_items > 0 ? "text-amber-400" : "text-emerald-400"
-                }`}
-              >
-                {lastDisposal.failed_items}
-              </div>
-            </div>
-          </div>
-        </WinUICard>
-      )}
-
-      {/* Rules Dense Inspection List */}
-      <WinUICard>
-        {scanning ? (
-          <div className="p-4">
-            <LiveScanProgressWidget scanType="cleanup" title={t.cleanup.scanningFiles} />
-          </div>
-        ) : cleaning ? (
-          <div className="p-4">
-            <LiveScanProgressWidget scanType="disposal" title={t.common.cleaning} showCancel={false} />
-          </div>
-        ) : filteredSummaries.length === 0 ? (
-          <div className="p-10 text-center space-y-1.5">
-            <CheckmarkCircle24Filled className="w-6 h-6 text-emerald-400 mx-auto" />
-            <h3 className="font-semibold text-[var(--text-primary)] text-sm">{t.cleanup.allCleanTitle}</h3>
-            <p className="text-xs text-[var(--text-secondary)]">{t.cleanup.allCleanDesc}</p>
-          </div>
-        ) : (
-          filteredSummaries.map((rule) => {
-            const isSelected = selectedRuleIds.has(rule.rule_id);
-            const isExpanded = expandedRules.has(rule.rule_id);
-            const hasCandidates = rule.candidates.length > 0 || rule.total_bytes > 0;
-
-            return (
-              <div key={rule.rule_id} className="border-t border-[var(--border-divider)] first:border-t-0">
-                {/* Rule Item Row */}
-                <div className="px-4 py-3 flex items-center justify-between gap-3 hover:bg-white/[0.02] transition-colors">
-                  <div className="flex items-center gap-3 min-w-0 flex-1">
-                    <button
-                      onClick={() => toggleSelectRule(rule.rule_id)}
-                      disabled={!hasCandidates}
-                      className="text-[var(--text-muted)] hover:text-[#0078d4] transition-colors disabled:opacity-30 cursor-pointer p-0.5"
-                    >
-                      {isSelected ? (
-                        <CheckboxChecked20Filled className="w-5 h-5 text-[#0078d4]" />
-                      ) : (
-                        <CheckboxUnchecked20Regular className="w-5 h-5 text-[var(--text-muted)]" />
-                      )}
-                    </button>
-
-                    <button
-                      onClick={() => toggleExpandRule(rule.rule_id)}
-                      className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors cursor-pointer p-0.5"
-                    >
-                      {isExpanded ? (
-                        <ChevronDown16Regular className="w-4 h-4 text-[#0078d4]" />
-                      ) : (
-                        <ChevronRight16Regular className="w-4 h-4" />
-                      )}
-                    </button>
-
-                    <div
-                      className="min-w-0 flex-1 cursor-pointer"
-                      onClick={() => toggleExpandRule(rule.rule_id)}
-                    >
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-semibold text-[var(--text-primary)] text-[13px] tracking-tight truncate">
-                          {rule.rule_name}
-                        </span>
-                        <span className="px-1.5 py-0.2 rounded-[4px] text-[10px] font-medium border bg-white/[0.04] border-[var(--border-subtle)] text-[var(--text-secondary)]">
-                          {getCategoryLabel(rule.category)}
-                        </span>
-                        <span
-                          className={`px-1.5 py-0.2 rounded-[4px] text-[9px] font-semibold ${
-                            rule.risk === "safe"
-                              ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                              : rule.risk === "low"
-                              ? "bg-blue-500/10 text-blue-400 border border-blue-500/20"
-                              : "bg-amber-500/10 text-amber-400 border border-amber-500/20"
-                          }`}
-                        >
-                          {rule.risk === "safe" ? t.cleanup.safeToClean : rule.risk === "low" ? t.cleanup.lowRisk : t.cleanup.devBuildCache}
-                        </span>
-                        {rule.is_locked_by_process && (
-                          <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-[4px] text-[9px] font-semibold bg-amber-500/15 text-amber-400 border border-amber-500/30">
-                            <DismissCircle20Regular className="w-2.5 h-2.5 text-amber-400 inline" />
-                            App Active ({rule.locking_process_name})
-                          </span>
-                        )}
-                        {rule.is_locked_by_process && rule.locking_process_name && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleCloseProcess(rule.locking_process_name!);
-                            }}
-                            className="px-2 py-0.5 text-[9px] font-semibold rounded-[4px] bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 cursor-pointer transition-colors"
-                            title={`Close ${rule.locking_process_name} to unlock cache`}
-                          >
-                            Close App & Unlock
-                          </button>
-                        )}
-                      </div>
-                      <p className="text-[11px] text-[var(--text-muted)] truncate mt-0.5">
-                        {rule.default_action === "trash" ? t.cleanup.routesRecycleBin : t.cleanup.safeCleanupAction}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Size & Items */}
-                  <div className="flex items-center gap-3 shrink-0 font-ibm-mono text-right tabular-nums">
-                    <div>
-                      <div className="text-xs font-semibold text-[var(--text-primary)]">
-                        {formatBytes(rule.total_bytes)}
-                      </div>
-                      <div className="text-[10px] text-[var(--text-muted)]">
-                        {rule.total_items} {t.common.items}
-                      </div>
+          {/* Result of the last cleanup */}
+          {lastDisposal && (
+            <Card className="space-y-3 animate-fadeIn">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start gap-2.5 min-w-0">
+                  <CheckmarkCircle20Filled className="w-5 h-5 text-[var(--success)] shrink-0" />
+                  <div className="min-w-0">
+                    <div className="text-sm font-semibold text-[var(--text-primary)]">{t.cleanup.cleanComplete}</div>
+                    <div className="text-sm text-[var(--text-secondary)]">
+                      {describeDisposal(lastDisposal, t, formatBytes)} ({lastDisposal.successful_items} {t.common.files}).
                     </div>
                   </div>
                 </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-xs text-[var(--text-muted)] font-ibm-mono">
+                    {fill(t.cleanup.session, { id: `${lastDisposal.session_id.substring(0, 8)}…` })}
+                  </span>
+                  <WinUIButton variant="subtle" size="sm" onClick={() => setLastDisposal(null)} title={t.common.dismiss}>
+                    <Dismiss16Regular className="w-4 h-4" />
+                  </WinUIButton>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {[
+                  { label: t.cleanup.reclaimedSpace, value: formatBytes(lastDisposal.total_freed_bytes), cls: "text-[var(--success)]" },
+                  { label: t.cleanup.movedToRecycleBin, value: formatBytes(lastDisposal.recycled_bytes ?? 0), cls: "text-[var(--text-primary)]" },
+                  {
+                    label: t.cleanup.filesCleaned,
+                    value: `${lastDisposal.successful_items} / ${lastDisposal.total_requested_items}`,
+                    cls: "text-[var(--text-primary)]",
+                  },
+                  {
+                    label: t.cleanup.failedTrash,
+                    value: String(lastDisposal.failed_items),
+                    cls: lastDisposal.failed_items > 0 ? "text-[var(--brand-amber)]" : "text-[var(--success)]",
+                  },
+                ].map((s) => (
+                  <div key={s.label} className="px-3 py-2 rounded-md bg-[var(--fill-subtle)]">
+                    <div className="text-xs text-[var(--text-secondary)]">{s.label}</div>
+                    <div className={`text-base font-semibold font-ibm-mono tabular-nums mt-0.5 ${s.cls}`}>{s.value}</div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
 
-                {/* Candidate Sub-list if expanded */}
-                {isExpanded && (
-                  <div className="border-t border-[var(--border-divider)] bg-black/20 p-3 space-y-1.5 max-h-60 overflow-y-auto scrollbar-thin">
-                    <div className="flex items-center justify-between text-[10px] font-ibm-mono text-[var(--text-muted)] uppercase mb-1">
-                      <span>{t.cleanup.matchingFiles} ({rule.candidates.length > 0 ? rule.candidates.length : rule.total_items})</span>
-                      {rule.total_items > rule.candidates.length && rule.candidates.length > 0 && (
-                        <span className="text-[#0078d4] normal-case font-ibm-mono">
-                          {t.cleanup.previewNotice} ({rule.candidates.length}/{rule.total_items})
-                        </span>
+          {/* Apps locking cache folders */}
+          {lockedActiveApps.length > 0 && (
+            <Card className="py-3 border-[color-mix(in_srgb,var(--brand-amber)_45%,transparent)] bg-[color-mix(in_srgb,var(--brand-amber)_8%,var(--bg-card))] flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-fadeIn">
+              <div className="flex items-start gap-2.5 text-sm text-[var(--text-primary)] min-w-0">
+                <Warning20Filled className="w-5 h-5 text-[var(--brand-amber)] shrink-0" />
+                <span>
+                  {fill(t.cleanup.lockedAppsWarning, {
+                    count: lockedActiveApps.length,
+                    apps: lockedActiveApps.join(", "),
+                  })}
+                </span>
+              </div>
+              <WinUIButton
+                variant="standard"
+                size="sm"
+                onClick={handleCloseAllLockingProcesses}
+                icon={<LockOpen16Regular className="w-4 h-4" />}
+                className="shrink-0"
+              >
+                {t.cleanup.closeAllUnlock}
+              </WinUIButton>
+            </Card>
+          )}
+
+          {/* Category filter + selection shortcuts */}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <FilterTabs
+              items={categories.map((cat) => ({ id: cat, label: getCategoryLabel(cat) }))}
+              value={activeCategory}
+              onChange={setActiveCategory}
+              className="min-w-0"
+            />
+            <div className="flex items-center gap-1 shrink-0">
+              <WinUIButton
+                variant="subtle"
+                size="sm"
+                onClick={selectSmart}
+                icon={<Sparkle20Regular className="w-4 h-4 text-[var(--accent-text)]" />}
+              >
+                {t.cleanup.smartSelect}
+              </WinUIButton>
+              <WinUIButton variant="subtle" size="sm" onClick={selectAll}>
+                {t.cleanup.selectAll}
+              </WinUIButton>
+              <WinUIButton variant="subtle" size="sm" onClick={clearSelection}>
+                {t.cleanup.clear}
+              </WinUIButton>
+            </div>
+          </div>
+
+          {/* Rule list */}
+          <Card padded={false} className="overflow-hidden">
+            {scanning ? (
+              <div className="p-4">
+                <LiveScanProgressWidget scanType="cleanup" title={t.cleanup.scanningFiles} />
+              </div>
+            ) : cleaning ? (
+              <div className="p-4">
+                <LiveScanProgressWidget scanType="disposal" title={t.common.cleaning} showCancel={false} />
+              </div>
+            ) : filteredSummaries.length === 0 ? (
+              <div className="py-12 px-4 text-center space-y-1.5">
+                <CheckmarkCircle20Filled className="w-8 h-8 text-[var(--success)] mx-auto" />
+                <h3 className="font-semibold text-[var(--text-primary)] text-base">{t.cleanup.allCleanTitle}</h3>
+                <p className="text-sm text-[var(--text-secondary)]">{t.cleanup.allCleanDesc}</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-[var(--border-divider)]">
+                {filteredSummaries.map((rule) => {
+                  const isSelected = selectedRuleIds.has(rule.rule_id);
+                  const isExpanded = expandedRules.has(rule.rule_id);
+                  const hasCandidates = rule.candidates.length > 0 || rule.total_bytes > 0;
+
+                  return (
+                    <div key={rule.rule_id}>
+                      <div
+                        className={`px-4 py-3 flex items-center gap-3 transition-colors hover:bg-[var(--fill-subtle)] ${
+                          hasCandidates ? "" : "opacity-60"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          disabled={!hasCandidates}
+                          onChange={() => toggleSelectRule(rule.rule_id)}
+                          className="accent-[var(--accent)] w-4 h-4 shrink-0 cursor-pointer disabled:cursor-not-allowed"
+                          aria-label={rule.rule_name}
+                        />
+
+                        <div className="min-w-0 flex-1 cursor-pointer" onClick={() => toggleExpandRule(rule.rule_id)}>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-sm font-medium text-[var(--text-primary)] truncate">{rule.rule_name}</span>
+                            <Badge>{getCategoryLabel(rule.category)}</Badge>
+                            <Badge tone={riskTone(rule.risk)}>{riskLabel(rule.risk)}</Badge>
+                            {rule.is_locked_by_process && (
+                              <Badge tone="warning">
+                                <LockClosed16Regular className="w-3.5 h-3.5" />
+                                {fill(t.cleanup.appInUse, { app: rule.locking_process_name ?? "" })}
+                              </Badge>
+                            )}
+                            {rule.is_locked_by_process && rule.locking_process_name && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleCloseProcess(rule.locking_process_name!);
+                                }}
+                                className="h-5 px-2 rounded text-xs font-medium text-[var(--brand-amber)] border border-[color-mix(in_srgb,var(--brand-amber)_45%,transparent)] hover:bg-[var(--fill-subtle-hover)] cursor-pointer transition-colors"
+                                title={fill(t.cleanup.closeAppUnlockTitle, { app: rule.locking_process_name })}
+                              >
+                                {t.cleanup.closeAppUnlock}
+                              </button>
+                            )}
+                          </div>
+                          <p className="text-xs text-[var(--text-muted)] truncate mt-0.5">
+                            {rule.default_action === "trash" ? t.cleanup.routesRecycleBin : t.cleanup.safeCleanupAction}
+                          </p>
+                        </div>
+
+                        <div className="shrink-0 text-right font-ibm-mono tabular-nums">
+                          <div className="text-sm font-semibold text-[var(--text-primary)]">{formatBytes(rule.total_bytes)}</div>
+                          <div className="text-xs text-[var(--text-muted)]">
+                            {rule.total_items} {t.common.items}
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={() => toggleExpandRule(rule.rule_id)}
+                          className="shrink-0 w-7 h-7 rounded-md flex items-center justify-center text-[var(--text-secondary)] hover:bg-[var(--fill-subtle-hover)] hover:text-[var(--text-primary)] transition-colors cursor-pointer"
+                          title={t.cleanup.expandDetails}
+                          aria-expanded={isExpanded}
+                        >
+                          {isExpanded ? <ChevronDown16Regular className="w-4 h-4" /> : <ChevronRight16Regular className="w-4 h-4" />}
+                        </button>
+                      </div>
+
+                      {/* Matching files */}
+                      {isExpanded && (
+                        <div className="border-t border-[var(--border-divider)] bg-[var(--fill-subtle)] px-4 py-3 space-y-1 max-h-60 overflow-y-auto scrollbar-thin">
+                          <div className="flex items-center justify-between gap-3 text-xs text-[var(--text-secondary)] mb-1.5">
+                            <span>
+                              {t.cleanup.matchingFiles} ({rule.candidates.length > 0 ? rule.candidates.length : rule.total_items})
+                            </span>
+                            {rule.total_items > rule.candidates.length && rule.candidates.length > 0 && (
+                              <span className="text-[var(--accent-text)]">
+                                {t.cleanup.previewNotice} ({rule.candidates.length}/{rule.total_items})
+                              </span>
+                            )}
+                          </div>
+                          {rule.candidates.length === 0 ? (
+                            <div className="flex items-center justify-between gap-3 px-2.5 py-1.5 rounded-md bg-[var(--bg-card)] border border-[var(--border-card)]">
+                              <div className="flex items-center gap-2 min-w-0 text-[var(--text-secondary)]">
+                                <Folder20Regular className="w-4 h-4 text-[var(--text-muted)] shrink-0" />
+                                <span className="truncate text-xs">
+                                  {rule.rule_id === "windows_recycle_bin"
+                                    ? fill(t.cleanup.recycleBinItems, { count: rule.total_items })
+                                    : fill(t.cleanup.ruleCacheFiles, { name: rule.rule_name, count: rule.total_items })}
+                                </span>
+                              </div>
+                              <span className="text-xs text-[var(--text-primary)] font-ibm-mono tabular-nums shrink-0">
+                                {formatBytes(rule.total_bytes)}
+                              </span>
+                            </div>
+                          ) : (
+                            rule.candidates.map((cand, cIdx) => (
+                              <div
+                                key={cIdx}
+                                className="flex items-center justify-between gap-3 px-2.5 py-1 rounded-md bg-[var(--bg-card)] border border-[var(--border-card)]"
+                              >
+                                <div className="flex items-center gap-2 min-w-0 text-[var(--text-secondary)]">
+                                  {cand.is_dir ? (
+                                    <Folder20Regular className="w-4 h-4 text-[var(--text-muted)] shrink-0" />
+                                  ) : (
+                                    <Document20Regular className="w-4 h-4 text-[var(--text-muted)] shrink-0" />
+                                  )}
+                                  <span className="truncate font-code text-xs select-all">{cand.path}</span>
+                                </div>
+                                <div className="flex items-center gap-1 shrink-0">
+                                  <span className="text-xs text-[var(--text-primary)] font-ibm-mono tabular-nums">
+                                    {formatBytes(cand.size_bytes)}
+                                  </span>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      revealItemInDir(cand.path).catch((err) => console.warn("Failed to reveal item in Explorer:", err));
+                                    }}
+                                    className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--accent-text)] hover:bg-[var(--fill-subtle-hover)] transition-colors cursor-pointer"
+                                    title={t.cleanup.openInExplorer}
+                                  >
+                                    <FolderOpen16Regular className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </div>
+                            ))
+                          )}
+                        </div>
                       )}
                     </div>
-                    {rule.candidates.length === 0 ? (
-                      <div className="flex items-center justify-between text-xs py-1.5 px-2.5 rounded-[4px] bg-white/[0.02] border border-[var(--border-subtle)] font-ibm-mono">
-                        <div className="flex items-center gap-2 truncate text-[var(--text-secondary)]">
-                          <Folder20Regular className="w-3.5 h-3.5 text-[#0078d4] shrink-0" />
-                          <span className="truncate text-[11px]">
-                            {rule.rule_id === "windows_recycle_bin"
-                              ? `Windows Recycle Bin items (${rule.total_items} items)`
-                              : `${rule.rule_name} system cache files (${rule.total_items} items)`}
-                          </span>
-                        </div>
-                        <span className="text-[var(--text-primary)] font-medium shrink-0 ml-4 tabular-nums">
-                          {formatBytes(rule.total_bytes)}
-                        </span>
-                      </div>
-                    ) : (
-                      rule.candidates.map((cand, cIdx) => (
-                        <div
-                          key={cIdx}
-                          className="flex items-center justify-between text-xs py-1 px-2.5 rounded-[4px] bg-white/[0.02] border border-[var(--border-subtle)] font-ibm-mono"
-                        >
-                          <div className="flex items-center gap-2 truncate text-[var(--text-secondary)]">
-                            {cand.is_dir ? (
-                              <Folder20Regular className="w-3.5 h-3.5 text-[#0078d4] shrink-0" />
-                            ) : (
-                              <Document20Regular className="w-3.5 h-3.5 text-[var(--text-muted)] shrink-0" />
-                            )}
-                            <span className="truncate text-[11px] select-all">{cand.path}</span>
-                          </div>
-                          <div className="flex items-center gap-2 shrink-0 ml-4">
-                            <span className="text-[var(--text-primary)] font-medium tabular-nums">
-                              {formatBytes(cand.size_bytes)}
-                            </span>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                revealItemInDir(cand.path).catch((err) => console.warn("Failed to reveal item in Explorer:", err));
-                              }}
-                              className="text-[var(--text-muted)] hover:text-[#0078d4] p-1 rounded transition-colors"
-                              title="Open location in Explorer"
-                            >
-                              <FolderOpen16Regular className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                )}
+                  );
+                })}
               </div>
-            );
-          })
-        )}
-      </WinUICard>
+            )}
+          </Card>
 
-      {/* Floating Bottom Selection Action Bar (WinUI 3 CommandBar) */}
-      {selectedRuleIds.size > 0 && (
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 max-w-2xl w-[90%] bg-[var(--bg-card)] border border-[var(--border-card)] rounded-lg shadow-2xl p-3 flex items-center justify-between gap-4 z-40 animate-slideUp">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-[4px] bg-[#0078d4]/10 text-[#0078d4] flex items-center justify-center shrink-0">
-              <Delete20Regular className="w-4 h-4" />
-            </div>
-            <div>
-              <div className="text-xs font-semibold text-[var(--text-primary)]">
-                {selectedRuleIds.size} {t.cleanup.itemsSelected} (<strong className="font-ibm-mono tabular-nums">{totalSelectedItems}</strong> {t.common.files})
-              </div>
-              <div className="text-[11px] text-[var(--text-muted)] font-ibm-mono">
-                {t.cleanup.estimatedSpace}: <strong className="text-emerald-400 tabular-nums">{formatBytes(totalSelectedBytes)}</strong>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 shrink-0">
-            <WinUIButton
-              variant="subtle"
-              size="sm"
-              onClick={clearSelection}
+          {/* Selection action bar */}
+          {selectedRuleIds.size > 0 && (
+            <ActionBar
+              summary={
+                <>
+                  <span className="text-[var(--text-primary)] font-medium">
+                    {fill(t.cleanup.selectedSummary, {
+                      count: selectedRuleIds.size,
+                      size: formatBytes(totalSelectedBytes),
+                    })}
+                  </span>
+                  <span className="text-[var(--text-muted)]">
+                    {" · "}
+                    {fill(t.cleanup.selectedFiles, { files: totalSelectedItems.toLocaleString() })}
+                  </span>
+                </>
+              }
             >
-              {t.common.deselectAll}
-            </WinUIButton>
-            <WinUIButton
-              variant="primary"
-              size="md"
-              onClick={() => {
-                if (confirmBeforeDelete) {
-                  setShowConfirmModal(true);
-                } else {
-                  handleExecuteCleanup();
-                }
-              }}
-              disabled={cleaning || scanning || selectedRuleIds.size === 0}
-              icon={<Delete20Regular className="w-4 h-4" />}
-            >
-              {cleaning
-                ? t.common.cleaning
-                : totalSelectedBytes === 0
-                ? t.cleanup.cleanNow
-                : `${t.cleanup.cleanNow} (${formatBytes(totalSelectedBytes)})`}
-            </WinUIButton>
-          </div>
-        </div>
-      )}
+              <WinUIButton variant="subtle" onClick={clearSelection}>
+                {t.common.deselectAll}
+              </WinUIButton>
+              <WinUIButton
+                variant="primary"
+                onClick={openConfirmOrClean}
+                disabled={cleaning || scanning || selectedRuleIds.size === 0}
+                icon={<Delete20Regular className="w-4 h-4" />}
+              >
+                {cleanLabel(t.cleanup.cleanNow)}
+              </WinUIButton>
+            </ActionBar>
+          )}
         </>
       )}
 
       {/* Safety Confirmation Modal */}
       {showConfirmModal && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
-          <div className="max-w-lg w-full p-6 shadow-2xl space-y-4 border border-[var(--border-card)] bg-[var(--bg-card)] rounded-lg">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
+          <Card className="max-w-lg w-full p-6 space-y-4 shadow-xl">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-[4px] bg-[#0078d4]/15 border border-[#0078d4]/30 flex items-center justify-center text-[#0078d4] shrink-0">
+              <div className="w-10 h-10 rounded-lg bg-[var(--fill-subtle)] border border-[var(--border-card)] flex items-center justify-center text-[var(--accent-text)] shrink-0">
                 <Delete20Regular className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="font-semibold text-[var(--text-primary)] text-sm">
-                  {t.settings.confirmDelete}
-                </h3>
-                <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+                <h3 className="font-semibold text-[var(--text-primary)] text-base">{t.settings.confirmDelete}</h3>
+                <p className="text-sm text-[var(--text-secondary)] mt-0.5">
                   Clean {selectedRuleIds.size} rule category(s) and free approx{" "}
-                  <span className="font-bold text-emerald-400 font-ibm-mono">
-                    {formatBytes(totalSelectedBytes)}
-                  </span>
-                  .
+                  <span className="font-semibold text-[var(--text-primary)] font-ibm-mono">{formatBytes(totalSelectedBytes)}</span>.
                 </p>
               </div>
             </div>
 
-            <div className="p-3 bg-black/20 rounded-[4px] border border-[var(--border-subtle)] text-xs space-y-2 font-sans">
-              <div className="flex justify-between text-[var(--text-secondary)]">
-                <span>{t.cleanup.itemsSelected}:</span>
-                <span className="font-ibm-mono text-[var(--text-primary)] font-bold">{selectedRuleIds.size}</span>
+            <div className="rounded-md bg-[var(--fill-subtle)] border border-[var(--border-card)] text-sm divide-y divide-[var(--border-divider)]">
+              <div className="flex justify-between px-3 py-2 text-[var(--text-secondary)]">
+                <span>{t.cleanup.itemsSelected}</span>
+                <span className="font-ibm-mono text-[var(--text-primary)] font-semibold">{selectedRuleIds.size}</span>
               </div>
-              <div className="flex justify-between text-[var(--text-secondary)]">
-                <span>{t.cleanup.filesCleaned}:</span>
-                <span className="font-ibm-mono text-[var(--text-primary)] font-bold">{totalSelectedItems.toLocaleString()}</span>
+              <div className="flex justify-between px-3 py-2 text-[var(--text-secondary)]">
+                <span>{t.cleanup.filesCleaned}</span>
+                <span className="font-ibm-mono text-[var(--text-primary)] font-semibold">{totalSelectedItems.toLocaleString()}</span>
               </div>
-              <div className="flex justify-between text-[var(--text-secondary)]">
-                <span>Safety route:</span>
-                <span className={`font-ibm-mono font-semibold ${alwaysTrashOverride ? "text-emerald-400" : "text-amber-400"}`}>
+              <div className="flex justify-between px-3 py-2 text-[var(--text-secondary)]">
+                <span>Safety route</span>
+                <span className={`font-semibold ${alwaysTrashOverride ? "text-[var(--success)]" : "text-[var(--brand-amber)]"}`}>
                   {alwaysTrashOverride ? "Recycle Bin (Safe)" : "Immediate Purge"}
                 </span>
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--border-divider)]">
-              <WinUIButton
-                variant="standard"
-                onClick={() => setShowConfirmModal(false)}
-                disabled={cleaning}
-              >
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <WinUIButton variant="standard" onClick={() => setShowConfirmModal(false)} disabled={cleaning}>
                 {t.common.cancel}
               </WinUIButton>
               <WinUIButton
@@ -805,20 +781,20 @@ export const CleanupPage: React.FC = () => {
                 {t.cleanup.cleanNow}
               </WinUIButton>
             </div>
-          </div>
+          </Card>
         </div>
       )}
 
       {/* Manual Conflict Modal for Failed Trash Deletions */}
       {manualConflictPath && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="max-w-lg w-full p-6 shadow-2xl space-y-4 border border-[var(--border-card)] bg-[var(--bg-card)] rounded-lg">
+          <Card className="max-w-lg w-full p-6 space-y-4 shadow-xl">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-[4px] bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+              <div className="w-10 h-10 rounded-lg bg-[var(--fill-subtle)] border border-[var(--border-card)] flex items-center justify-center text-[var(--brand-amber)] shrink-0">
                 <Warning20Filled className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="font-semibold text-[var(--text-primary)] text-sm">
+                <h3 className="font-semibold text-[var(--text-primary)] text-base">
                   {t.cleanup.trashFailedTitle}
                   {failedTotal > 1 && (
                     <span className="ml-2 font-ibm-mono text-xs text-[var(--text-muted)]">
@@ -826,45 +802,31 @@ export const CleanupPage: React.FC = () => {
                     </span>
                   )}
                 </h3>
-                <p className="text-xs text-[var(--text-secondary)]">{t.cleanup.trashFailedDesc}</p>
+                <p className="text-sm text-[var(--text-secondary)]">{t.cleanup.trashFailedDesc}</p>
               </div>
             </div>
 
-            <div className="p-2.5 rounded-[4px] bg-black/20 border border-[var(--border-subtle)] font-ibm-mono text-xs text-[var(--text-secondary)] break-all select-all">
+            <div className="px-3 py-2 rounded-md bg-[var(--fill-subtle)] border border-[var(--border-card)] font-code text-xs text-[var(--text-secondary)] break-all select-all">
               {manualConflictPath}
             </div>
 
-            <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
-              {t.cleanup.trashFailedHelp}
-            </p>
+            <p className="text-sm text-[var(--text-secondary)] leading-relaxed">{t.cleanup.trashFailedHelp}</p>
 
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--border-divider)]">
-              <WinUIButton
-                variant="standard"
-                onClick={resolveCurrentConflict}
-                disabled={resolvingPath}
-              >
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <WinUIButton variant="standard" onClick={resolveCurrentConflict} disabled={resolvingPath}>
                 {t.cleanup.keepFileAction}
               </WinUIButton>
-              <WinUIButton
-                variant="standard"
-                onClick={() => handleRetryTrash(manualConflictPath)}
-                disabled={resolvingPath}
-              >
+              <WinUIButton variant="standard" onClick={() => handleRetryTrash(manualConflictPath)} disabled={resolvingPath}>
                 {t.cleanup.retryTrash}
               </WinUIButton>
-              <WinUIButton
-                variant="danger"
-                onClick={() => handleForceDelete(manualConflictPath)}
-                disabled={resolvingPath}
-              >
+              <WinUIButton variant="danger" onClick={() => handleForceDelete(manualConflictPath)} disabled={resolvingPath}>
                 {t.cleanup.permanentDeleteAction}
               </WinUIButton>
             </div>
-          </div>
+          </Card>
         </div>
       )}
-    </div>
+    </Page>
   );
 };
 

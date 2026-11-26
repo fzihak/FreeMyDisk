@@ -246,11 +246,11 @@ impl WindowsSystemMaintenanceHandler {
         // the step stops waiting after RECYCLE_BIN_TIMEOUT.
         let (tx, rx) = std::sync::mpsc::channel();
         std::thread::spawn(move || {
-            use windows_sys::Win32::UI::Shell::{
-                SHEmptyRecycleBinW, SHERB_NOCONFIRMATION, SHERB_NOPROGRESSUI, SHERB_NOSOUND,
+            // Deletes on several threads; see `recycle_bin::empty_fast`.
+            let hr = match super::recycle_bin::empty_fast(|_| {}) {
+                Ok(_) => 0i32,
+                Err(_) => -1i32,
             };
-            let flags = SHERB_NOCONFIRMATION | SHERB_NOPROGRESSUI | SHERB_NOSOUND;
-            let hr = unsafe { SHEmptyRecycleBinW(std::ptr::null_mut(), std::ptr::null(), flags) };
             let _ = tx.send(hr);
         });
 

@@ -3,10 +3,9 @@ import { invoke } from "@tauri-apps/api/core";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { useI18nStore } from "@/i18n";
 import { toast } from "@/stores/toast-store";
-import { WinUICard } from "@/components/winui/WinUICard";
 import { WinUIButton } from "@/components/winui/WinUIButton";
+import { Page, PageHeader, Card, StatCard, Badge, ProgressBar, FilterTabs, EmptyState, ActionBar } from "@/components/ui";
 import {
-  Apps24Filled,
   Apps20Regular,
   ArrowClockwise20Regular,
   Search20Regular,
@@ -14,18 +13,52 @@ import {
   Delete20Regular,
   FolderDismiss20Regular,
   Pulse20Regular,
-  CheckmarkCircle20Filled,
+  CheckmarkCircle20Regular,
   HardDrive20Regular,
   ArrowSort20Regular,
   Layer20Regular,
-  Checkmark16Filled,
-  FolderOpen16Regular,
-  Flash20Filled,
-  DismissCircle20Filled,
-  Sparkle20Filled,
+  FolderOpen20Regular,
+  Flash20Regular,
+  DismissCircle20Regular,
+  Sparkle20Regular,
   DocumentBulletList20Regular,
   Folder20Regular,
+  Info20Regular,
 } from "@fluentui/react-icons";
+
+const controlClass =
+  "h-8 rounded-md bg-[var(--bg-input)] border border-[var(--border-card)] text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] disabled:opacity-50";
+
+const confidenceTone = (c: string): "success" | "warning" | "neutral" => {
+  const v = c.toLowerCase();
+  return v === "high" ? "success" : v === "medium" ? "warning" : "neutral";
+};
+
+/** App icon tile: the real extracted icon when available, initials otherwise. */
+const AppIcon: React.FC<{ src?: string | null; name: string; fallback: string }> = ({ src, name, fallback }) =>
+  src ? (
+    <img
+      src={src}
+      alt={name}
+      className="w-8 h-8 object-contain rounded-md p-1 bg-[var(--fill-subtle)] shrink-0"
+    />
+  ) : (
+    <span className="w-8 h-8 rounded-md bg-[var(--fill-subtle)] flex items-center justify-center text-xs font-semibold text-[var(--text-secondary)] shrink-0 font-ibm-mono">
+      {name.trim().slice(0, 2).toUpperCase() || fallback}
+    </span>
+  );
+
+/** Busy card for scans without backend progress events: indeterminate bar. */
+const BusyCard: React.FC<{ title: string; subtitle?: string }> = ({ title, subtitle }) => (
+  <Card className="space-y-3">
+    <div className="flex items-center gap-2">
+      <ArrowClockwise20Regular className="w-4 h-4 animate-spin text-[var(--accent-text)]" />
+      <span className="text-sm font-semibold text-[var(--text-primary)]">{title}</span>
+    </div>
+    {subtitle && <div className="text-xs text-[var(--text-secondary)]">{subtitle}</div>}
+    <ProgressBar value={100} className="animate-pulse" />
+  </Card>
+);
 
 export interface InstalledAppInfo {
   id: string;
@@ -448,371 +481,309 @@ export const ApplicationsPage: React.FC = () => {
     [deepGroups]
   );
 
+  const handleRefresh = () => {
+    if (activeTab === "installed") loadApplications();
+    else if (activeTab === "uwp") loadUwpApplications();
+    else handleScanLeftovers();
+  };
+
+  const refreshBusy =
+    activeTab === "installed" ? loading : activeTab === "uwp" ? uwpLoading : leftoverLoading || cleaning;
+
+  const handleTabChange = (tab: "installed" | "uwp" | "leftovers") => {
+    setActiveTab(tab);
+    if (tab === "uwp" && uwpApps.length === 0) loadUwpApplications();
+    if (tab === "leftovers" && deepGroups.length === 0) handleScanLeftovers();
+  };
+
+  const searchBox = (
+    <div className="relative flex-1 min-w-0">
+      <Search20Regular className="w-4 h-4 absolute left-2.5 top-2 text-[var(--text-muted)] pointer-events-none" />
+      <input
+        type="text"
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        placeholder={t.applications.searchPlaceholder}
+        className={`${controlClass} w-full pl-8 pr-3 placeholder-[var(--text-muted)] select-text`}
+      />
+    </div>
+  );
+
+  const allLeftoversSelected =
+    totalLeftoverItemCount > 0 && selectedLeftoverPaths.size === totalLeftoverItemCount;
+
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-4 select-none font-sans text-[var(--text-primary)] pb-24">
-      {/* WinUI 3 Header Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-[4px] bg-white/[0.04] border border-[var(--border-subtle)] flex items-center justify-center text-[#0078d4] shrink-0">
-            <Apps24Filled className="w-6 h-6" />
-          </div>
-          <div>
-            <h1 className="text-xl font-semibold tracking-tight text-[var(--text-primary)]">{t.applications.title}</h1>
-            <p className="text-xs text-[var(--text-secondary)]">
-              {t.applications.subtitle}
-            </p>
-          </div>
-        </div>
-      </div>
+    <Page className="select-none">
+      <PageHeader
+        icon={<Apps20Regular />}
+        title={t.applications.title}
+        description={t.applications.subtitle}
+        actions={
+          <WinUIButton
+            variant="standard"
+            onClick={handleRefresh}
+            disabled={refreshBusy}
+            icon={<ArrowClockwise20Regular className={`w-4 h-4 ${refreshBusy ? "animate-spin" : ""}`} />}
+          >
+            {t.common.refresh}
+          </WinUIButton>
+        }
+      />
 
-      {/* Tab switcher - WinUI 3 Segmented Control (own row so all tabs fit on one line) */}
-      <div className="flex">
-        <div className="flex flex-nowrap items-center gap-1 bg-black/20 p-0.5 rounded-[4px] border border-[var(--border-card)] max-w-full overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          <button
-            onClick={() => setActiveTab("installed")}
-            className={`px-3 py-1 rounded-[3px] text-xs font-medium whitespace-nowrap transition-all cursor-pointer ${
-              activeTab === "installed"
-                ? "bg-[#0078d4] text-white shadow-xs"
-                : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-            }`}
-          >
-            {t.applications.tabWin32} ({apps.length})
-          </button>
-          <button
-            onClick={() => {
-              setActiveTab("uwp");
-              if (uwpApps.length === 0) loadUwpApplications();
-            }}
-            className={`px-3 py-1 rounded-[3px] text-xs font-medium whitespace-nowrap transition-all cursor-pointer ${
-              activeTab === "uwp"
-                ? "bg-purple-600 text-white shadow-xs"
-                : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-            }`}
-          >
-            {t.applications.tabUwp} {uwpApps.length > 0 && `(${uwpApps.length})`}
-          </button>
-          <button
-            onClick={() => {
-              setActiveTab("leftovers");
-              if (deepGroups.length === 0) handleScanLeftovers();
-            }}
-            className={`px-3 py-1 rounded-[3px] text-xs font-medium whitespace-nowrap transition-all cursor-pointer ${
-              activeTab === "leftovers"
-                ? "bg-[#0078d4] text-white shadow-xs"
-                : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-            }`}
-          >
-            {t.applications.tabLeftovers} {deepGroups.length > 0 && `(${deepGroups.length})`}
-          </button>
-        </div>
-      </div>
+      <FilterTabs
+        items={[
+          { id: "installed" as const, label: t.applications.tabWin32, count: apps.length },
+          {
+            id: "uwp" as const,
+            label: t.applications.tabUwp,
+            count: uwpApps.length > 0 ? uwpApps.length : undefined,
+          },
+          {
+            id: "leftovers" as const,
+            label: t.applications.tabLeftovers,
+            count: deepGroups.length > 0 ? deepGroups.length : undefined,
+          },
+        ]}
+        value={activeTab}
+        onChange={handleTabChange}
+      />
 
-      {/* Notification Banner */}
+      {/* Notice line (UWP uninstall result) */}
       {notification && (
-        <div className="p-3 bg-[#0078d4]/10 border border-[#0078d4]/30 rounded-[4px] flex items-center justify-between text-xs text-[#0078d4] animate-fadeIn">
-          <div className="flex items-center gap-2">
-            <CheckmarkCircle20Filled className="w-4 h-4 text-[#0078d4] shrink-0" />
-            <span>{notification}</span>
+        <Card className="py-2.5 flex items-center justify-between gap-3 animate-fadeIn">
+          <div className="flex items-center gap-2 min-w-0">
+            <Info20Regular className="w-4 h-4 shrink-0 text-[var(--accent-text)]" />
+            <span className="text-sm text-[var(--text-primary)] truncate" title={notification}>
+              {notification}
+            </span>
           </div>
-          <button onClick={() => setNotification(null)} className="text-[#0078d4] hover:underline cursor-pointer">
+          <WinUIButton variant="subtle" size="sm" onClick={() => setNotification(null)}>
             {t.common.dismiss}
-          </button>
-        </div>
+          </WinUIButton>
+        </Card>
       )}
 
-      {/* Tab 1: Installed Applications */}
+      {/* View 1: Installed applications */}
       {activeTab === "installed" && (
-        <div className="space-y-4">
-          {/* Quick Stats */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 font-ibm-mono">
-            <WinUICard className="p-3.5">
-              <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] mb-1 font-sans">
-                <span className="font-medium text-[11px]">{t.applications.totalInstalled}</span>
-                <Apps20Regular className="w-3.5 h-3.5 text-[#0078d4]" />
-              </div>
-              <div className="text-xl font-bold text-[var(--text-primary)] tabular-nums">{apps.length}</div>
-              <div className="text-[10px] text-[var(--text-muted)] mt-0.5 font-sans">{t.applications.discoveredRegistry}</div>
-            </WinUICard>
-
-            <WinUICard className="p-3.5">
-              <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] mb-1 font-sans">
-                <span className="font-medium text-[11px]">{t.applications.estimatedUsage}</span>
-                <HardDrive20Regular className="w-3.5 h-3.5 text-cyan-400" />
-              </div>
-              <div className="text-xl font-bold text-cyan-400 tabular-nums">{formatBytes(totalAppSize)}</div>
-              <div className="text-[10px] text-[var(--text-muted)] mt-0.5 font-sans">{t.applications.declaredInstallers}</div>
-            </WinUICard>
-
-            <WinUICard className="p-3.5">
-              <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] mb-1 font-sans">
-                <span className="font-medium text-[11px]">{t.applications.runningBadge}</span>
-                <Pulse20Regular className="w-3.5 h-3.5 text-emerald-400" />
-              </div>
-              <div className="text-xl font-bold text-emerald-400 tabular-nums">{runningAppsCount}</div>
-              <div className="text-[10px] text-[var(--text-muted)] mt-0.5 font-sans">{t.applications.activeProcesses}</div>
-            </WinUICard>
+        <>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <StatCard
+              label={t.applications.totalInstalled}
+              value={apps.length}
+              hint={t.applications.discoveredRegistry}
+              icon={<Apps20Regular />}
+            />
+            <StatCard
+              label={t.applications.estimatedUsage}
+              value={formatBytes(totalAppSize)}
+              hint={t.applications.declaredInstallers}
+              icon={<HardDrive20Regular />}
+            />
+            <StatCard
+              label={t.applications.runningBadge}
+              value={runningAppsCount}
+              hint={t.applications.activeProcesses}
+              icon={<Pulse20Regular />}
+              tone={runningAppsCount > 0 ? "success" : "neutral"}
+            />
           </div>
 
-          {/* Search & Sort Toolbar */}
-          <WinUICard className="p-3 flex flex-col sm:flex-row items-center justify-between gap-3">
-            <div className="relative flex-1 w-full">
-              <Search20Regular className="w-3.5 h-3.5 absolute left-2.5 top-2 text-[var(--text-muted)]" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder={t.applications.searchPlaceholder}
-                className="w-full pl-8 pr-3 py-1 bg-black/20 border border-[var(--border-card)] rounded-[4px] text-xs text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-[#0078d4] font-ibm-mono transition-colors"
-              />
-            </div>
-
-            <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
-              <div className="flex items-center gap-1.5 text-xs text-[var(--text-secondary)] font-sans">
-                <ArrowSort20Regular className="w-3.5 h-3.5 text-[var(--text-muted)]" />
-                <span>{t.largeFiles.sortBy}</span>
-              </div>
+          <div className="flex items-center gap-2">
+            {searchBox}
+            <div className="relative shrink-0">
+              <ArrowSort20Regular className="w-4 h-4 absolute left-2.5 top-2 text-[var(--text-muted)] pointer-events-none" />
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as any)}
-                className="bg-black/20 border border-[var(--border-card)] text-xs text-[var(--text-primary)] rounded-[4px] px-2 py-1 focus:outline-none focus:border-[#0078d4] font-sans cursor-pointer"
+                title={t.largeFiles.sortBy}
+                className={`${controlClass} pl-8 pr-2 cursor-pointer`}
               >
-                <option value="size" className="bg-[#202020] text-[var(--text-primary)]">{t.applications.sortBySize}</option>
-                <option value="name" className="bg-[#202020] text-[var(--text-primary)]">{t.applications.sortByName}</option>
-                <option value="date" className="bg-[#202020] text-[var(--text-primary)]">{t.applications.sortByDate}</option>
+                <option value="size" className="bg-[var(--bg-card)]">{t.applications.sortBySize}</option>
+                <option value="name" className="bg-[var(--bg-card)]">{t.applications.sortByName}</option>
+                <option value="date" className="bg-[var(--bg-card)]">{t.applications.sortByDate}</option>
               </select>
-
-              <WinUIButton
-                variant="subtle"
-                onClick={loadApplications}
-                disabled={loading}
-                className="p-1.5"
-                title={t.common.rescan}
-              >
-                <ArrowClockwise20Regular className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
-              </WinUIButton>
             </div>
-          </WinUICard>
-
-          {/* Applications List */}
-          {loading ? (
-            <WinUICard className="p-12 text-center space-y-2">
-              <ArrowClockwise20Regular className="w-6 h-6 animate-spin text-[#0078d4] mx-auto" />
-              <p className="text-xs font-semibold text-[var(--text-primary)]">{t.common.scanning}</p>
-            </WinUICard>
-          ) : filteredApps.length > 0 ? (
-            <WinUICard className="overflow-hidden">
-              <div className="divide-y divide-[var(--border-divider)]">
-                {filteredApps.map((app) => (
-                  <div
-                    key={app.id}
-                    className="px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-white/[0.02] transition-colors"
-                  >
-                    <div className="flex items-center gap-3 flex-1 min-w-0">
-                      {/* Application Icon with Fallback */}
-                      {app.display_icon && appIcons[app.display_icon] ? (
-                        <img
-                          src={appIcons[app.display_icon]}
-                          alt={app.name}
-                          className="w-9 h-9 object-contain rounded-[4px] p-1 bg-black/20 border border-[var(--border-card)] shrink-0"
-                        />
-                      ) : (
-                        <div className="w-9 h-9 rounded-[4px] bg-[#0078d4]/10 border border-[#0078d4]/20 flex items-center justify-center font-bold text-xs text-[#0078d4] shrink-0 font-ibm-mono">
-                          {app.name.trim().slice(0, 2).toUpperCase() || "AP"}
-                        </div>
-                      )}
-
-                      <div className="space-y-0.5 flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-semibold text-[var(--text-primary)] text-xs truncate">
-                            {app.name}
-                          </span>
-                          {app.display_version && (
-                            <span className="text-[10px] px-1.5 py-0.2 rounded-[3px] bg-black/20 text-[var(--text-muted)] font-ibm-mono">
-                              v{app.display_version}
-                            </span>
-                          )}
-                          {app.is_running && (
-                            <div className="flex items-center gap-1.5">
-                              <span className="flex items-center gap-1 text-[10px] px-1.5 py-0.2 rounded-[3px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-ibm-mono">
-                                <Pulse20Regular className="w-3 h-3 text-emerald-400 animate-pulse" /> {t.applications.runningBadge}
-                              </span>
-                              <WinUIButton
-                                variant="subtle"
-                                size="sm"
-                                onClick={() => handleCloseApp(app)}
-                                disabled={closingAppId === app.id}
-                                className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 h-6 px-1.5 text-[10px]"
-                                title={t.applications.closeApp}
-                              >
-                                <DismissCircle20Filled className="w-3 h-3 text-rose-400" />
-                                <span>{closingAppId === app.id ? t.applications.closingApp : t.applications.closeApp}</span>
-                              </WinUIButton>
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="text-[11px] text-[var(--text-secondary)] flex items-center gap-3 truncate">
-                          {app.publisher && <span>{app.publisher}</span>}
-                          {app.install_location && (
-                            <span className="text-[var(--text-muted)] truncate max-w-md font-ibm-mono text-[10px]">
-                              {app.install_location}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 shrink-0 justify-between sm:justify-end font-ibm-mono">
-                      <div className="text-right text-xs font-bold text-[var(--text-primary)] tabular-nums mr-2">
-                        {app.estimated_size_bytes ? formatBytes(app.estimated_size_bytes) : "—"}
-                      </div>
-                      {app.uninstall_string && (
-                        <>
-                          <WinUIButton
-                            variant="primary"
-                            onClick={() => handleUninstallAndHunt(app)}
-                            disabled={huntingAppId === app.id}
-                            className="flex items-center gap-1.5 text-xs bg-[#0078d4] hover:bg-[#187bd1]"
-                            title={t.applications.uninstallAndHuntDesc}
-                          >
-                            {huntingAppId === app.id ? (
-                              <ArrowClockwise20Regular className="w-3.5 h-3.5 animate-spin" />
-                            ) : (
-                              <Flash20Filled className="w-3.5 h-3.5" />
-                            )}
-                            <span>{huntingAppId === app.id ? t.applications.uninstalling : t.applications.uninstallAndHunt}</span>
-                          </WinUIButton>
-
-                          <WinUIButton
-                            variant="standard"
-                            onClick={() => handleUninstall(app)}
-                            className="flex items-center gap-1 text-xs"
-                            title={t.applications.confirmWin32Title}
-                          >
-                            <Open20Regular className="w-3.5 h-3.5 text-[#0078d4]" />
-                            <span>{t.applications.uninstall}</span>
-                          </WinUIButton>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </WinUICard>
-          ) : (
-            <WinUICard className="p-12 text-center space-y-2">
-              <Apps24Filled className="w-10 h-10 text-[var(--text-muted)] mx-auto" />
-              <h3 className="font-semibold text-[var(--text-primary)] text-sm">{t.applications.noAppsFound}</h3>
-              <p className="text-xs text-[var(--text-secondary)]">
-                {t.applications.noAppsDesc}
-              </p>
-            </WinUICard>
-          )}
-        </div>
-      )}
-
-      {/* Tab 2: Windows Store & Bloatware (UWP) */}
-      {activeTab === "uwp" && (
-        <div className="space-y-4">
-          {/* Quick Stats */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 font-ibm-mono">
-            <WinUICard className="p-3.5">
-              <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] mb-1 font-sans">
-                <span className="font-medium text-[11px]">{t.applications.storePackagesFound}</span>
-                <Apps20Regular className="w-3.5 h-3.5 text-purple-400" />
-              </div>
-              <div className="text-xl font-bold text-[var(--text-primary)] tabular-nums">{uwpApps.length}</div>
-              <div className="text-[10px] text-[var(--text-muted)] mt-0.5 font-sans">{t.applications.removableUwp}</div>
-            </WinUICard>
-
-            <WinUICard className="p-3.5">
-              <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] mb-1 font-sans">
-                <span className="font-medium text-[11px]">{t.applications.estimatedFootprint}</span>
-                <HardDrive20Regular className="w-3.5 h-3.5 text-purple-400" />
-              </div>
-              <div className="text-xl font-bold text-purple-400 tabular-nums">{formatBytes(totalUwpSize)}</div>
-              <div className="text-[10px] text-[var(--text-muted)] mt-0.5 font-sans">{t.applications.windowsAppsDirs}</div>
-            </WinUICard>
-
-            <WinUICard className="p-3.5">
-              <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] mb-1 font-sans">
-                <span className="font-medium text-[11px]">{t.applications.safeUninstallNotice}</span>
-                <Layer20Regular className="w-3.5 h-3.5 text-emerald-400" />
-              </div>
-              <div className="text-xl font-bold text-emerald-400 font-sans">{t.applications.allUsers}</div>
-              <div className="text-[10px] text-[var(--text-muted)] mt-0.5 font-sans">{t.applications.powerShellElevation}</div>
-            </WinUICard>
           </div>
 
-          {/* Search Toolbar */}
-          <WinUICard className="p-3 flex flex-col sm:flex-row items-center justify-between gap-3">
-            <div className="relative flex-1 w-full">
-              <Search20Regular className="w-3.5 h-3.5 absolute left-2.5 top-2 text-[var(--text-muted)]" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder={t.applications.searchPlaceholder}
-                className="w-full pl-8 pr-3 py-1 bg-black/20 border border-[var(--border-card)] rounded-[4px] text-xs text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-purple-500 font-ibm-mono transition-colors"
-              />
-            </div>
+          {loading ? (
+            <BusyCard title={t.common.scanning} />
+          ) : filteredApps.length > 0 ? (
+            <Card padded={false} className="overflow-hidden">
+              <div className="divide-y divide-[var(--border-divider)]">
+                {filteredApps.map((app) => {
+                  const hunting = huntingAppId === app.id;
+                  return (
+                    <div
+                      key={app.id}
+                      className="px-4 py-3 flex flex-col md:flex-row md:items-center gap-3 hover:bg-[var(--fill-subtle)] transition-colors"
+                    >
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <AppIcon
+                          src={app.display_icon ? appIcons[app.display_icon] : null}
+                          name={app.name}
+                          fallback="AP"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="text-sm font-medium text-[var(--text-primary)] truncate" title={app.name}>
+                              {app.name}
+                            </span>
+                            {app.display_version && (
+                              <Badge className="font-ibm-mono shrink-0">v{app.display_version}</Badge>
+                            )}
+                            {app.is_running && (
+                              <>
+                                <Badge tone="success" className="shrink-0">
+                                  <Pulse20Regular className="w-3 h-3" />
+                                  {t.applications.runningBadge}
+                                </Badge>
+                                <span
+                                  className="shrink-0"
+                                  title={closingAppId === app.id ? t.applications.closingApp : t.applications.closeApp}
+                                >
+                                  <WinUIButton
+                                    variant="subtle"
+                                    size="sm"
+                                    className="w-7 !px-0"
+                                    aria-label={t.applications.closeApp}
+                                    onClick={() => handleCloseApp(app)}
+                                    disabled={closingAppId === app.id}
+                                    icon={
+                                      closingAppId === app.id ? (
+                                        <ArrowClockwise20Regular className="w-4 h-4 animate-spin text-[var(--text-secondary)]" />
+                                      ) : (
+                                        <DismissCircle20Regular className="w-4 h-4 text-[var(--text-secondary)]" />
+                                      )
+                                    }
+                                  />
+                                </span>
+                              </>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-3 min-w-0 mt-0.5 text-xs">
+                            {app.publisher && (
+                              <span className="text-[var(--text-secondary)] truncate shrink-0 max-w-[40%]" title={app.publisher}>
+                                {app.publisher}
+                              </span>
+                            )}
+                            {app.install_location && (
+                              <span
+                                className="font-code text-xs text-[var(--text-muted)] truncate min-w-0"
+                                title={app.install_location}
+                              >
+                                {app.install_location}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
 
-            <WinUIButton
-              variant="subtle"
-              onClick={loadUwpApplications}
-              disabled={uwpLoading}
-              className="p-1.5 shrink-0"
-              title={t.common.rescan}
-            >
-              <ArrowClockwise20Regular className={`w-3.5 h-3.5 ${uwpLoading ? "animate-spin" : ""}`} />
-            </WinUIButton>
-          </WinUICard>
+                      <div className="flex items-center gap-2 shrink-0 justify-between md:justify-end">
+                        <span className="w-20 text-right text-sm font-ibm-mono tabular-nums text-[var(--text-primary)]">
+                          {app.estimated_size_bytes ? formatBytes(app.estimated_size_bytes) : "—"}
+                        </span>
+                        {app.uninstall_string && (
+                          <div className="flex items-center gap-1">
+                            <WinUIButton
+                              variant="standard"
+                              size="sm"
+                              onClick={() => handleUninstallAndHunt(app)}
+                              disabled={hunting}
+                              title={t.applications.uninstallAndHuntDesc}
+                              icon={
+                                hunting ? (
+                                  <ArrowClockwise20Regular className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <Flash20Regular className="w-4 h-4 text-[var(--accent-text)]" />
+                                )
+                              }
+                            >
+                              {hunting ? t.applications.uninstalling : t.applications.uninstallAndHunt}
+                            </WinUIButton>
+                            <WinUIButton
+                              variant="subtle"
+                              size="sm"
+                              onClick={() => handleUninstall(app)}
+                              title={t.applications.confirmWin32Title}
+                              icon={<Open20Regular className="w-4 h-4 text-[var(--text-secondary)]" />}
+                            >
+                              {t.applications.uninstall}
+                            </WinUIButton>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+          ) : (
+            <EmptyState
+              icon={<Apps20Regular />}
+              title={t.applications.noAppsFound}
+              description={t.applications.noAppsDesc}
+            />
+          )}
+        </>
+      )}
 
-          {/* UWP List */}
+      {/* View 2: Windows Store & bloatware (UWP) */}
+      {activeTab === "uwp" && (
+        <>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <StatCard
+              label={t.applications.storePackagesFound}
+              value={uwpApps.length}
+              hint={t.applications.removableUwp}
+              icon={<Apps20Regular />}
+            />
+            <StatCard
+              label={t.applications.estimatedFootprint}
+              value={formatBytes(totalUwpSize)}
+              hint={t.applications.windowsAppsDirs}
+              icon={<HardDrive20Regular />}
+            />
+            <StatCard
+              label={t.applications.safeUninstallNotice}
+              value={<span className="font-sans">{t.applications.allUsers}</span>}
+              hint={t.applications.powerShellElevation}
+              icon={<Layer20Regular />}
+            />
+          </div>
+
+          <div className="flex items-center gap-2">{searchBox}</div>
+
           {uwpLoading ? (
-            <WinUICard className="p-12 text-center space-y-2">
-              <ArrowClockwise20Regular className="w-6 h-6 animate-spin text-purple-400 mx-auto" />
-              <p className="text-xs font-semibold text-[var(--text-primary)]">{t.common.scanning}</p>
-            </WinUICard>
+            <BusyCard title={t.common.scanning} />
           ) : filteredUwpApps.length > 0 ? (
-            <WinUICard className="overflow-hidden">
+            <Card padded={false} className="overflow-hidden">
               <div className="divide-y divide-[var(--border-divider)]">
                 {filteredUwpApps.map((pkg) => (
                   <div
                     key={pkg.package_full_name}
-                    className="px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-white/[0.02] transition-colors"
+                    className="px-4 py-3 flex flex-col md:flex-row md:items-center gap-3 hover:bg-[var(--fill-subtle)] transition-colors"
                   >
                     <div className="flex items-center gap-3 flex-1 min-w-0">
-                      {pkg.icon_data_url ? (
-                        <img
-                          src={pkg.icon_data_url}
-                          alt={pkg.display_name}
-                          className="w-9 h-9 object-contain rounded-[4px] shrink-0 bg-black/20 p-1 border border-purple-500/20"
-                        />
-                      ) : (
-                        <div className="w-9 h-9 rounded-[4px] bg-purple-500/10 border border-purple-500/20 flex items-center justify-center font-bold text-xs text-purple-400 shrink-0 font-ibm-mono">
-                          {pkg.display_name.trim().slice(0, 2).toUpperCase() || "WP"}
-                        </div>
-                      )}
-
-                      <div className="space-y-0.5 flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-semibold text-[var(--text-primary)] text-xs truncate">
+                      <AppIcon src={pkg.icon_data_url} name={pkg.display_name} fallback="WP" />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="text-sm font-medium text-[var(--text-primary)] truncate" title={pkg.display_name}>
                             {pkg.display_name}
                           </span>
-                          {pkg.version && (
-                            <span className="text-[10px] px-1.5 py-0.2 rounded-[3px] bg-black/20 text-[var(--text-muted)] font-ibm-mono">
-                              v{pkg.version}
+                          {pkg.version && <Badge className="font-ibm-mono shrink-0">v{pkg.version}</Badge>}
+                          <Badge className="font-ibm-mono shrink-0">UWP</Badge>
+                        </div>
+                        <div className="flex items-center gap-3 min-w-0 mt-0.5 text-xs">
+                          {pkg.publisher && (
+                            <span className="text-[var(--text-secondary)] truncate shrink-0 max-w-[40%]" title={pkg.publisher}>
+                              {pkg.publisher}
                             </span>
                           )}
-                          <span className="text-[10px] px-1.5 py-0.2 rounded-[3px] bg-purple-500/10 text-purple-400 border border-purple-500/20 font-ibm-mono">
-                            UWP
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-3 text-xs text-[var(--text-secondary)] flex-wrap">
-                          {pkg.publisher && <span>{pkg.publisher}</span>}
                           {pkg.install_location && (
-                            <span className="font-ibm-mono text-[10px] text-[var(--text-muted)] truncate max-w-xs">
+                            <span
+                              className="font-code text-xs text-[var(--text-muted)] truncate min-w-0"
+                              title={pkg.install_location}
+                            >
                               {pkg.install_location}
                             </span>
                           )}
@@ -820,144 +791,102 @@ export const ApplicationsPage: React.FC = () => {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-3 self-end sm:self-auto shrink-0 font-ibm-mono">
-                      {pkg.estimated_size_bytes ? (
-                        <span className="text-xs font-bold text-[var(--text-primary)] tabular-nums">
-                          {formatBytes(pkg.estimated_size_bytes)}
-                        </span>
-                      ) : null}
-
+                    <div className="flex items-center gap-2 shrink-0 justify-between md:justify-end">
+                      <span className="w-20 text-right text-sm font-ibm-mono tabular-nums text-[var(--text-primary)]">
+                        {pkg.estimated_size_bytes ? formatBytes(pkg.estimated_size_bytes) : ""}
+                      </span>
                       <WinUIButton
-                        variant="danger"
+                        variant="subtle"
+                        size="sm"
                         onClick={() => setConfirmUwpTarget(pkg)}
-                        className="flex items-center gap-1 text-xs"
+                        icon={<Delete20Regular className="w-4 h-4 text-[var(--danger)]" />}
                       >
-                        <Delete20Regular className="w-3.5 h-3.5" />
-                        <span>{t.applications.uninstallBloatware}</span>
+                        {t.applications.uninstallBloatware}
                       </WinUIButton>
                     </div>
                   </div>
                 ))}
               </div>
-            </WinUICard>
+            </Card>
           ) : (
-            <WinUICard className="p-12 text-center space-y-2">
-              <Apps24Filled className="w-10 h-10 text-[var(--text-muted)] mx-auto" />
-              <h3 className="font-semibold text-[var(--text-primary)] text-sm">{t.applications.noAppsFound}</h3>
-              <p className="text-xs text-[var(--text-secondary)]">
-                {t.applications.noAppsDesc}
-              </p>
-            </WinUICard>
+            <EmptyState
+              icon={<Apps20Regular />}
+              title={t.applications.noAppsFound}
+              description={t.applications.noAppsDesc}
+            />
           )}
-        </div>
+        </>
       )}
 
-      {/* Tab 3: Leftovers Hunter */}
+      {/* View 3: Leftover hunter */}
       {activeTab === "leftovers" && (
-        <div className="space-y-4">
-          {/* Quick Stats Strip */}
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 font-ibm-mono">
-            <WinUICard className="p-3.5">
-              <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] mb-1 font-sans">
-                <span className="font-medium text-[11px]">{t.applications.tabLeftovers}</span>
-                <FolderDismiss20Regular className="w-3.5 h-3.5 text-amber-400" />
-              </div>
-              <div className="text-xl font-bold text-amber-400 tabular-nums">{deepGroups.length}</div>
-              <div className="text-[10px] text-[var(--text-muted)] mt-0.5 font-sans">{t.applications.leftoverCount}</div>
-            </WinUICard>
-
-            <WinUICard className="p-3.5">
-              <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] mb-1 font-sans">
-                <span className="font-medium text-[11px]">{t.applications.filesystemRemnants}</span>
-                <Folder20Regular className="w-3.5 h-3.5 text-blue-400" />
-              </div>
-              <div className="text-xl font-bold text-blue-400 tabular-nums">{formatBytes(totalFsBytes)}</div>
-              <div className="text-[10px] text-[var(--text-muted)] mt-0.5 font-sans">AppData & ProgramData</div>
-            </WinUICard>
-
-            <WinUICard className="p-3.5">
-              <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] mb-1 font-sans">
-                <span className="font-medium text-[11px]">{t.applications.registryHives}</span>
-                <DocumentBulletList20Regular className="w-3.5 h-3.5 text-purple-400" />
-              </div>
-              <div className="text-xl font-bold text-purple-400 tabular-nums">{totalRegItems}</div>
-              <div className="text-[10px] text-[var(--text-muted)] mt-0.5 font-sans">HKCU & HKLM Software</div>
-            </WinUICard>
-
-            <WinUICard className="p-3.5">
-              <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] mb-1 font-sans">
-                <span className="font-medium text-[11px]">{t.applications.leftoverSize}</span>
-                <Sparkle20Filled className="w-3.5 h-3.5 text-emerald-400" />
-              </div>
-              <div className="text-xl font-bold text-emerald-400 tabular-nums">{formatBytes(totalLeftoverBytes)}</div>
-              <div className="text-[10px] text-[var(--text-muted)] mt-0.5 font-sans">{t.virtualization.reclaimable}</div>
-            </WinUICard>
+        <>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <StatCard
+              label={t.applications.tabLeftovers}
+              value={deepGroups.length}
+              hint={t.applications.leftoverCount}
+              icon={<FolderDismiss20Regular />}
+              tone={deepGroups.length > 0 ? "warning" : "neutral"}
+            />
+            <StatCard
+              label={t.applications.filesystemRemnants}
+              value={formatBytes(totalFsBytes)}
+              hint="AppData & ProgramData"
+              icon={<Folder20Regular />}
+            />
+            <StatCard
+              label={t.applications.registryHives}
+              value={totalRegItems}
+              hint="HKCU & HKLM Software"
+              icon={<DocumentBulletList20Regular />}
+            />
+            <StatCard
+              label={t.applications.leftoverSize}
+              value={formatBytes(totalLeftoverBytes)}
+              hint={t.virtualization.reclaimable}
+              icon={<Sparkle20Regular />}
+              tone={totalLeftoverBytes > 0 ? "success" : "neutral"}
+            />
           </div>
 
-          {/* Action Toolbar */}
-          <WinUICard className="p-3 flex flex-col sm:flex-row items-center justify-between gap-3">
-            <div>
-              <h2 className="text-xs font-semibold text-[var(--text-primary)] flex items-center gap-2">
-                <FolderDismiss20Regular className="w-4 h-4 text-amber-400" />
-                {t.applications.tabLeftovers}
-              </h2>
-              <p className="text-xs text-[var(--text-secondary)] mt-0.5">
-                {t.applications.subtitle}
-              </p>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <WinUIButton
-                variant="subtle"
-                onClick={handleScanLeftovers}
-                disabled={leftoverLoading}
-                className="flex items-center gap-1.5"
-              >
-                <ArrowClockwise20Regular className={`w-3.5 h-3.5 ${leftoverLoading ? "animate-spin" : ""}`} />
-                <span>{t.common.rescan}</span>
-              </WinUIButton>
-              {deepGroups.length > 0 && selectedLeftoverPaths.size > 0 && (
-                <WinUIButton
-                  variant="danger"
-                  onClick={handleCleanSelectedLeftovers}
-                  disabled={cleaning}
-                  className="flex items-center gap-1.5 font-ibm-mono"
-                >
-                  <Delete20Regular className="w-3.5 h-3.5" />
-                  <span>
-                    {cleaning
-                      ? t.applications.cleaningLeftovers
-                      : `${t.applications.cleanLeftovers} (${formatBytes(selectedLeftoverBytes)})`}
-                  </span>
-                </WinUIButton>
-              )}
-            </div>
-          </WinUICard>
-
           {leftoverLoading ? (
-            <WinUICard className="p-12 text-center space-y-2">
-              <ArrowClockwise20Regular className="w-6 h-6 animate-spin text-amber-400 mx-auto" />
-              <p className="text-xs font-semibold text-[var(--text-primary)]">{t.common.scanning}</p>
-            </WinUICard>
+            <BusyCard title={t.common.scanning} subtitle={t.applications.tabLeftovers} />
           ) : deepGroups.length === 0 ? (
-            <WinUICard className="p-12 text-center space-y-2">
-              <CheckmarkCircle20Filled className="w-10 h-10 text-emerald-400 mx-auto" />
-              <h3 className="font-semibold text-[var(--text-primary)] text-sm">{t.applications.noLeftoversFound}</h3>
-              <p className="text-xs text-[var(--text-secondary)]">
-                {t.applications.noLeftoversDesc}
-              </p>
-            </WinUICard>
-          ) : (
-            <WinUICard className="overflow-hidden">
-              <div className="px-4 py-2.5 bg-black/20 border-b border-[var(--border-divider)] flex items-center justify-between text-xs font-ibm-mono">
-                <button
-                  onClick={toggleSelectAllLeftovers}
-                  className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer font-medium font-sans"
+            <EmptyState
+              icon={<CheckmarkCircle20Regular />}
+              title={t.applications.noLeftoversFound}
+              description={t.applications.noLeftoversDesc}
+              action={
+                <WinUIButton
+                  variant="primary"
+                  size="lg"
+                  onClick={handleScanLeftovers}
+                  icon={<Search20Regular className="w-4 h-4" />}
                 >
-                  {selectedLeftoverPaths.size === totalLeftoverItemCount ? t.cleanup.clear : t.cleanup.selectAll}
-                </button>
-                <span className="text-[var(--text-muted)] text-[11px] tabular-nums">
-                  {selectedLeftoverPaths.size} / {totalLeftoverItemCount} {t.cleanup.itemsSelected} ({formatBytes(selectedLeftoverBytes)})
+                  {t.common.rescan}
+                </WinUIButton>
+              }
+            />
+          ) : (
+            <Card padded={false} className="overflow-hidden">
+              {/* Header: select all + selection count */}
+              <div className="px-4 py-2 flex items-center justify-between gap-3 border-b border-[var(--border-divider)] text-xs text-[var(--text-secondary)]">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={allLeftoversSelected}
+                    ref={(el) => {
+                      if (el) el.indeterminate = selectedLeftoverPaths.size > 0 && !allLeftoversSelected;
+                    }}
+                    onChange={toggleSelectAllLeftovers}
+                    className="accent-[var(--accent)] w-4 h-4 shrink-0 cursor-pointer"
+                  />
+                  <span>{allLeftoversSelected ? t.cleanup.clear : t.cleanup.selectAll}</span>
+                </label>
+                <span className="text-[var(--text-muted)] tabular-nums">
+                  {selectedLeftoverPaths.size} / {totalLeftoverItemCount} {t.cleanup.itemsSelected} (
+                  {formatBytes(selectedLeftoverBytes)})
                 </span>
               </div>
 
@@ -965,108 +894,99 @@ export const ApplicationsPage: React.FC = () => {
                 {deepGroups.map((group) => {
                   const allSelected = group.items.every((i) => selectedLeftoverPaths.has(i.path_or_key));
                   const someSelected = group.items.some((i) => selectedLeftoverPaths.has(i.path_or_key));
+                  const conf = group.overall_confidence.toLowerCase();
 
                   return (
-                    <div key={group.id} className="p-4 space-y-3 hover:bg-white/[0.015] transition-colors">
-                      {/* Group Header */}
-                      <div className="flex items-center justify-between gap-3">
-                        <div
-                          onClick={() => toggleLeftoverGroup(group)}
-                          className="flex items-center gap-3 cursor-pointer flex-1 min-w-0"
-                        >
-                          <div
-                            className={`w-4 h-4 rounded-[3px] border flex items-center justify-center shrink-0 transition-colors ${
-                              allSelected
-                                ? "bg-[#0078d4] border-[#0078d4] text-white"
-                                : someSelected
-                                ? "bg-[#0078d4]/40 border-[#0078d4] text-white"
-                                : "border-[var(--border-subtle)] bg-black/20"
-                            }`}
-                          >
-                            {allSelected && <Checkmark16Filled className="w-3 h-3 text-white" />}
-                            {someSelected && !allSelected && <div className="w-2 h-0.5 bg-white rounded-full" />}
-                          </div>
-
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-semibold text-sm text-[var(--text-primary)]">{group.app_name}</span>
-                            <span
-                              className={`text-[10px] font-ibm-mono px-2 py-0.5 rounded border font-medium ${
-                                group.overall_confidence.toLowerCase() === "high"
-                                  ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-                                  : group.overall_confidence.toLowerCase() === "medium"
-                                  ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
-                                  : "bg-slate-500/10 text-slate-400 border-slate-500/20"
-                              }`}
-                            >
-                              {group.overall_confidence.toLowerCase() === "high"
-                                ? t.applications.confidenceHigh
-                                : group.overall_confidence.toLowerCase() === "medium"
-                                ? t.applications.confidenceMedium
-                                : t.applications.confidenceLow}
-                            </span>
-                          </div>
+                    <div key={group.id}>
+                      {/* Group header */}
+                      <div
+                        onClick={() => toggleLeftoverGroup(group)}
+                        className="px-4 py-3 flex items-center gap-3 cursor-pointer hover:bg-[var(--fill-subtle)] transition-colors"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={allSelected}
+                          ref={(el) => {
+                            if (el) el.indeterminate = someSelected && !allSelected;
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={() => toggleLeftoverGroup(group)}
+                          className="accent-[var(--accent)] w-4 h-4 shrink-0 cursor-pointer"
+                        />
+                        <span className="w-8 h-8 shrink-0 rounded-md bg-[var(--fill-subtle)] flex items-center justify-center text-[var(--text-secondary)]">
+                          <FolderDismiss20Regular className="w-4 h-4" />
+                        </span>
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                          <span className="text-sm font-semibold text-[var(--text-primary)] truncate">{group.app_name}</span>
+                          <Badge tone={confidenceTone(conf)} className="shrink-0">
+                            {conf === "high"
+                              ? t.applications.confidenceHigh
+                              : conf === "medium"
+                              ? t.applications.confidenceMedium
+                              : t.applications.confidenceLow}
+                          </Badge>
+                          <span className="text-xs text-[var(--text-muted)] shrink-0">
+                            {group.items.length} {t.applications.itemsCount}
+                          </span>
                         </div>
-
-                        <div className="text-right font-ibm-mono text-xs font-bold text-emerald-400 tabular-nums">
+                        <span className="text-sm font-ibm-mono tabular-nums text-[var(--text-primary)] shrink-0">
                           {formatBytes(group.total_size_bytes)}
-                        </div>
+                        </span>
                       </div>
 
-                      {/* Items List */}
-                      <div className="pl-7 space-y-1.5 font-ibm-mono text-xs">
+                      {/* Items */}
+                      <div className="divide-y divide-[var(--border-divider)] border-t border-[var(--border-divider)]">
                         {group.items.map((item) => {
                           const isSelected = selectedLeftoverPaths.has(item.path_or_key);
-
                           return (
                             <div
                               key={item.id}
                               onClick={() => toggleLeftoverItem(item.path_or_key)}
-                              className="p-2 rounded bg-white/[0.02] border border-[var(--border-card)] flex items-center justify-between gap-3 hover:bg-white/[0.04] transition-colors cursor-pointer"
+                              className={`pl-11 pr-4 py-2 flex items-center gap-3 cursor-pointer transition-colors ${
+                                isSelected ? "bg-[var(--fill-subtle)]" : "hover:bg-[var(--fill-subtle)]"
+                              }`}
                             >
-                              <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onClick={(e) => e.stopPropagation()}
+                                onChange={() => toggleLeftoverItem(item.path_or_key)}
+                                className="accent-[var(--accent)] w-4 h-4 shrink-0 cursor-pointer"
+                              />
+                              {item.kind === "filesystem" ? (
+                                <Folder20Regular className="w-4 h-4 shrink-0 text-[var(--text-secondary)]" />
+                              ) : (
+                                <DocumentBulletList20Regular className="w-4 h-4 shrink-0 text-[var(--text-secondary)]" />
+                              )}
+                              <div className="flex-1 min-w-0">
                                 <div
-                                  className={`w-3.5 h-3.5 rounded-[2px] border flex items-center justify-center shrink-0 ${
-                                    isSelected
-                                      ? "bg-[#0078d4] border-[#0078d4] text-white"
-                                      : "border-[var(--border-subtle)] bg-black/20"
-                                  }`}
+                                  className="font-code text-xs text-[var(--text-primary)] truncate select-all"
+                                  title={item.path_or_key}
                                 >
-                                  {isSelected && <Checkmark16Filled className="w-2.5 h-2.5 text-white" />}
+                                  {item.path_or_key}
                                 </div>
-
-                                {item.kind === "filesystem" ? (
-                                  <Folder20Regular className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                                ) : (
-                                  <DocumentBulletList20Regular className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-                                )}
-
-                                <div className="space-y-0.5 flex-1 min-w-0">
-                                  <div className="text-[11px] text-[var(--text-secondary)] truncate select-all">
-                                    {item.path_or_key}
-                                  </div>
-                                  <div className="text-[10px] text-[var(--text-muted)] font-sans">
-                                    {item.description} ({item.item_count} {t.applications.itemsCount})
-                                  </div>
+                                <div className="text-xs text-[var(--text-muted)] truncate">
+                                  {item.description} ({item.item_count} {t.applications.itemsCount})
                                 </div>
                               </div>
-
-                              <div className="flex items-center gap-2 shrink-0">
-                                <span className="text-[11px] font-bold text-[var(--text-primary)] tabular-nums">
-                                  {formatBytes(item.size_bytes)}
-                                </span>
+                              <span className="text-xs font-ibm-mono tabular-nums text-[var(--text-secondary)] shrink-0">
+                                {formatBytes(item.size_bytes)}
+                              </span>
+                              <span className="w-8 shrink-0 flex justify-end" title={item.kind === "filesystem" ? t.common.openInExplorer : undefined}>
                                 {item.kind === "filesystem" && (
-                                  <button
+                                  <WinUIButton
+                                    variant="subtle"
+                                    size="sm"
+                                    className="w-8 !px-0"
+                                    aria-label={t.common.openInExplorer}
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       handleReveal(item.path_or_key);
                                     }}
-                                    title={t.common.openInExplorer}
-                                    className="hover:text-[var(--text-primary)] text-[var(--text-secondary)] transition-colors p-1"
-                                  >
-                                    <FolderOpen16Regular className="w-3.5 h-3.5" />
-                                  </button>
+                                    icon={<FolderOpen20Regular className="w-4 h-4 text-[var(--text-secondary)]" />}
+                                  />
                                 )}
-                              </div>
+                              </span>
                             </div>
                           );
                         })}
@@ -1075,33 +995,66 @@ export const ApplicationsPage: React.FC = () => {
                   );
                 })}
               </div>
-            </WinUICard>
+            </Card>
           )}
-        </div>
+
+          {deepGroups.length > 0 && selectedLeftoverPaths.size > 0 && (
+            <ActionBar
+              summary={
+                <span className="font-semibold text-[var(--text-primary)]">
+                  {selectedLeftoverPaths.size} / {totalLeftoverItemCount} {t.cleanup.itemsSelected} ·{" "}
+                  <span className="font-ibm-mono">{formatBytes(selectedLeftoverBytes)}</span>
+                </span>
+              }
+            >
+              <WinUIButton variant="standard" onClick={() => setSelectedLeftoverPaths(new Set())} disabled={cleaning}>
+                {t.cleanup.clear}
+              </WinUIButton>
+              <WinUIButton
+                variant="danger"
+                onClick={handleCleanSelectedLeftovers}
+                disabled={cleaning}
+                icon={
+                  cleaning ? (
+                    <ArrowClockwise20Regular className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Delete20Regular className="w-4 h-4" />
+                  )
+                }
+              >
+                {cleaning
+                  ? t.applications.cleaningLeftovers
+                  : `${t.applications.cleanLeftovers} (${formatBytes(selectedLeftoverBytes)})`}
+              </WinUIButton>
+            </ActionBar>
+          )}
+        </>
       )}
 
-      {/* Confirmation Modal for UWP Bloatware Removal */}
+      {/* Confirmation modal for UWP bloatware removal */}
       {confirmUwpTarget && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <WinUICard className="max-w-md w-full p-5 space-y-3 shadow-2xl animate-fadeIn">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-[4px] bg-rose-500/10 border border-rose-500/20 text-rose-400 shrink-0">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fadeIn">
+          <Card className="max-w-md w-full p-5 space-y-4 shadow-2xl">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-lg bg-[color-mix(in_srgb,var(--danger)_14%,transparent)] flex items-center justify-center text-[var(--danger)] shrink-0">
                 <Delete20Regular className="w-5 h-5" />
               </div>
-              <div>
-                <h3 className="text-sm font-semibold text-[var(--text-primary)]">{t.applications.confirmUwpTitle}</h3>
-                <p className="text-xs text-[var(--text-secondary)] mt-0.5">{t.applications.confirmUwpDesc}</p>
+              <div className="space-y-1 min-w-0">
+                <h3 className="text-base font-semibold text-[var(--text-primary)]">{t.applications.confirmUwpTitle}</h3>
+                <p className="text-sm text-[var(--text-secondary)]">{t.applications.confirmUwpDesc}</p>
               </div>
             </div>
 
-            <div className="p-2.5 bg-black/30 rounded-[4px] border border-[var(--border-card)] font-ibm-mono text-xs space-y-0.5">
-              <div className="text-[var(--text-primary)] font-semibold">{confirmUwpTarget.display_name}</div>
-              <div className="text-[var(--text-muted)] text-[10px] truncate select-all">{confirmUwpTarget.package_full_name}</div>
+            <div className="rounded-md border border-[var(--border-card)] bg-[var(--bg-input)] px-3 py-2 space-y-0.5">
+              <div className="text-sm font-medium text-[var(--text-primary)]">{confirmUwpTarget.display_name}</div>
+              <div className="font-code text-xs text-[var(--text-muted)] truncate select-all" title={confirmUwpTarget.package_full_name}>
+                {confirmUwpTarget.package_full_name}
+              </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-2">
+            <div className="flex items-center justify-end gap-2 pt-1">
               <WinUIButton
-                variant="subtle"
+                variant="standard"
                 onClick={() => setConfirmUwpTarget(null)}
                 disabled={uninstallingPkg !== null}
               >
@@ -1111,51 +1064,60 @@ export const ApplicationsPage: React.FC = () => {
                 variant="danger"
                 onClick={() => handleUninstallUwp(confirmUwpTarget)}
                 disabled={uninstallingPkg === confirmUwpTarget.package_full_name}
+                icon={
+                  uninstallingPkg === confirmUwpTarget.package_full_name ? (
+                    <ArrowClockwise20Regular className="w-4 h-4 animate-spin" />
+                  ) : undefined
+                }
               >
                 {uninstallingPkg === confirmUwpTarget.package_full_name ? t.common.deleting : t.common.uninstall}
               </WinUIButton>
             </div>
-          </WinUICard>
+          </Card>
         </div>
       )}
 
-      {/* Post-Uninstall Leftovers Discovered Modal */}
+      {/* Post-uninstall leftovers discovered modal */}
       {leftoverModalResult && leftoverModalResult.leftovers && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <WinUICard className="max-w-lg w-full p-6 space-y-4 shadow-2xl animate-fadeIn">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-[4px] bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 shrink-0">
-                <Sparkle20Filled className="w-6 h-6" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fadeIn">
+          <Card className="max-w-lg w-full p-5 space-y-4 shadow-2xl">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-lg bg-[var(--fill-subtle)] flex items-center justify-center text-[var(--accent-text)] shrink-0">
+                <Sparkle20Regular className="w-5 h-5" />
               </div>
-              <div>
-                <h3 className="text-sm font-semibold text-[var(--text-primary)]">
+              <div className="space-y-1 min-w-0">
+                <h3 className="text-base font-semibold text-[var(--text-primary)]">
                   {t.applications.leftoversFoundModalTitle}
                 </h3>
-                <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+                <p className="text-sm text-[var(--text-secondary)]">
                   {t.applications.leftoversFoundModalDesc} ({leftoverModalResult.app_name})
                 </p>
               </div>
             </div>
 
-            <div className="max-h-60 overflow-y-auto space-y-1.5 p-3 bg-black/30 rounded-[4px] border border-[var(--border-card)] font-ibm-mono text-xs">
+            <div className="rounded-md border border-[var(--border-card)] bg-[var(--bg-input)] max-h-60 overflow-y-auto divide-y divide-[var(--border-divider)]">
               {leftoverModalResult.leftovers.items.map((item) => (
-                <div key={item.id} className="flex items-center justify-between gap-2 p-1.5 bg-white/[0.02] rounded">
-                  <span className="truncate text-[var(--text-secondary)]">{item.path_or_key}</span>
-                  <span className="shrink-0 font-bold text-emerald-400">{formatBytes(item.size_bytes)}</span>
+                <div key={item.id} className="flex items-center justify-between gap-2 px-3 py-1.5">
+                  <span className="font-code text-xs truncate text-[var(--text-secondary)]" title={item.path_or_key}>
+                    {item.path_or_key}
+                  </span>
+                  <span className="shrink-0 text-xs font-ibm-mono text-[var(--text-primary)]">
+                    {formatBytes(item.size_bytes)}
+                  </span>
                 </div>
               ))}
             </div>
 
-            <div className="flex items-center justify-between pt-2">
-              <div className="font-ibm-mono text-xs text-[var(--text-muted)]">
+            <div className="flex items-center justify-between gap-3 pt-1">
+              <div className="text-sm text-[var(--text-secondary)]">
                 {t.applications.leftoverSize}:{" "}
-                <span className="text-emerald-400 font-bold">
+                <span className="font-ibm-mono font-semibold text-[var(--text-primary)]">
                   {formatBytes(leftoverModalResult.leftovers.total_size_bytes)}
                 </span>
               </div>
               <div className="flex items-center gap-2">
                 <WinUIButton
-                  variant="subtle"
+                  variant="standard"
                   onClick={() => setLeftoverModalResult(null)}
                   disabled={cleaningModalLeftovers}
                 >
@@ -1165,16 +1127,18 @@ export const ApplicationsPage: React.FC = () => {
                   variant="primary"
                   onClick={() => handleCleanModalLeftovers(leftoverModalResult.leftovers!)}
                   disabled={cleaningModalLeftovers}
-                  className="bg-emerald-600 hover:bg-emerald-500 text-white"
+                  icon={
+                    cleaningModalLeftovers ? <ArrowClockwise20Regular className="w-4 h-4 animate-spin" /> : undefined
+                  }
                 >
                   {cleaningModalLeftovers ? t.applications.cleaningLeftovers : t.applications.cleanNow}
                 </WinUIButton>
               </div>
             </div>
-          </WinUICard>
+          </Card>
         </div>
       )}
-    </div>
+    </Page>
   );
 };
 
