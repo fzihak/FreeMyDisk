@@ -91,7 +91,7 @@ impl ScanExclusions {
                 .iter()
                 .any(|n| OsStr::new(n).eq_ignore_ascii_case(name))
         });
-        named || self.in_critical(path)
+        named || is_profile_app_data(path) || self.in_critical(path)
     }
 
     /// True for a file that is part of the operating system (page file, hibernation
@@ -104,6 +104,17 @@ impl ScanExclusions {
         });
         named || self.in_critical(path)
     }
+}
+
+/// True for `<drive>\Users\<name>\AppData`. Files there belong to installed
+/// apps (WSL and VM disks, app databases); deleting them breaks those apps,
+/// so file scans do not list them. Cache cleanup has its own rules.
+fn is_profile_app_data(path: &Path) -> bool {
+    let is = |p: Option<&Path>, want: &str| {
+        p.and_then(Path::file_name)
+            .is_some_and(|n| OsStr::new(want).eq_ignore_ascii_case(n))
+    };
+    is(Some(path), "AppData") && is(path.parent().and_then(Path::parent), "Users")
 }
 
 /// Live counters a caller can poll while [`discover_files`] runs.
@@ -287,6 +298,15 @@ where
 mod tests {
     use super::*;
     use std::fs;
+
+    #[test]
+    fn profile_app_data_is_skipped_but_user_folders_are_not() {
+        let ex = ScanExclusions::new();
+        assert!(ex.skip_dir(Path::new(r"D:\Users\someone\AppData")));
+        assert!(ex.skip_dir(Path::new(r"D:\Users\someone\appdata")));
+        assert!(!ex.skip_dir(Path::new(r"D:\Users\someone\Downloads")));
+        assert!(!ex.skip_dir(Path::new(r"D:\Projects\AppData")));
+    }
 
     fn collect(roots: &[PathBuf], min: u64) -> Vec<DiscoveredFile> {
         let found = Mutex::new(Vec::new());
