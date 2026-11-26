@@ -1,6 +1,6 @@
 name: Cleanup rule request
 description: Suggest an app or tool whose cache FreeMyDisk should clean
-labels: [rule-request]
+labels: [rule-request, needs-triage]
 body:
   - type: input
     id: app
