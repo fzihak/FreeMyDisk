@@ -1,208 +1,259 @@
-# FreeMyDisk
-
 <div align="center">
-  <img src="FMD_Icon.png" width="128" height="128" alt="FreeMyDisk Logo" />
-  <h1>FreeMyDisk</h1>
-  <p><strong>Next-Generation, Safe Disk Cleaning & Storage Optimization for Windows & macOS</strong></p>
-  <p>Created & Developed by <a href="https://github.com/fzihak"><strong>Foysal Zihak</strong></a></p>
 
-  <p>
-    <a href="https://github.com/fzihak/FreeMyDisk"><img src="https://img.shields.io/badge/GitHub-fzihak%2FFreeMyDisk-181717?style=flat-square&logo=github" alt="GitHub Repository" /></a>
-    <a href="https://github.com/fzihak/FreeMyDisk/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-GPL--3.0-blue?style=flat-square" alt="License: GPL-3.0" /></a>
-    <img src="https://img.shields.io/badge/Rust-1.85%2B-orange?style=flat-square&logo=rust" alt="Rust 1.85+" />
-    <img src="https://img.shields.io/badge/Tauri-v2-24C8DB?style=flat-square&logo=tauri" alt="Tauri v2" />
-    <img src="https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react" alt="React 19" />
-    <img src="https://img.shields.io/badge/Platform-Windows%20%7C%20macOS-0078D4?style=flat-square&logo=windows" alt="Windows & macOS" />
-  </p>
+<img src="docs/media/banner.svg" alt="FreeMyDisk — reclaim gigabytes on Windows, safely" width="100%" />
+
+<br />
+
+<a href="https://github.com/fzihak/FreeMyDisk/releases/latest"><img src="https://img.shields.io/github/v/release/fzihak/FreeMyDisk?style=for-the-badge&label=Download&logo=windows&color=0078d4" alt="Download the latest release" /></a>
+<a href="https://github.com/fzihak/FreeMyDisk/releases"><img src="https://img.shields.io/github/downloads/fzihak/FreeMyDisk/total?style=for-the-badge&color=2ea043" alt="Total downloads" /></a>
+<a href="https://github.com/fzihak/FreeMyDisk/stargazers"><img src="https://img.shields.io/github/stars/fzihak/FreeMyDisk?style=for-the-badge&color=f7b500" alt="GitHub stars" /></a>
+
+<a href="https://github.com/fzihak/FreeMyDisk/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/fzihak/FreeMyDisk/ci.yml?branch=main&style=flat-square&label=CI" alt="CI status" /></a>
+<a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0-blue?style=flat-square" alt="License: GPL-3.0" /></a>
+<img src="https://img.shields.io/badge/Rust-Tauri%202-orange?style=flat-square&logo=rust" alt="Rust and Tauri 2" />
+<img src="https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=white" alt="React 19" />
+<img src="https://img.shields.io/badge/telemetry-none-2ea043?style=flat-square" alt="No telemetry" />
+
+### Your drive is full of things you don't need. FreeMyDisk finds them, explains them, and frees the space — without ever risking the things you do need.
+
+**[⬇️ Download for Windows](https://github.com/fzihak/FreeMyDisk/releases/latest)** · **[See it in action](#-see-it-in-action)** · **[Why it's safe](#-safe-by-design-not-by-promise)** · **[CLI](#-power-users-the-cli)** · **[Add a rule](#-add-a-cleanup-rule-in-20-lines)**
+
 </div>
 
 ---
 
-## ⚡ Overview
+## 🎬 See it in action
 
-**FreeMyDisk** is a high-performance system maintenance and storage optimization utility designed with uncompromising safety standards. It bridges the gap between deep system decluttering and risk-free operation, featuring declarative cache scanners, Canvas-accelerated disk treemaps, 4-phase duplicate detection with physical block identity awareness, application leftover hunters, and privacy clean engines.
+<div align="center">
 
----
+<img src="docs/media/demo.webp" alt="FreeMyDisk demo: scanning junk, finding large files and duplicates, switching themes" width="100%" />
 
-## 🛡️ Core Safety Invariants
+<sub>Scan 122 cleanup rules → review what was found → find large files and duplicates → switch themes. Large Files and Duplicates show sample data in this clip.</sub>
 
-FreeMyDisk guarantees that user data is protected against accidental loss, unexpected crashes, and race conditions through strict invariants:
-
-1. **Trash-First by Default**: All user-facing deletions move items to the OS Recycle Bin / Trash with 100% rollback capability.
-2. **Zero Automatic Fallback**: If Trash disposal fails (e.g. non-supported volume or permission error), FreeMyDisk **NEVER** silently falls back to permanent deletion. The file is preserved and flagged.
-3. **Write-Ahead Log (WAL) Crash Recovery Journal**: Deletion intents are logged to an embedded SQLite WAL database before filesystem modifications. Interrupted sessions are automatically cleaned or rolled back.
-4. **Hardlink & Physical Block Identity (0-Savings)**: Duplicate detection inspects filesystem device IDs and file indices. Files pointing to identical physical disk blocks contribute **0 bytes** to potential savings calculations.
-5. **Canonical Path Deduplication**: Cleanup plans deduplicate targets by physical canonical path, ensuring zero redundant deletions or duplicate size metrics.
-6. **Subpath & Critical Directory Protection**: Kernel system directories (e.g. `C:\Windows`, `/System`, system user hives) are strictly protected by a non-bypassable path registry.
-7. **Active Browser Process Protection**: Scans detect active browser processes (Chrome, Edge, Firefox, Brave) and skip locked SQLite databases to prevent browser crashes.
+</div>
 
 ---
 
-## 🏗️ Architecture
+## ✨ Why FreeMyDisk?
 
-```
-┌───────────────────────────────────────────────────────────────┐
-│              FreeMyDisk Desktop Frontend (React 19)           │
-│        Clarity Engine • Canvas Treemap • TailwindCSS v4       │
-└───────────────────────────────┬───────────────────────────────┘
-                                │ Tauri v2 IPC
-┌───────────────────────────────▼───────────────────────────────┐
-│               Tauri Host Application (src-tauri)              │
-│       State Management • Permission Dispatch • Updater        │
-└───────────────┬───────────────────────────────┬───────────────┘
-                │                               │
-┌───────────────▼──────────────┐ ┌──────────────▼──────────────┐
-│  freemydisk-core (Rust)      │ │ freemydisk-cli (Rust CLI)    │
-│  • RuleEngine (TOML)         │ │ Headless terminal execution  │
-│  • DuplicateDetector (BLAKE3)│ │ Tabular / JSON / CSV output  │
-│  • LargeFilesScanner         │ └──────────────────────────────┘
-│  • StorageAnalyzer (Canvas)  │
-│  • CrashRecoveryJournal(WAL) │
-│  • DisposalEngine & Planner  │
-└───────────────┬──────────────┘
-                │ Platform Traits
-┌───────────────▼───────────────────────────────────────────────┐
-│               freemydisk-platform (Rust)                      │
-│     WindowsPlatform (Win32 / WinReg) • MacosPlatform          │
-└───────────────────────────────┬───────────────────────────────┘
-                                │ IPC Pipe (Named Pipe / UAC)
-┌───────────────────────────────▼───────────────────────────────┐
-│           freemydisk-elevated Helper Service                  │
-│    Allowlisted privileged actions (DISM, SFC, System Temp)    │
-└───────────────────────────────────────────────────────────────┘
-```
+<table>
+<tr>
+<td width="50%" valign="top">
+
+### 🛡️ Safe by default
+Everything goes to the **Recycle Bin** first. Every deletion is written to a **crash-safe journal** *before* it happens. System folders, files in use, and anything changed in the last 24 hours are left alone.
+
+</td>
+<td width="50%" valign="top">
+
+### ⚡ Fast, because it's Rust
+A full scan of **122 cleanup rules takes ~9 s**. Large files across 5 drives in **under a minute**. Duplicates are confirmed with **BLAKE3** after cheap size and sample checks, so it only reads what it has to.
+
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+
+### 🔍 It tells you what — and why
+No mystery "registry issues found!". Every item shows what it is, which app owns it, whether it's safe to remove, and why something couldn't be cleaned (in use, needs administrator, protected).
+
+</td>
+<td width="50%" valign="top">
+
+### 🔒 Private and open
+**No accounts, no ads, no telemetry.** The only network request is the optional update check against this repository. Every release is built in public CI and **signed**; every installer carries a **build-provenance attestation**.
+
+</td>
+</tr>
+</table>
 
 ---
 
-## 📦 System Modules & Features
+## 🧰 Everything in one place
 
-| Module | Features & Capabilities |
+| | Tool | What it does |
+| :---: | :--- | :--- |
+| 🏠 | **Dashboard** | Drive health at a glance, one-click **Clean Now** that only takes what can succeed right now, Recycle Bin, memory, and low-space rescue. |
+| 🧹 | **Deep Cleanup** | **122 rules** for Windows, browsers, apps, developer tools and AI caches — each with risk level, owner app and size. Developer project artifacts (`node_modules`, `target`, build caches) and AI model caches have their own views. |
+| 🗺️ | **Space Visualizer** | Interactive treemap of any drive or folder, plus a list of the heaviest folders. |
+| 📦 | **Large Files** | Finds the biggest files on every drive, sorted and filterable. System files (`pagefile.sys`, `hiberfil.sys`) and app data are never offered. |
+| 👯 | **Duplicates** | Byte-identical duplicates with a keep/delete choice per copy. Hard links count as 0 bytes saved, and it never removes every copy. |
+| 🕶️ | **Privacy Cleaner** | Browser history, cookies, caches and sessions, grouped per browser, with a cookie whitelist for the sites you want to stay signed in to. |
+| 🧩 | **Apps & Leftovers** | Uninstall apps (desktop and Store) and hunt the files and registry keys they leave behind. |
+| 🚀 | **Startup Apps** | See every startup entry with its boot impact; turn things off safely. |
+| 🔧 | **Maintenance & Optimizer** | Repair caches, DNS, search index and Windows Update; manage hibernation, Storage Sense, WSL and Docker disks. |
+| 🆘 | **Emergency Rescue** | When a drive is nearly full: one guided run that frees space fast — with every step shown before it starts. |
+| 🧾 | **Audit Log** | Every operation and its result, plus files queued for deletion on the next restart. |
+
+<details>
+<summary><b>📸 Screenshots</b></summary>
+<br />
+
+| Dashboard (dark) | Dashboard (light) |
+| :---: | :---: |
+| <img src="docs/media/screens/dashboard-dark.png" alt="Dashboard, dark theme" /> | <img src="docs/media/screens/dashboard-light.png" alt="Dashboard, light theme" /> |
+| **Deep Cleanup** | **Large Files** |
+| <img src="docs/media/screens/deep-cleanup.png" alt="Deep Cleanup" /> | <img src="docs/media/screens/large-files.png" alt="Large Files" /> |
+| **Duplicates** | **Privacy Cleaner** |
+| <img src="docs/media/screens/duplicates.png" alt="Duplicate Files" /> | <img src="docs/media/screens/privacy.png" alt="Privacy Cleaner" /> |
+| **Startup Apps** | **Settings** |
+| <img src="docs/media/screens/startup.png" alt="Startup Apps" /> | <img src="docs/media/screens/settings.png" alt="Settings" /> |
+
+</details>
+
+---
+
+## 🛡️ Safe by design, not by promise
+
+Most cleaners ask you to trust them. FreeMyDisk is built so that a bug, a crash or a misclick can't cost you your files:
+
+| Guarantee | How |
 | :--- | :--- |
-| **Dashboard** | Real-time storage gauges, quick system health overview, one-click safe cleanup. |
-| **Cleanup** | Declarative TOML-based rule scanning across System, Browser, Development, and AI model caches. |
-| **Storage (Treemap)** | Canvas-rendered Squarified D3 treemap with memory spillover store and hierarchical zoom. |
-| **Large Files** | Multi-root traversal discovering large files with extension classification (Media, Archives, Documents, Binaries). |
-| **Duplicates** | 4-phase deduplication engine (Size → Identity → Sample Hash → BLAKE3 Full Hash) with smart heuristic selection. |
-| **Privacy** | Cleans browser history, download cache, and cookies with configurable cookie whitelist domain protection. |
-| **Applications** | Lists installed software, tracks disk consumption, and cleans post-uninstall leftover artifacts. |
-| **Startup** | Analyzes startup software with calculated boot impact ratings and protected system guards. |
-| **Maintenance** | Diagnostics: Icon & Thumbnail cache reset, DNS resolver flush, Search Index rebuild, Windows Update cache purge, Network reset. |
-| **Optimization** | Hibernation file management (`hiberfil.sys`), Storage Sense automated toggling, and Delivery Optimization cache purge. |
-| **History** | Audit log of all completed cleanup sessions with recovered bytes and execution logs. |
-| **Settings** | Extra-safe global Trash override, auto-updater configuration, and telemetry preferences. |
+| **Recycle Bin first** | User-facing deletions go to the Recycle Bin. If that fails, the file is **kept and flagged** — never silently deleted permanently. |
+| **Crash-safe journal** | Each deletion is recorded in an SQLite WAL journal *before* it touches the disk. An interrupted cleanup is detected and recovered on the next start. |
+| **Protected paths** | Windows, Program Files, user hives and FreeMyDisk itself are behind a non-bypassable protected-path registry. |
+| **Nothing in use** | Files held open by a running app are skipped; caches of running browsers are flagged with *"close Chrome to clean"*. |
+| **Recent files are kept** | Temp and dump cleaning skips anything modified in the last 24 hours. |
+| **Real sizes** | Duplicates and plans deduplicate by physical file identity — hard links never inflate "space saved". |
+| **Least privilege** | Runs as a normal user. Admin-only tasks go through a small allow-listed helper behind the Windows UAC prompt. |
+| **Signed updates** | Updates are offered, never forced. Downloads are verified against the app's built-in public key before they install. |
 
 ---
 
-## 💻 Headless CLI (`freemydisk`)
+## ⬇️ Install
 
-FreeMyDisk includes a full-featured headless CLI binary for automation, scripts, and terminal power users.
+1. Download **`FreeMyDisk_<version>_x64-setup.exe`** from the [latest release](https://github.com/fzihak/FreeMyDisk/releases/latest).
+2. Run it. Install for just you, or for all users.
+3. That's it — FreeMyDisk tells you when a new version is out and updates itself after you say yes.
 
-### Global Installation / Build
-```bash
-cargo build --release -p freemydisk-cli
-# Executable located at: target/release/freemydisk-cli
+**Requirements:** Windows 10 or 11 (64-bit) with WebView2 (already part of current Windows).
+
+<details>
+<summary><b>Verify your download</b></summary>
+<br />
+
+Every installer is built by GitHub Actions from this repository and carries a signed build-provenance attestation:
+
+```powershell
+gh attestation verify .\FreeMyDisk_1.1.0_x64-setup.exe --repo fzihak/FreeMyDisk
 ```
 
-### CLI Command Reference
-
-#### 1. Scan verified caches
-```bash
-# Scan all caches with rich tabular output
-freemydisk scan
-
-# Filter by category (system, browser, development, application, ai)
-freemydisk scan --category browser
-
-# Output in JSON or CSV for scripting
-freemydisk scan --format json
-freemydisk scan --format csv
-```
-
-#### 2. Safe cleanup execution
-```bash
-# Dry-run simulation (no files are deleted or modified)
-freemydisk clean --dry-run
-
-# Interactive cleanup with Recycle Bin / Trash default
-freemydisk clean
-
-# Automated non-interactive cleanup for cron/scripts
-freemydisk clean --yes
-
-# Filter cleanup by category
-freemydisk clean --category system --yes
-```
-
-#### 3. Duplicate file detection
-```bash
-# Scan current directory for duplicates >= 10 MB
-freemydisk duplicates --min-size 10
-
-# Scan multiple specific directories
-freemydisk duplicates --roots "C:\Projects" "D:\Downloads" --min-size 5
-```
-
-#### 4. Large files discovery
-```bash
-# Find files larger than 500 MB (top 50)
-freemydisk large-files --min-size 500 --limit 50
-```
-
-#### 5. Storage analysis tree
-```bash
-# Print hierarchical storage breakdown tree (depth 3)
-freemydisk analyze --path "C:\Users\foysa" --depth 3
-```
-
-#### 6. System maintenance & repair
-```bash
-# List available diagnostic repair tasks
-freemydisk maintenance --list
-
-# Run a specific task by ID
-freemydisk maintenance --task dns_flush
-
-# Run all recommended safe repair tasks
-freemydisk maintenance --all
-```
-
-#### 7. Startup application impact
-```bash
-# Display registered startup software and boot impact scores
-freemydisk startup
-```
+</details>
 
 ---
 
-## 🧪 Testing & Verification
+## 💻 Power users: the CLI
 
-The FreeMyDisk codebase is test-gated across all backend crates and frontend components:
+The installer ships `freemydisk-cli.exe` — the same engine, scriptable, with `text`, `json` and `csv` output.
 
-```bash
-# Run all 36+ Rust workspace tests (domain logic, platform traits, journals, CLI)
-cargo test --workspace
-
-# Run frontend test suite (Vitest + React Testing Library)
-pnpm test
-
-# Build production bundle
-pnpm build
+```powershell
+freemydisk-cli scan --category browser            # what can be cleaned, per rule
+freemydisk-cli clean --dry-run                    # show exactly what would happen
+freemydisk-cli clean --category development --yes # clean dev caches, no prompt
+freemydisk-cli large-files --min-size 500 --limit 20
+freemydisk-cli duplicates --roots "D:\Photos" --min-size 5
+freemydisk-cli analyze --path "D:\Projects" --depth 3
+freemydisk-cli maintenance --list
+freemydisk-cli vitals --format json
 ```
 
----
-
-## 👨‍💻 Author & Credits
-
-FreeMyDisk is designed and engineered by **Foysal Zihak** ([@fzihak](https://github.com/fzihak)).
-
-- **GitHub Repository**: [https://github.com/fzihak/FreeMyDisk](https://github.com/fzihak/FreeMyDisk)
-- **Author Profile**: [https://github.com/fzihak](https://github.com/fzihak)
-- **Bug Tracker & Issues**: [https://github.com/fzihak/FreeMyDisk/issues](https://github.com/fzihak/FreeMyDisk/issues)
-- **Release Downloads**: [https://github.com/fzihak/FreeMyDisk/releases](https://github.com/fzihak/FreeMyDisk/releases)
+Also available: `artifacts`, `heavy-folders`, `apps`, `privacy`, `startup`, `rescue` and `virtualization`. Run `freemydisk-cli <command> --help` for details.
 
 ---
 
-## 📜 License
+## 🧩 Add a cleanup rule in 20 lines
 
-FreeMyDisk is open-source software licensed under the **[GNU General Public License v3.0](LICENSE)** (GPL-3.0-only).  
-Trademarks, product naming, and visual identity are governed under **[TRADEMARK.md](TRADEMARK.md)**.
+Rules are plain TOML — no code, no rebuild of the engine logic. This is the real rule for Spotify:
+
+```toml
+[rule]
+id = "windows_application_spotify_cache"
+name = "Spotify Media & Storage Cache"
+category = "application"
+risk = "safe"
+verified_rebuildable = true
+description = "Cached streamed audio chunks and offline artwork stored by Spotify"
+platform = "windows"
+locking_processes = ["spotify.exe"]       # skipped while Spotify is running
+
+[applicability]
+conditions = [{ type = "path_exists", path = "${local_app_data}/Spotify/Data" }]
+
+[targets]
+paths = [{ path = "${local_app_data}/Spotify/Data/*", matcher = "glob" }]
+
+[disposal]
+default_action = "permanent"
+protect_subpaths = ["*/Users/*"]
+```
+
+Drop a file into [`src-tauri/crates/freemydisk-core/rules/`](src-tauri/crates/freemydisk-core/rules) and open a pull request. Your favourite app's cache could be rule #123.
+
+---
+
+## 🏗️ How it's built
+
+```mermaid
+flowchart LR
+    UI["React 19 UI<br/>Windows 11 design"] -- "Tauri IPC" --> Host["Tauri 2 host<br/>commands · events · updater"]
+    Host --> Core["freemydisk-core<br/>rule engine · planner · disposal · journal<br/>duplicates (BLAKE3) · scanners"]
+    CLI["freemydisk-cli"] --> Core
+    Core --> Platform["freemydisk-platform<br/>Win32 · Recycle Bin · Restart Manager"]
+    Host -. "UAC, allow-listed actions" .-> Helper["freemydisk-elevated"]
+```
+
+| Layer | Tech |
+| :--- | :--- |
+| Engine | Rust 2021 · rayon · BLAKE3 · rusqlite (WAL) · Win32 APIs |
+| App | Tauri 2 · React 19 · TypeScript · Tailwind CSS 4 · Zustand |
+| Quality | `cargo clippy -D warnings` · Rust integration tests · Vitest · CI on every PR |
+| Supply chain | Actions pinned to commit SHAs · protected release environment · signed updates · build attestations |
+
+<details>
+<summary><b>Build from source</b></summary>
+<br />
+
+```powershell
+git clone https://github.com/fzihak/FreeMyDisk.git
+cd FreeMyDisk
+pnpm install
+pnpm tauri dev          # run the app
+cargo test --workspace  # Rust tests
+pnpm test               # UI tests
+pnpm build:bundle       # Windows installer (NSIS)
+```
+
+Needs Rust (stable), Node.js 20+, pnpm 9+ and the Visual Studio C++ build tools.
+
+</details>
+
+---
+
+## 🗺️ Roadmap
+
+- [x] Windows 10 / 11 release with signed in-app updates
+- [x] 122 cleanup rules incl. developer and AI caches
+- [ ] `winget install FreeMyDisk`
+- [ ] Scheduled background cleaning
+- [ ] macOS and Linux
+- [ ] More languages for the UI (9 already included — help translating!)
+
+---
+
+## 🤝 Contributing
+
+Bug reports, rules and translations are all very welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md), or [open an issue](https://github.com/fzihak/FreeMyDisk/issues/new).
+
+If FreeMyDisk freed some space for you, **a ⭐ helps other people find it.**
+
+<a href="https://star-history.com/#fzihak/FreeMyDisk&Date">
+  <img src="https://api.star-history.com/svg?repos=fzihak/FreeMyDisk&type=Date" alt="Star history" width="600" />
+</a>
+
+---
+
+<div align="center">
+
+**[GPL-3.0](LICENSE)** · Name and logo: [TRADEMARK.md](TRADEMARK.md) · Made by [@fzihak](https://github.com/fzihak)
+
+</div>

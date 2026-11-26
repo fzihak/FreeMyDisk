@@ -1,0 +1,39 @@
+name: Bug report
+description: Something doesn't work as expected
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for helping make FreeMyDisk better! Please fill in what you can.
+  - type: input
+    id: version
+    attributes:
+      label: FreeMyDisk version
+      description: Settings → About
+      placeholder: "1.0.0"
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version
+      placeholder: "Windows 11 24H2"
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open Deep Cleanup
+        2. Click …
+  - type: textarea
+    id: logs
+    attributes:
+      label: Screenshots or error messages
+      description: Please remove any personal file names or paths you don't want to share.
