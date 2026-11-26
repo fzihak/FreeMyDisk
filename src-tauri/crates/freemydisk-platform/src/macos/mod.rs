@@ -12,6 +12,10 @@ impl MacosPlatform {
     pub fn new() -> Self {
         Self
     }
+
+    pub fn get_system_vitals(&self) -> Result<crate::traits::SystemVitals, PlatformError> {
+        Ok(crate::unix::system_vitals("macOS"))
+    }
 }
 
 impl Default for MacosPlatform {
@@ -71,11 +75,7 @@ impl PlatformFilesystem for MacosPlatform {
     }
 
     fn list_volumes(&self) -> Result<Vec<crate::traits::StorageVolumeInfo>, PlatformError> {
-        Ok(vec![crate::unix_volume::volume_info(
-            "/",
-            "Macintosh HD",
-            "APFS",
-        )?])
+        Ok(vec![crate::unix::volume_info("/", "Macintosh HD", "APFS")?])
     }
 }
 
@@ -91,7 +91,7 @@ impl PlatformRebootQueue for MacosPlatform {
 
 impl PlatformElevation for MacosPlatform {
     fn is_elevated(&self) -> bool {
-        crate::unix_volume::is_root()
+        crate::unix::is_root()
     }
 }
 

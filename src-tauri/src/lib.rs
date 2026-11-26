@@ -600,6 +600,7 @@ async fn execute_cleanup_rules(
         let platform = get_platform();
 
         if is_dry_run {
+            #[cfg_attr(not(target_os = "windows"), allow(unused_mut))]
             let mut results: Vec<DisposalItemResult> = candidates
                 .iter()
                 .map(|c| DisposalItemResult {

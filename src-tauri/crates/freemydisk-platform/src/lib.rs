@@ -6,7 +6,7 @@ pub mod storage_optim;
 pub mod traits;
 
 #[cfg(unix)]
-mod unix_volume;
+mod unix;
 
 #[cfg(target_os = "windows")]
 pub mod windows;

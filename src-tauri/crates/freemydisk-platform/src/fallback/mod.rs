@@ -12,6 +12,19 @@ impl FallbackPlatform {
     pub fn new() -> Self {
         Self
     }
+
+    pub fn get_system_vitals(&self) -> Result<crate::traits::SystemVitals, PlatformError> {
+        #[cfg(unix)]
+        {
+            Ok(crate::unix::system_vitals("Linux"))
+        }
+        #[cfg(not(unix))]
+        {
+            Err(PlatformError::Unsupported(
+                "System vitals are not available on this platform".to_string(),
+            ))
+        }
+    }
 }
 
 impl Default for FallbackPlatform {
@@ -85,7 +98,7 @@ impl PlatformFilesystem for FallbackPlatform {
     fn list_volumes(&self) -> Result<Vec<crate::traits::StorageVolumeInfo>, PlatformError> {
         #[cfg(unix)]
         {
-            Ok(vec![crate::unix_volume::volume_info("/", "Root", "")?])
+            Ok(vec![crate::unix::volume_info("/", "Root", "")?])
         }
         #[cfg(not(unix))]
         {
@@ -108,7 +121,7 @@ impl PlatformElevation for FallbackPlatform {
     fn is_elevated(&self) -> bool {
         #[cfg(unix)]
         {
-            crate::unix_volume::is_root()
+            crate::unix::is_root()
         }
         #[cfg(not(unix))]
         {
