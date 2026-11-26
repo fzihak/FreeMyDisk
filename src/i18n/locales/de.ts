@@ -502,7 +502,13 @@ export const de: TranslationSchema = {
     "statAllDesc": "Registry, Autostart-Ordner & geplante Aufgaben",
     "statEnabledDesc": "Starten automatisch bei der Anmeldung",
     "statHighDesc": "Aktivierte Einträge, die den Start verlangsamen",
-    "statCriticalDesc": "Von Windows benötigt, nicht deaktivierbar"
+    "statCriticalDesc": "Von Windows benötigt, nicht deaktivierbar",
+    "pageDesc": "See which apps start with Windows and turn off the ones you do not need.",
+    "statProtected": "Protected entries",
+    "systemCritical": "System critical",
+    "loadingDesc": "Reading Run registry keys, Startup folders and scheduled tasks...",
+    "openLocation": "Open file location",
+    "protectedHint": "Protected: required by Windows"
   },
   "privacy": {
     "title": "Datenschutz",
@@ -527,7 +533,27 @@ export const de: TranslationSchema = {
     "noItemsFound": "Keine Einträge gefunden",
     "noItemsDesc": "Keine Datenschutzspuren vorhanden.",
     "runningBrowsers": "Aktiv",
-    "allTypes": "Alle Typen"
+    "allTypes": "Alle Typen",
+    "dataProtectionBadge": "Data Protection",
+    "closeBrowsers": "Close running browsers",
+    "closingBrowsers": "Closing browsers…",
+    "statItems": "Items found",
+    "itemsShown": "shown",
+    "statSize": "Total size",
+    "selectedLabel": "selected",
+    "statBrowsers": "Browsers detected",
+    "runningLabel": "running",
+    "statLocked": "Locked by a browser",
+    "lockedHint": "Close the browser to clean them",
+    "nothingLocked": "Nothing locked",
+    "profile": "profile",
+    "profiles": "profiles",
+    "items": "items",
+    "selectAllInBrowser": "Select all in this browser",
+    "lockedByBrowser": "Locked by running browser",
+    "scanTitle": "Scan browser privacy data",
+    "scanDesc": "Find caches, history, cookies and activity traces left by your browsers and Windows.",
+    "startScan": "Scan now"
   },
   "maintenance": {
     "title": "Systemwartung",

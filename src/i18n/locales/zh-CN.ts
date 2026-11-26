@@ -502,7 +502,13 @@ export const zhCN: TranslationSchema = {
     "statAllDesc": "注册表、启动文件夹和计划任务",
     "statEnabledDesc": "登录时自动启动",
     "statHighDesc": "拖慢开机的已启用项",
-    "statCriticalDesc": "Windows 必需，无法禁用"
+    "statCriticalDesc": "Windows 必需，无法禁用",
+    "pageDesc": "See which apps start with Windows and turn off the ones you do not need.",
+    "statProtected": "Protected entries",
+    "systemCritical": "System critical",
+    "loadingDesc": "Reading Run registry keys, Startup folders and scheduled tasks...",
+    "openLocation": "Open file location",
+    "protectedHint": "Protected: required by Windows"
   },
   "privacy": {
     "title": "浏览器与隐私清理器",
@@ -527,7 +533,27 @@ export const zhCN: TranslationSchema = {
     "noItemsFound": "未发现隐私痕迹",
     "noItemsDesc": "没有匹配您筛选条件的上网记录或临时追踪文件。",
     "runningBrowsers": "正在运行",
-    "allTypes": "所有类型"
+    "allTypes": "所有类型",
+    "dataProtectionBadge": "Data Protection",
+    "closeBrowsers": "Close running browsers",
+    "closingBrowsers": "Closing browsers…",
+    "statItems": "Items found",
+    "itemsShown": "shown",
+    "statSize": "Total size",
+    "selectedLabel": "selected",
+    "statBrowsers": "Browsers detected",
+    "runningLabel": "running",
+    "statLocked": "Locked by a browser",
+    "lockedHint": "Close the browser to clean them",
+    "nothingLocked": "Nothing locked",
+    "profile": "profile",
+    "profiles": "profiles",
+    "items": "items",
+    "selectAllInBrowser": "Select all in this browser",
+    "lockedByBrowser": "Locked by running browser",
+    "scanTitle": "Scan browser privacy data",
+    "scanDesc": "Find caches, history, cookies and activity traces left by your browsers and Windows.",
+    "startScan": "Scan now"
   },
   "maintenance": {
     "title": "系统健康与日常维护",

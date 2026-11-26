@@ -502,7 +502,13 @@ export const bn: TranslationSchema = {
     "statAllDesc": "রেজিস্ট্রি, স্টার্টআপ ফোল্ডার ও নির্ধারিত টাস্ক",
     "statEnabledDesc": "সাইন-ইনের সময় স্বয়ংক্রিয়ভাবে চালু হয়",
     "statHighDesc": "চালু থাকা এন্ট্রি যা বুট ধীর করে",
-    "statCriticalDesc": "Windows-এর জন্য প্রয়োজনীয়, বন্ধ করা যায় না"
+    "statCriticalDesc": "Windows-এর জন্য প্রয়োজনীয়, বন্ধ করা যায় না",
+    "pageDesc": "See which apps start with Windows and turn off the ones you do not need.",
+    "statProtected": "Protected entries",
+    "systemCritical": "System critical",
+    "loadingDesc": "Reading Run registry keys, Startup folders and scheduled tasks...",
+    "openLocation": "Open file location",
+    "protectedHint": "Protected: required by Windows"
   },
   "privacy": {
     "title": "প্রাইভেসি ক্লিনার",
@@ -527,7 +533,27 @@ export const bn: TranslationSchema = {
     "noItemsFound": "কোন আইটেম নেই",
     "noItemsDesc": "মুছে ফেলার মতো কোনো প্রাইভেসি রেকর্ড নেই।",
     "runningBrowsers": "চলমান",
-    "allTypes": "সব ধরন"
+    "allTypes": "সব ধরন",
+    "dataProtectionBadge": "Data Protection",
+    "closeBrowsers": "Close running browsers",
+    "closingBrowsers": "Closing browsers…",
+    "statItems": "Items found",
+    "itemsShown": "shown",
+    "statSize": "Total size",
+    "selectedLabel": "selected",
+    "statBrowsers": "Browsers detected",
+    "runningLabel": "running",
+    "statLocked": "Locked by a browser",
+    "lockedHint": "Close the browser to clean them",
+    "nothingLocked": "Nothing locked",
+    "profile": "profile",
+    "profiles": "profiles",
+    "items": "items",
+    "selectAllInBrowser": "Select all in this browser",
+    "lockedByBrowser": "Locked by running browser",
+    "scanTitle": "Scan browser privacy data",
+    "scanDesc": "Find caches, history, cookies and activity traces left by your browsers and Windows.",
+    "startScan": "Scan now"
   },
   "maintenance": {
     "title": "সিস্টেম রক্ষণাবেক্ষণ",

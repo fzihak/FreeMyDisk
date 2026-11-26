@@ -502,7 +502,13 @@ export const fr: TranslationSchema = {
     "statAllDesc": "Registre, dossier Démarrage et tâches planifiées",
     "statEnabledDesc": "Se lancent automatiquement à l'ouverture de session",
     "statHighDesc": "Entrées actives qui ralentissent le démarrage",
-    "statCriticalDesc": "Requises par Windows, impossible à désactiver"
+    "statCriticalDesc": "Requises par Windows, impossible à désactiver",
+    "pageDesc": "See which apps start with Windows and turn off the ones you do not need.",
+    "statProtected": "Protected entries",
+    "systemCritical": "System critical",
+    "loadingDesc": "Reading Run registry keys, Startup folders and scheduled tasks...",
+    "openLocation": "Open file location",
+    "protectedHint": "Protected: required by Windows"
   },
   "privacy": {
     "title": "Nettoyeur de confidentialité",
@@ -527,7 +533,27 @@ export const fr: TranslationSchema = {
     "noItemsFound": "Zéro élément trouvé",
     "noItemsDesc": "Aucune trace de navigation ne correspond à vos critères.",
     "runningBrowsers": "En cours",
-    "allTypes": "Tous les types"
+    "allTypes": "Tous les types",
+    "dataProtectionBadge": "Data Protection",
+    "closeBrowsers": "Close running browsers",
+    "closingBrowsers": "Closing browsers…",
+    "statItems": "Items found",
+    "itemsShown": "shown",
+    "statSize": "Total size",
+    "selectedLabel": "selected",
+    "statBrowsers": "Browsers detected",
+    "runningLabel": "running",
+    "statLocked": "Locked by a browser",
+    "lockedHint": "Close the browser to clean them",
+    "nothingLocked": "Nothing locked",
+    "profile": "profile",
+    "profiles": "profiles",
+    "items": "items",
+    "selectAllInBrowser": "Select all in this browser",
+    "lockedByBrowser": "Locked by running browser",
+    "scanTitle": "Scan browser privacy data",
+    "scanDesc": "Find caches, history, cookies and activity traces left by your browsers and Windows.",
+    "startScan": "Scan now"
   },
   "maintenance": {
     "title": "Maintenance et santé système",

@@ -502,7 +502,13 @@ export const ja: TranslationSchema = {
     "statAllDesc": "レジストリ、スタートアップフォルダー、タスク スケジューラ",
     "statEnabledDesc": "サインイン時に自動起動",
     "statHighDesc": "起動を遅くする有効な項目",
-    "statCriticalDesc": "Windows に必須、無効化不可"
+    "statCriticalDesc": "Windows に必須、無効化不可",
+    "pageDesc": "See which apps start with Windows and turn off the ones you do not need.",
+    "statProtected": "Protected entries",
+    "systemCritical": "System critical",
+    "loadingDesc": "Reading Run registry keys, Startup folders and scheduled tasks...",
+    "openLocation": "Open file location",
+    "protectedHint": "Protected: required by Windows"
   },
   "privacy": {
     "title": "プライバシークリーナー",
@@ -527,7 +533,27 @@ export const ja: TranslationSchema = {
     "noItemsFound": "項目が見つかりません",
     "noItemsDesc": "消去対象のプライバシー履歴はありません。",
     "runningBrowsers": "実行中",
-    "allTypes": "すべての種類"
+    "allTypes": "すべての種類",
+    "dataProtectionBadge": "Data Protection",
+    "closeBrowsers": "Close running browsers",
+    "closingBrowsers": "Closing browsers…",
+    "statItems": "Items found",
+    "itemsShown": "shown",
+    "statSize": "Total size",
+    "selectedLabel": "selected",
+    "statBrowsers": "Browsers detected",
+    "runningLabel": "running",
+    "statLocked": "Locked by a browser",
+    "lockedHint": "Close the browser to clean them",
+    "nothingLocked": "Nothing locked",
+    "profile": "profile",
+    "profiles": "profiles",
+    "items": "items",
+    "selectAllInBrowser": "Select all in this browser",
+    "lockedByBrowser": "Locked by running browser",
+    "scanTitle": "Scan browser privacy data",
+    "scanDesc": "Find caches, history, cookies and activity traces left by your browsers and Windows.",
+    "startScan": "Scan now"
   },
   "maintenance": {
     "title": "システムメンテナンス",

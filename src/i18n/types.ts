@@ -577,6 +577,12 @@ export interface TranslationSchema {
     statEnabledDesc: string;
     statHighDesc: string;
     statCriticalDesc: string;
+    pageDesc: string;
+    statProtected: string;
+    systemCritical: string;
+    loadingDesc: string;
+    openLocation: string;
+    protectedHint: string;
   };
   privacy: {
     title: string;
@@ -602,6 +608,26 @@ export interface TranslationSchema {
     noItemsDesc: string;
     runningBrowsers: string;
     allTypes: string;
+    dataProtectionBadge: string;
+    closeBrowsers: string;
+    closingBrowsers: string;
+    statItems: string;
+    itemsShown: string;
+    statSize: string;
+    selectedLabel: string;
+    statBrowsers: string;
+    runningLabel: string;
+    statLocked: string;
+    lockedHint: string;
+    nothingLocked: string;
+    profile: string;
+    profiles: string;
+    items: string;
+    selectAllInBrowser: string;
+    lockedByBrowser: string;
+    scanTitle: string;
+    scanDesc: string;
+    startScan: string;
   };
   maintenance: {
     title: string;

@@ -502,7 +502,13 @@ export const ptBR: TranslationSchema = {
     "statAllDesc": "Registro, pasta Inicializar e tarefas agendadas",
     "statEnabledDesc": "Iniciam automaticamente ao entrar",
     "statHighDesc": "Entradas ativas que deixam a inicialização lenta",
-    "statCriticalDesc": "Exigidos pelo Windows, não podem ser desativados"
+    "statCriticalDesc": "Exigidos pelo Windows, não podem ser desativados",
+    "pageDesc": "See which apps start with Windows and turn off the ones you do not need.",
+    "statProtected": "Protected entries",
+    "systemCritical": "System critical",
+    "loadingDesc": "Reading Run registry keys, Startup folders and scheduled tasks...",
+    "openLocation": "Open file location",
+    "protectedHint": "Protected: required by Windows"
   },
   "privacy": {
     "title": "Limpador de Privacidade e Navegadores",
@@ -527,7 +533,27 @@ export const ptBR: TranslationSchema = {
     "noItemsFound": "Nenhum Item de Privacidade Encontrado",
     "noItemsDesc": "Nenhum rastro ou arquivo de rastreamento corresponde à sua pesquisa.",
     "runningBrowsers": "Em execução",
-    "allTypes": "Todos os tipos"
+    "allTypes": "Todos os tipos",
+    "dataProtectionBadge": "Data Protection",
+    "closeBrowsers": "Close running browsers",
+    "closingBrowsers": "Closing browsers…",
+    "statItems": "Items found",
+    "itemsShown": "shown",
+    "statSize": "Total size",
+    "selectedLabel": "selected",
+    "statBrowsers": "Browsers detected",
+    "runningLabel": "running",
+    "statLocked": "Locked by a browser",
+    "lockedHint": "Close the browser to clean them",
+    "nothingLocked": "Nothing locked",
+    "profile": "profile",
+    "profiles": "profiles",
+    "items": "items",
+    "selectAllInBrowser": "Select all in this browser",
+    "lockedByBrowser": "Locked by running browser",
+    "scanTitle": "Scan browser privacy data",
+    "scanDesc": "Find caches, history, cookies and activity traces left by your browsers and Windows.",
+    "startScan": "Scan now"
   },
   "maintenance": {
     "title": "Manutenção e Saúde do Sistema",

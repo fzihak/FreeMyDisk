@@ -502,7 +502,13 @@ export const es: TranslationSchema = {
     "statAllDesc": "Registro, carpeta Inicio y tareas programadas",
     "statEnabledDesc": "Se inician automáticamente al iniciar sesión",
     "statHighDesc": "Entradas activas que ralentizan el arranque",
-    "statCriticalDesc": "Requeridas por Windows, no se pueden desactivar"
+    "statCriticalDesc": "Requeridas por Windows, no se pueden desactivar",
+    "pageDesc": "See which apps start with Windows and turn off the ones you do not need.",
+    "statProtected": "Protected entries",
+    "systemCritical": "System critical",
+    "loadingDesc": "Reading Run registry keys, Startup folders and scheduled tasks...",
+    "openLocation": "Open file location",
+    "protectedHint": "Protected: required by Windows"
   },
   "privacy": {
     "title": "Limpiador de privacidad y navegadores",
@@ -527,7 +533,27 @@ export const es: TranslationSchema = {
     "noItemsFound": "Cero elementos de privacidad",
     "noItemsDesc": "No se encontraron rastros que coincidan con tu búsqueda.",
     "runningBrowsers": "En ejecución",
-    "allTypes": "Todos los tipos"
+    "allTypes": "Todos los tipos",
+    "dataProtectionBadge": "Data Protection",
+    "closeBrowsers": "Close running browsers",
+    "closingBrowsers": "Closing browsers…",
+    "statItems": "Items found",
+    "itemsShown": "shown",
+    "statSize": "Total size",
+    "selectedLabel": "selected",
+    "statBrowsers": "Browsers detected",
+    "runningLabel": "running",
+    "statLocked": "Locked by a browser",
+    "lockedHint": "Close the browser to clean them",
+    "nothingLocked": "Nothing locked",
+    "profile": "profile",
+    "profiles": "profiles",
+    "items": "items",
+    "selectAllInBrowser": "Select all in this browser",
+    "lockedByBrowser": "Locked by running browser",
+    "scanTitle": "Scan browser privacy data",
+    "scanDesc": "Find caches, history, cookies and activity traces left by your browsers and Windows.",
+    "startScan": "Scan now"
   },
   "maintenance": {
     "title": "Mantenimiento y salud del sistema",

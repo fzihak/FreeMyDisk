@@ -1,17 +1,15 @@
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useI18nStore } from "@/i18n";
-import { WinUICard } from "@/components/winui/WinUICard";
+import { useScanProgress, useScanProgressStore } from "@/stores/scan-progress-store";
 import { WinUIButton } from "@/components/winui/WinUIButton";
-import { LiveScanProgressWidget } from "@/components/shared/LiveScanProgressWidget";
+import { Page, PageHeader, Card, StatCard, Badge, ProgressBar, FilterTabs, EmptyState, ActionBar } from "@/components/ui";
 import {
-  ShieldCheckmark24Filled,
   ShieldCheckmark20Regular,
   ArrowClockwise20Regular,
   Delete20Regular,
   Warning20Filled,
   CheckmarkCircle20Filled,
-  Checkmark16Filled,
   LockClosed20Regular,
   Globe20Regular,
   Add20Regular,
@@ -20,6 +18,8 @@ import {
   Flash20Regular,
   History20Regular,
   Storage20Regular,
+  Layer20Regular,
+  HardDrive20Regular,
 } from "@fluentui/react-icons";
 
 export type PrivacyCategoryKind =
@@ -49,6 +49,77 @@ export interface PrivacyScanResult {
   total_size_bytes: number;
   running_browsers: string[];
 }
+
+/** Items locked by a running browser can't be selected, except caches. */
+const isSelectable = (item: PrivacyItem) => !item.is_locked || item.category === "cache";
+
+/** Live progress of a running scan or clean, fed by the backend progress events. */
+const ScanProgressCard: React.FC<{ scanType: string; title: string }> = ({ scanType, title }) => {
+  const { initProgressListener } = useScanProgressStore();
+  const progress = useScanProgress(scanType);
+
+  useEffect(() => {
+    let unlisten: (() => void) | null = null;
+    initProgressListener().then((u) => {
+      unlisten = u;
+    });
+    return () => {
+      if (unlisten) unlisten();
+    };
+  }, [initProgressListener]);
+
+  const percent = Math.max(1, Math.min(100, progress.percent || 1));
+
+  return (
+    <Card className="space-y-3">
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <div className="text-sm font-semibold text-[var(--text-primary)]">{progress.stage || title}</div>
+          <div className="text-xs text-[var(--text-secondary)] mt-0.5 truncate">{title}</div>
+        </div>
+        <span className="text-sm font-ibm-mono text-[var(--text-secondary)] shrink-0">{percent}%</span>
+      </div>
+      <ProgressBar value={percent} />
+      <div className="flex items-center justify-between gap-4">
+        <div className="font-code text-xs text-[var(--text-muted)] truncate min-w-0" title={progress.currentPath}>
+          {progress.currentPath || "…"}
+        </div>
+        {progress.itemsScanned > 0 && (
+          <span className="text-xs font-ibm-mono text-[var(--text-muted)] shrink-0">
+            {progress.itemsScanned.toLocaleString()}
+          </span>
+        )}
+      </div>
+    </Card>
+  );
+};
+
+/** Native checkbox that can show the "some selected" state. */
+const TriCheckbox: React.FC<{
+  checked: boolean;
+  indeterminate: boolean;
+  disabled?: boolean;
+  title?: string;
+  onChange: () => void;
+}> = ({ checked, indeterminate, disabled, title, onChange }) => {
+  const ref = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (ref.current) ref.current.indeterminate = indeterminate;
+  }, [indeterminate]);
+  return (
+    <input
+      ref={ref}
+      type="checkbox"
+      checked={checked}
+      disabled={disabled}
+      title={title}
+      aria-label={title}
+      onClick={(e) => e.stopPropagation()}
+      onChange={onChange}
+      className="accent-[var(--accent)] w-4 h-4 shrink-0 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+    />
+  );
+};
 
 export const PrivacyPage: React.FC = () => {
   const { t } = useI18nStore();
@@ -190,11 +261,29 @@ export const PrivacyPage: React.FC = () => {
     });
   }, [items, activeBrowserFilter, activeCategoryFilter, searchQuery]);
 
+  /** Filtered items grouped per browser, in first-seen order. */
+  const browserGroups = useMemo(() => {
+    const map = new Map<string, PrivacyItem[]>();
+    for (const item of filteredItems) {
+      const list = map.get(item.browser_name);
+      if (list) list.push(item);
+      else map.set(item.browser_name, [item]);
+    }
+    return Array.from(map.entries()).map(([name, groupItems]) => ({
+      name,
+      items: groupItems,
+      profileCount: new Set(groupItems.map((i) => i.profile_name)).size,
+      totalBytes: groupItems.reduce((acc, i) => acc + i.size_bytes, 0),
+    }));
+  }, [filteredItems]);
+
   const selectedBytes = useMemo(() => {
     return items
       .filter((i) => selectedItemIds.has(i.id))
       .reduce((acc, i) => acc + i.size_bytes, 0);
   }, [items, selectedItemIds]);
+
+  const lockedCount = useMemo(() => items.filter((i) => i.is_locked).length, [items]);
 
   const handleSelectAll = () => {
     const next = new Set<string>();
@@ -210,364 +299,409 @@ export const PrivacyPage: React.FC = () => {
     setSelectedItemIds(new Set());
   };
 
+  const toggleItem = (item: PrivacyItem) => {
+    if (item.is_locked && item.category !== "cache") {
+      setStatusMessage(`"${item.title}" is locked by an active browser. Close the browser to enable cleaning.`);
+      return;
+    }
+    const next = new Set(selectedItemIds);
+    if (next.has(item.id)) {
+      next.delete(item.id);
+    } else {
+      next.add(item.id);
+    }
+    setSelectedItemIds(next);
+  };
+
+  /** Selects every selectable item of one browser group, or clears them if all are selected. */
+  const toggleBrowserGroup = (groupItems: PrivacyItem[]) => {
+    const selectable = groupItems.filter(isSelectable);
+    const allSelected = selectable.length > 0 && selectable.every((i) => selectedItemIds.has(i.id));
+    const next = new Set(selectedItemIds);
+    for (const item of selectable) {
+      if (allSelected) next.delete(item.id);
+      else next.add(item.id);
+    }
+    setSelectedItemIds(next);
+  };
+
   const getCategoryIcon = (category: PrivacyCategoryKind) => {
+    const cls = "w-4 h-4 text-[var(--text-secondary)]";
     switch (category) {
       case "cache":
-        return <Flash20Regular className="w-4 h-4 text-amber-400" />;
+        return <Flash20Regular className={cls} />;
       case "history":
-        return <History20Regular className="w-4 h-4 text-cyan-400" />;
+        return <History20Regular className={cls} />;
       case "cookies":
-        return <Globe20Regular className="w-4 h-4 text-emerald-400" />;
+        return <Globe20Regular className={cls} />;
       case "sessions":
-        return <Storage20Regular className="w-4 h-4 text-purple-400" />;
-      case "system_activity":
-        return <ShieldCheckmark20Regular className="w-4 h-4 text-rose-400" />;
+        return <Storage20Regular className={cls} />;
       default:
-        return <ShieldCheckmark20Regular className="w-4 h-4 text-purple-400" />;
+        return <ShieldCheckmark20Regular className={cls} />;
     }
   };
 
+  const categoryTabs = [
+    { id: "all", label: t.privacy.allTypes },
+    { id: "cache", label: t.privacy.categoryCache },
+    { id: "history", label: t.privacy.categoryHistory },
+    { id: "cookies", label: t.privacy.categoryCookies },
+    { id: "sessions", label: t.privacy.categorySessions },
+    { id: "system_activity", label: t.privacy.categoryActivity },
+  ];
+
+  const browserTabs = [
+    { id: "all", label: t.privacy.filterAll, count: browserNames.length },
+    ...browserNames.map((name) => ({ id: name, label: name })),
+  ];
+
+  const busy = loading || cleaning;
+
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-4 select-none font-sans text-[var(--text-primary)] pb-24">
-      {/* WinUI 3 Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="w-10 h-10 rounded-[4px] bg-white/[0.04] border border-[var(--border-subtle)] flex items-center justify-center text-purple-400 shrink-0">
-            <ShieldCheckmark24Filled className="w-6 h-6" />
-          </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl font-semibold tracking-tight text-[var(--text-primary)]">
-                {t.privacy.title}
-              </h1>
-              <span className="px-2 py-0.5 rounded-[4px] text-xs font-ibm-mono uppercase tracking-wider bg-purple-500/10 text-purple-400 border border-purple-500/20">
-                Data Protection
-              </span>
-            </div>
-            <p className="text-xs text-[var(--text-secondary)]">
-              {t.privacy.subtitle}
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 shrink-0">
-          <WinUIButton
-            variant="standard"
-            onClick={() => setWhitelistModalOpen(true)}
-            icon={<Globe20Regular className="w-3.5 h-3.5 text-cyan-400" />}
-          >
-            {t.privacy.cookieWhitelist} ({whitelistDomains.length})
-          </WinUIButton>
-
-          <WinUIButton
-            variant="standard"
-            onClick={handleScan}
-            disabled={loading}
-            className="flex items-center gap-1.5"
-          >
-            <ArrowClockwise20Regular className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
-            <span>{loading ? t.common.scanning : t.common.rescan}</span>
-          </WinUIButton>
-
-          {selectedItemIds.size > 0 && (
+    <Page className="select-none">
+      <PageHeader
+        icon={<ShieldCheckmark20Regular />}
+        title={
+          <span className="inline-flex items-center gap-3">
+            {t.privacy.title}
+            <Badge tone="accent">{t.privacy.dataProtectionBadge}</Badge>
+          </span>
+        }
+        description={t.privacy.subtitle}
+        actions={
+          <>
             <WinUIButton
-              variant="primary"
-              onClick={handleClean}
-              disabled={cleaning || loading}
-              className="flex items-center gap-1.5 bg-purple-600 hover:bg-purple-500 text-white"
+              variant="standard"
+              onClick={() => setWhitelistModalOpen(true)}
+              icon={<Globe20Regular className="w-4 h-4" />}
             >
-              <Delete20Regular className="w-3.5 h-3.5" />
-              <span>{cleaning ? t.privacy.cleaningProgress : `${t.privacy.cleanSelected} (${formatBytes(selectedBytes)})`}</span>
+              {t.privacy.cookieWhitelist}
+              <span className="ml-1 text-xs font-ibm-mono text-[var(--text-muted)]">{whitelistDomains.length}</span>
             </WinUIButton>
-          )}
-        </div>
-      </div>
+            <WinUIButton
+              variant="standard"
+              onClick={handleScan}
+              disabled={loading}
+              icon={<ArrowClockwise20Regular className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />}
+            >
+              {loading ? t.common.scanning : t.common.rescan}
+            </WinUIButton>
+          </>
+        }
+      />
 
-      {/* Running Browsers Notice with 1-Click Close */}
+      {/* Running browsers notice with 1-click close */}
       {scanResult && scanResult.running_browsers.length > 0 && (
-        <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-[4px] flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <Warning20Filled className="w-4 h-4 text-amber-400 shrink-0" />
-            <div className="text-xs text-amber-300">
-              <span className="font-semibold">{t.privacy.activeBrowserNotice}</span>{" "}
-              <span>
+        <Card
+          className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+          style={{
+            borderColor: "color-mix(in srgb, var(--brand-amber) 45%, transparent)",
+            background: "color-mix(in srgb, var(--brand-amber) 8%, var(--bg-card))",
+          }}
+        >
+          <div className="flex items-start gap-3 min-w-0">
+            <Warning20Filled className="w-5 h-5 text-[var(--brand-amber)] shrink-0" />
+            <div className="min-w-0">
+              <div className="text-sm font-semibold text-[var(--text-primary)]">{t.privacy.activeBrowserNotice}</div>
+              <div className="text-xs text-[var(--text-secondary)] mt-0.5">
                 {t.privacy.runningBrowsers}: {scanResult.running_browsers.join(", ")}
-              </span>
+              </div>
             </div>
           </div>
           <WinUIButton
             variant="standard"
+            size="sm"
             onClick={handleCloseBrowsers}
             disabled={closingBrowsers}
-            className="self-start sm:self-auto text-xs font-semibold bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border-amber-500/40 shrink-0"
+            className="self-start sm:self-auto shrink-0"
           >
-            {closingBrowsers ? "Closing Browsers..." : "Close Running Browsers"}
+            {closingBrowsers ? t.privacy.closingBrowsers : t.privacy.closeBrowsers}
           </WinUIButton>
-        </div>
+        </Card>
       )}
 
-      {/* Status Notification */}
+      {/* Status notification */}
       {statusMessage && (
-        <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-[4px] flex items-center justify-between shadow-xs">
-          <div className="flex items-center gap-2.5">
-            <CheckmarkCircle20Filled className="w-4 h-4 text-emerald-400 shrink-0" />
-            <span className="text-xs text-emerald-400 font-medium">{statusMessage}</span>
+        <Card className="py-3 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <CheckmarkCircle20Filled className="w-5 h-5 text-[var(--success)] shrink-0" />
+            <span className="text-sm text-[var(--text-primary)]">{statusMessage}</span>
           </div>
-          <button
-            onClick={() => setStatusMessage(null)}
-            className="text-xs text-emerald-400 hover:text-white px-2 py-0.5 rounded-[3px] bg-emerald-500/20 font-medium cursor-pointer"
-          >
+          <WinUIButton variant="subtle" size="sm" onClick={() => setStatusMessage(null)}>
             {t.common.close}
-          </button>
-        </div>
+          </WinUIButton>
+        </Card>
       )}
 
-      {/* Filter and Search Bar */}
-      <WinUICard className="p-3 space-y-3">
-        <div className="flex flex-col lg:flex-row items-center justify-between gap-3">
-          <div className="relative w-full lg:w-72">
-            <Search20Regular className="w-3.5 h-3.5 absolute left-2.5 top-2 text-[var(--text-muted)]" />
-            <input
-              type="text"
-              placeholder={t.privacy.searchPlaceholder}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-8 pr-3 py-1 bg-black/20 border border-[var(--border-card)] rounded-[4px] text-xs font-ibm-mono text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-purple-500"
+      {busy ? (
+        <ScanProgressCard scanType="privacy" title={loading ? t.common.scanning : t.privacy.cleaningProgress} />
+      ) : !scanResult ? (
+        <EmptyState
+          icon={<ShieldCheckmark20Regular />}
+          title={t.privacy.scanTitle}
+          description={t.privacy.scanDesc}
+          action={
+            <WinUIButton variant="primary" onClick={handleScan} icon={<Search20Regular className="w-4 h-4" />}>
+              {t.privacy.startScan}
+            </WinUIButton>
+          }
+        />
+      ) : (
+        <>
+          {/* Stats */}
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <StatCard
+              label={t.privacy.statItems}
+              icon={<Layer20Regular />}
+              value={items.length.toLocaleString()}
+              hint={`${filteredItems.length} ${t.privacy.itemsShown}`}
+            />
+            <StatCard
+              label={t.privacy.statSize}
+              icon={<HardDrive20Regular />}
+              tone="success"
+              value={formatBytes(scanResult.total_size_bytes)}
+              hint={`${formatBytes(selectedBytes)} ${t.privacy.selectedLabel}`}
+            />
+            <StatCard
+              label={t.privacy.statBrowsers}
+              icon={<Globe20Regular />}
+              value={browserNames.length}
+              hint={`${scanResult.running_browsers.length} ${t.privacy.runningLabel}`}
+            />
+            <StatCard
+              label={t.privacy.statLocked}
+              icon={<LockClosed20Regular />}
+              tone={lockedCount > 0 ? "warning" : "neutral"}
+              value={lockedCount}
+              hint={lockedCount > 0 ? t.privacy.lockedHint : t.privacy.nothingLocked}
             />
           </div>
 
-          {/* Quick Selection Toolbar */}
-          <div className="flex items-center gap-2 w-full lg:w-auto justify-end">
-            <button
-              onClick={handleSelectAll}
-              className="text-xs px-2.5 py-1 rounded-[3px] bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 border border-purple-500/30 font-medium transition-all cursor-pointer"
-            >
-              {t.common.selectAll}
-            </button>
-            <button
-              onClick={handleDeselectAll}
-              className="text-xs px-2.5 py-1 rounded-[3px] bg-black/20 text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border-card)] font-medium transition-all cursor-pointer"
-            >
-              {t.common.deselectAll}
-            </button>
+          {/* Filters */}
+          <div className="space-y-2">
+            <div className="flex flex-col md:flex-row md:items-center gap-2">
+              <FilterTabs
+                className="flex-1 min-w-0"
+                items={categoryTabs}
+                value={activeCategoryFilter}
+                onChange={setActiveCategoryFilter}
+              />
+              <div className="relative w-full md:w-60 shrink-0">
+                <Search20Regular className="w-4 h-4 absolute left-2.5 top-2 text-[var(--text-muted)]" />
+                <input
+                  type="text"
+                  placeholder={t.privacy.searchPlaceholder}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full h-8 pl-8 pr-3 bg-[var(--bg-input)] border border-[var(--border-card)] rounded-md text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-[var(--accent)]"
+                />
+              </div>
+            </div>
+            <div className="flex flex-col md:flex-row md:items-center gap-2">
+              {browserNames.length > 1 ? (
+                <FilterTabs
+                  className="flex-1 min-w-0"
+                  items={browserTabs}
+                  value={activeBrowserFilter}
+                  onChange={setActiveBrowserFilter}
+                />
+              ) : (
+                <div className="flex-1" />
+              )}
+              <div className="flex items-center gap-2 shrink-0">
+                <WinUIButton size="sm" onClick={handleSelectAll}>
+                  {t.common.selectAll}
+                </WinUIButton>
+                <WinUIButton size="sm" variant="subtle" onClick={handleDeselectAll}>
+                  {t.common.deselectAll}
+                </WinUIButton>
+              </div>
+            </div>
           </div>
-        </div>
 
-        {/* Category Pills & Browser Filters */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1 border-t border-[var(--border-divider)]">
-          {/* Category Filter Pills */}
-          <div className="flex items-center gap-1.5 min-w-0 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {[
-              { id: "all", label: t.privacy.allTypes },
-              { id: "cache", label: t.privacy.categoryCache },
-              { id: "history", label: t.privacy.categoryHistory },
-              { id: "cookies", label: t.privacy.categoryCookies },
-              { id: "sessions", label: t.privacy.categorySessions },
-              { id: "system_activity", label: t.privacy.categoryActivity },
-            ].map((cat) => (
-              <button
-                key={cat.id}
-                onClick={() => setActiveCategoryFilter(cat.id)}
-                className={`px-2.5 py-0.5 rounded-[4px] text-xs font-medium transition-all whitespace-nowrap cursor-pointer ${
-                  activeCategoryFilter === cat.id
-                    ? "bg-purple-600 text-white shadow-xs"
-                    : "bg-black/20 text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border-card)]"
-                }`}
-              >
-                {cat.label}
-              </button>
-            ))}
-          </div>
+          {/* Results, one card per browser */}
+          {browserGroups.length > 0 ? (
+            <div className="space-y-3">
+              {browserGroups.map((group) => {
+                const selectable = group.items.filter(isSelectable);
+                const selectedInGroup = selectable.filter((i) => selectedItemIds.has(i.id)).length;
+                const allSelected = selectable.length > 0 && selectedInGroup === selectable.length;
 
-          {/* Browser Filter Pills */}
-          <div className="flex items-center gap-1.5 min-w-0 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            <button
-              onClick={() => setActiveBrowserFilter("all")}
-              className={`px-2.5 py-0.5 rounded-[4px] text-xs font-medium transition-all whitespace-nowrap cursor-pointer ${
-                activeBrowserFilter === "all"
-                  ? "bg-purple-600 text-white shadow-xs"
-                  : "bg-black/20 text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border-card)]"
-              }`}
-            >
-              {t.privacy.filterAll} ({browserNames.length})
-            </button>
-            {browserNames.map((name) => (
-              <button
-                key={name}
-                onClick={() => setActiveBrowserFilter(name)}
-                className={`px-2.5 py-0.5 rounded-[4px] text-xs font-medium transition-all whitespace-nowrap cursor-pointer ${
-                  activeBrowserFilter === name
-                    ? "bg-purple-600 text-white shadow-xs"
-                    : "bg-black/20 text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border-card)]"
-                }`}
-              >
-                {name}
-              </button>
-            ))}
-          </div>
-        </div>
-      </WinUICard>
-
-      {/* Items List */}
-      {loading || cleaning ? (
-        <LiveScanProgressWidget
-          scanType="privacy"
-          title={loading ? t.common.scanning : t.privacy.cleaningProgress}
-          showCancel={false}
-        />
-      ) : filteredItems.length > 0 ? (
-        <WinUICard className="overflow-hidden">
-          <div className="divide-y divide-[var(--border-divider)]">
-            {filteredItems.map((item) => {
-              const isSelected = selectedItemIds.has(item.id);
-
-              return (
-                <div
-                  key={item.id}
-                  onClick={() => {
-                    if (item.is_locked && item.category !== "cache") {
-                      setStatusMessage(`"${item.title}" is locked by an active browser. Close the browser to enable cleaning.`);
-                      return;
-                    }
-                    const next = new Set(selectedItemIds);
-                    if (next.has(item.id)) {
-                      next.delete(item.id);
-                    } else {
-                      next.add(item.id);
-                    }
-                    setSelectedItemIds(next);
-                  }}
-                  className={`px-4 py-3 flex items-center justify-between gap-4 transition-colors cursor-pointer ${
-                    isSelected ? "bg-purple-500/[0.04] hover:bg-purple-500/[0.08]" : "hover:bg-white/[0.02]"
-                  }`}
-                >
-                  <div className="flex items-center gap-3 min-w-0 flex-1">
-                    <div className={`w-4 h-4 rounded-[3px] border flex items-center justify-center shrink-0 transition-colors ${
-                      isSelected
-                        ? "bg-purple-600 border-purple-600 text-white"
-                        : "border-[var(--border-subtle)] bg-black/20"
-                    }`}>
-                      {isSelected && <Checkmark16Filled className="w-3 h-3 text-white" />}
-                    </div>
-
-                    <div className="p-1.5 rounded-[4px] bg-white/[0.03] border border-[var(--border-card)] shrink-0">
-                      {getCategoryIcon(item.category)}
-                    </div>
-
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-semibold text-[var(--text-primary)] text-xs truncate">
-                          {item.title}
+                return (
+                  <Card key={group.name} padded={false} className="overflow-hidden">
+                    <div className="px-4 py-3 flex items-center gap-3 border-b border-[var(--border-divider)]">
+                      <TriCheckbox
+                        checked={allSelected}
+                        indeterminate={selectedInGroup > 0 && !allSelected}
+                        disabled={selectable.length === 0}
+                        title={t.privacy.selectAllInBrowser}
+                        onChange={() => toggleBrowserGroup(group.items)}
+                      />
+                      <Globe20Regular className="w-4 h-4 text-[var(--text-secondary)] shrink-0" />
+                      <div className="min-w-0 flex-1 flex items-baseline gap-2">
+                        <span className="text-sm font-semibold text-[var(--text-primary)] truncate">{group.name}</span>
+                        <span className="text-xs text-[var(--text-muted)] whitespace-nowrap">
+                          {group.profileCount} {group.profileCount === 1 ? t.privacy.profile : t.privacy.profiles} ·{" "}
+                          {group.items.length} {t.privacy.items}
                         </span>
-                        <span className="text-xs font-ibm-mono uppercase px-1.5 py-0.2 rounded-[3px] bg-black/20 text-[var(--text-secondary)]">
-                          {item.browser_name}
-                        </span>
-                        {item.profile_name && item.profile_name !== "Default" && (
-                          <span className="text-xs font-ibm-mono px-1.5 py-0.2 rounded-[3px] bg-black/30 text-[var(--text-muted)]">
-                            {item.profile_name}
-                          </span>
-                        )}
-                        {item.is_locked && (
-                          <span className="flex items-center gap-1 text-xs font-ibm-mono px-1.5 py-0.2 rounded-[3px] bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                            <LockClosed20Regular className="w-3 h-3" /> {t.privacy.lockedNotice}
-                          </span>
-                        )}
                       </div>
-
-                      <p className="text-xs text-[var(--text-secondary)] mt-0.5">{item.description}</p>
+                      <span className="text-sm font-semibold font-ibm-mono text-[var(--text-primary)] shrink-0 tabular-nums">
+                        {formatBytes(group.totalBytes)}
+                      </span>
                     </div>
-                  </div>
 
-                  <div className="font-ibm-mono text-xs font-semibold text-purple-400 shrink-0 text-right tabular-nums">
-                    {formatBytes(item.size_bytes)}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </WinUICard>
-      ) : (
-        <WinUICard className="p-12 text-center space-y-2">
-          <ShieldCheckmark24Filled className="w-10 h-10 text-[var(--text-muted)] mx-auto" />
-          <h3 className="text-sm font-semibold text-[var(--text-primary)]">{t.privacy.noItemsFound}</h3>
-          <p className="text-xs text-[var(--text-secondary)] max-w-md mx-auto">
-            {t.privacy.noItemsDesc}
-          </p>
-        </WinUICard>
+                    <div className="divide-y divide-[var(--border-divider)]">
+                      {group.items.map((item) => {
+                        const isSelected = selectedItemIds.has(item.id);
+                        const canSelect = isSelectable(item);
+                        const showProfile =
+                          !!item.profile_name && (item.profile_name !== "Default" || group.profileCount > 1);
+
+                        return (
+                          <div
+                            key={item.id}
+                            onClick={() => toggleItem(item)}
+                            className={`px-4 py-3 flex items-center gap-3 transition-colors cursor-pointer hover:bg-[var(--fill-subtle)] ${
+                              canSelect ? "" : "opacity-80"
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              disabled={!canSelect}
+                              aria-label={item.title}
+                              onClick={(e) => e.stopPropagation()}
+                              onChange={() => toggleItem(item)}
+                              className="accent-[var(--accent)] w-4 h-4 shrink-0 cursor-pointer disabled:pointer-events-none disabled:opacity-50"
+                            />
+                            <span className="shrink-0">{getCategoryIcon(item.category)}</span>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-sm text-[var(--text-primary)] truncate">{item.title}</span>
+                                {showProfile && <Badge>{item.profile_name}</Badge>}
+                                {item.is_locked && (
+                                  <Badge tone="warning">
+                                    <LockClosed20Regular className="w-3 h-3" />
+                                    {t.privacy.lockedByBrowser}
+                                  </Badge>
+                                )}
+                              </div>
+                              <p className="text-xs text-[var(--text-muted)] mt-0.5 truncate" title={item.description}>
+                                {item.description}
+                              </p>
+                            </div>
+                            <span className="text-sm font-ibm-mono text-[var(--text-secondary)] shrink-0 text-right tabular-nums">
+                              {formatBytes(item.size_bytes)}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </Card>
+                );
+              })}
+            </div>
+          ) : (
+            <EmptyState
+              icon={<ShieldCheckmark20Regular />}
+              title={t.privacy.noItemsFound}
+              description={t.privacy.noItemsDesc}
+            />
+          )}
+        </>
       )}
 
-      {/* Whitelist Modal */}
+      {/* Selection actions */}
+      {scanResult && !loading && selectedItemIds.size > 0 && (
+        <ActionBar
+          summary={
+            <>
+              <span className="font-semibold text-[var(--text-primary)]">
+                {selectedItemIds.size} {t.privacy.selectedLabel}
+              </span>{" "}
+              · <span className="font-ibm-mono">{formatBytes(selectedBytes)}</span>
+            </>
+          }
+        >
+          <WinUIButton variant="subtle" onClick={handleDeselectAll} disabled={busy}>
+            {t.common.deselectAll}
+          </WinUIButton>
+          <WinUIButton
+            variant="primary"
+            onClick={handleClean}
+            disabled={cleaning || loading}
+            icon={<Delete20Regular className="w-4 h-4" />}
+          >
+            {cleaning ? t.privacy.cleaningProgress : t.privacy.cleanSelected}
+          </WinUIButton>
+        </ActionBar>
+      )}
+
+      {/* Cookie whitelist modal */}
       {whitelistModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fadeIn">
-          <WinUICard className="max-w-lg w-full p-5 space-y-3 shadow-2xl relative">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5 text-cyan-400">
-                <div className="p-1.5 rounded-[4px] bg-cyan-500/10 border border-cyan-500/30">
-                  <Globe20Regular className="w-4 h-4" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fadeIn">
+          <Card className="max-w-lg w-full p-6 space-y-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-lg bg-[var(--fill-subtle)] border border-[var(--border-card)] flex items-center justify-center text-[var(--accent-text)] shrink-0">
+                  <Globe20Regular className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-[var(--text-primary)] text-sm">{t.privacy.whitelistTitle}</h3>
-                  <p className="text-xs text-[var(--text-secondary)]">
-                    {t.privacy.whitelistDesc}
-                  </p>
+                  <h3 className="text-sm font-semibold text-[var(--text-primary)]">{t.privacy.whitelistTitle}</h3>
+                  <p className="text-sm text-[var(--text-secondary)] mt-0.5">{t.privacy.whitelistDesc}</p>
                 </div>
               </div>
-              <button
+              <WinUIButton
+                variant="subtle"
+                size="sm"
+                aria-label={t.common.close}
                 onClick={() => setWhitelistModalOpen(false)}
-                className="text-[var(--text-muted)] hover:text-[var(--text-primary)] p-1 rounded-[4px] hover:bg-white/[0.05] cursor-pointer"
-              >
-                <Dismiss20Regular className="w-4 h-4" />
-              </button>
+                icon={<Dismiss20Regular className="w-4 h-4" />}
+              />
             </div>
 
-            <div className="flex items-center gap-2 pt-1">
+            <div className="flex items-center gap-2">
               <input
                 type="text"
                 placeholder={t.privacy.domainPlaceholder}
                 value={newDomainInput}
                 onChange={(e) => setNewDomainInput(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleAddDomain()}
-                className="flex-1 px-3 py-1.5 bg-black/20 border border-[var(--border-card)] rounded-[4px] text-xs font-ibm-mono text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-cyan-500"
+                className="flex-1 h-8 px-3 bg-[var(--bg-input)] border border-[var(--border-card)] rounded-md text-sm font-code text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-[var(--accent)]"
               />
-              <WinUIButton
-                variant="primary"
-                onClick={handleAddDomain}
-                className="flex items-center gap-1 text-xs"
-              >
-                <Add20Regular className="w-3.5 h-3.5" />
-                <span>{t.privacy.addDomain}</span>
+              <WinUIButton variant="primary" onClick={handleAddDomain} icon={<Add20Regular className="w-4 h-4" />}>
+                {t.privacy.addDomain}
               </WinUIButton>
             </div>
 
-            <div className="max-h-56 overflow-y-auto space-y-1 pt-1">
+            <div className="max-h-56 overflow-y-auto rounded-md border border-[var(--border-card)] divide-y divide-[var(--border-divider)]">
               {whitelistDomains.map((dom) => (
                 <div
                   key={dom}
-                  className="flex items-center justify-between px-3 py-1.5 rounded-[4px] bg-black/20 border border-[var(--border-card)] text-xs font-ibm-mono text-[var(--text-primary)]"
+                  className="flex items-center justify-between gap-2 px-3 py-1.5 hover:bg-[var(--fill-subtle)] transition-colors"
                 >
-                  <span>{dom}</span>
+                  <span className="font-code text-xs text-[var(--text-primary)] truncate">{dom}</span>
                   <button
                     onClick={() => handleRemoveDomain(dom)}
-                    className="text-[var(--text-muted)] hover:text-rose-400 p-0.5 transition-colors cursor-pointer"
+                    aria-label={dom}
+                    className="text-[var(--text-muted)] hover:text-[var(--danger)] p-1 rounded-md hover:bg-[var(--fill-subtle-hover)] transition-colors cursor-pointer"
                   >
-                    <Dismiss20Regular className="w-3.5 h-3.5" />
+                    <Dismiss20Regular className="w-4 h-4" />
                   </button>
                 </div>
               ))}
             </div>
 
-            <div className="flex justify-end pt-2">
-              <WinUIButton
-                variant="standard"
-                onClick={() => setWhitelistModalOpen(false)}
-              >
+            <div className="flex justify-end pt-3 border-t border-[var(--border-divider)]">
+              <WinUIButton variant="standard" onClick={() => setWhitelistModalOpen(false)}>
                 {t.common.close}
               </WinUIButton>
             </div>
-          </WinUICard>
+          </Card>
         </div>
       )}
-    </div>
+    </Page>
   );
 };
 

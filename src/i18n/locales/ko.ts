@@ -502,7 +502,13 @@ export const ko: TranslationSchema = {
     "statAllDesc": "레지스트리, 시작 폴더 및 예약된 작업",
     "statEnabledDesc": "로그인 시 자동으로 실행",
     "statHighDesc": "부팅을 느리게 하는 활성 항목",
-    "statCriticalDesc": "Windows에 필요, 비활성화 불가"
+    "statCriticalDesc": "Windows에 필요, 비활성화 불가",
+    "pageDesc": "See which apps start with Windows and turn off the ones you do not need.",
+    "statProtected": "Protected entries",
+    "systemCritical": "System critical",
+    "loadingDesc": "Reading Run registry keys, Startup folders and scheduled tasks...",
+    "openLocation": "Open file location",
+    "protectedHint": "Protected: required by Windows"
   },
   "privacy": {
     "title": "개인정보 보호",
@@ -527,7 +533,27 @@ export const ko: TranslationSchema = {
     "noItemsFound": "항목 없음",
     "noItemsDesc": "정리할 개인정보 기록이 없습니다.",
     "runningBrowsers": "실행 중",
-    "allTypes": "모든 유형"
+    "allTypes": "모든 유형",
+    "dataProtectionBadge": "Data Protection",
+    "closeBrowsers": "Close running browsers",
+    "closingBrowsers": "Closing browsers…",
+    "statItems": "Items found",
+    "itemsShown": "shown",
+    "statSize": "Total size",
+    "selectedLabel": "selected",
+    "statBrowsers": "Browsers detected",
+    "runningLabel": "running",
+    "statLocked": "Locked by a browser",
+    "lockedHint": "Close the browser to clean them",
+    "nothingLocked": "Nothing locked",
+    "profile": "profile",
+    "profiles": "profiles",
+    "items": "items",
+    "selectAllInBrowser": "Select all in this browser",
+    "lockedByBrowser": "Locked by running browser",
+    "scanTitle": "Scan browser privacy data",
+    "scanDesc": "Find caches, history, cookies and activity traces left by your browsers and Windows.",
+    "startScan": "Scan now"
   },
   "maintenance": {
     "title": "시스템 유지보수",
