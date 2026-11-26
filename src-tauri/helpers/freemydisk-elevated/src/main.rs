@@ -5,10 +5,16 @@ use std::os::windows::process::CommandExt;
 use std::path::PathBuf;
 
 fn hidden_cmd(prog: &str) -> std::process::Command {
-    let mut cmd = std::process::Command::new(prog);
     #[cfg(target_os = "windows")]
-    cmd.creation_flags(0x08000000);
-    cmd
+    {
+        let mut cmd = std::process::Command::new(prog);
+        cmd.creation_flags(0x08000000);
+        cmd
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        std::process::Command::new(prog)
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
