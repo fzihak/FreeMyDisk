@@ -522,7 +522,14 @@ struct CleanupPlanInput {
     always_trash: Option<bool>,
     #[serde(default, alias = "close_locking_apps")]
     close_locking_apps: Option<bool>,
+    /// Leave items that need administrator rights alone when the app is not
+    /// elevated, reporting them as skipped instead of failed.
+    #[serde(default, alias = "skip_admin_paths")]
+    skip_admin_paths: Option<bool>,
 }
+
+/// Message shown for items left alone because they need administrator rights.
+const NEEDS_ADMIN_REASON: &str = "needs_administrator";
 
 #[tauri::command]
 #[allow(non_snake_case)]
@@ -584,6 +591,18 @@ async fn execute_cleanup_rules(
                 missing.len()
             )
         })?
+    };
+    let skip_admin = plan
+        .as_ref()
+        .and_then(|p| p.skip_admin_paths)
+        .unwrap_or(false)
+        && !is_app_elevated();
+    let (candidates, admin_skipped): (Vec<_>, Vec<_>) = if skip_admin {
+        candidates.into_iter().partition(|c| {
+            !freemydisk_core::system_maintenance::rescue::path_requires_admin(&c.path)
+        })
+    } else {
+        (candidates, Vec::new())
     };
     let empty_recycle_bin = effective_rule_ids
         .iter()
@@ -716,6 +735,18 @@ async fn execute_cleanup_rules(
             }
             summary.results.insert(0, result);
         }
+
+        summary.total_requested_items += admin_skipped.len();
+        summary.skipped_items += admin_skipped.len();
+        summary
+            .results
+            .extend(admin_skipped.into_iter().map(|c| DisposalItemResult {
+                path: c.path,
+                success: false,
+                bytes_freed: 0,
+                route_used: "skipped".to_string(),
+                error: Some(NEEDS_ADMIN_REASON.to_string()),
+            }));
 
         if summary.total_freed_bytes >= 5 * 1024 * 1024 * 1024 {
             freemydisk_platform::storage_optim::trigger_background_trim_if_ssd('C');
@@ -1623,12 +1654,136 @@ fn cancel_reboot_deletion(path: String) -> Result<(), String> {
     cancel_pending_reboot_deletion(path)
 }
 
+fn is_app_elevated() -> bool {
+    use freemydisk_platform::PlatformElevation;
+    get_platform().is_elevated()
+}
+
+/// Runs Emergency Rescue step by step. Each step is reported on the
+/// `scan-progress` event with scan type `rescue`: `stage` is the step id,
+/// `items_scanned` its 1-based number and `bytes_found` the bytes freed so far.
 #[tauri::command]
 async fn execute_emergency_rescue(
-) -> Result<freemydisk_core::system_maintenance::EmergencyRescueResult, String> {
-    tauri::async_runtime::spawn_blocking(|| MaintenanceService::new().execute_emergency_rescue())
-        .await
-        .map_err(ipc_error)?
+    app: AppHandle,
+) -> Result<freemydisk_core::system_maintenance::EmergencyRescueReport, String> {
+    use freemydisk_core::system_maintenance::rescue;
+
+    let operation = begin_operation(&app, "disposal");
+    let cancel = operation.token();
+    let journal = get_journal(&app)?;
+    let lock_dir = get_lock_dir(&app)?;
+    let emitter = app.clone();
+    let res = tauri::async_runtime::spawn_blocking(move || {
+        let _bg_guard = freemydisk_platform::io_priority::BackgroundExecutionGuard::enter();
+        let platform = get_platform();
+        let ctx = rescue::RescueContext {
+            platform: &platform,
+            journal: &journal,
+            lock_dir: &lock_dir,
+            cancel: &cancel,
+            is_elevated: is_app_elevated(),
+        };
+        // Built-in rules only: a custom rule must not widen what Rescue deletes.
+        let engine = RuleEngine::new();
+        let report = rescue::run_emergency_rescue(engine.rules(), &ctx, |p| {
+            let base = ((p.step_index - 1) * 100) / p.total_steps.max(1);
+            let percent = if p.is_complete { 100 } else { base.max(1) };
+            let _ = emitter.emit(
+                "scan-progress",
+                AppScanProgress {
+                    scan_type: "rescue".to_string(),
+                    stage: p.step.to_string(),
+                    percent: percent as u8,
+                    items_scanned: p.step_index as u64,
+                    current_path: p.detail,
+                    bytes_found: p.bytes_so_far,
+                    is_complete: p.is_complete,
+                },
+            );
+        });
+        let _ = platform.refresh_shell();
+        trim_process_working_set();
+        report
+    })
+    .await
+    .map_err(ipc_error);
+    if res.is_err() {
+        // Never leave the dialog waiting: close the progress stream on failure.
+        let _ = app.emit(
+            "scan-progress",
+            AppScanProgress {
+                scan_type: "rescue".to_string(),
+                stage: "failed".to_string(),
+                percent: 100,
+                items_scanned: 0,
+                current_path: String::new(),
+                bytes_found: 0,
+                is_complete: true,
+            },
+        );
+    }
+    res
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct RuleAdminRequirement {
+    pub rule_id: String,
+    /// Bytes from the last scan that need administrator rights to remove.
+    pub admin_bytes: u64,
+    pub admin_items: usize,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct QuickCleanRequirements {
+    pub is_elevated: bool,
+    /// Rules with at least one item that needs administrator rights. Empty when
+    /// the app is elevated.
+    pub rules: Vec<RuleAdminRequirement>,
+}
+
+/// Tells the Dashboard which parts of the last cleanup scan need administrator
+/// rights, so one-click cleaning only counts what it can actually remove.
+#[tauri::command]
+#[allow(non_snake_case)]
+async fn get_quick_clean_requirements(
+    app: AppHandle,
+    rule_ids: Option<Vec<String>>,
+    ruleIds: Option<Vec<String>>,
+) -> Result<QuickCleanRequirements, String> {
+    let ids = rule_ids.or(ruleIds).unwrap_or_default();
+    let scan_cache = app.state::<RuleScanCache>().inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let is_elevated = is_app_elevated();
+        if is_elevated {
+            return QuickCleanRequirements {
+                is_elevated,
+                rules: Vec::new(),
+            };
+        }
+        let mut by_rule: std::collections::BTreeMap<String, (u64, usize)> = Default::default();
+        for c in scan_cache.peek(&ids) {
+            if freemydisk_core::system_maintenance::rescue::path_requires_admin(&c.path) {
+                let entry = by_rule.entry(c.rule_id).or_default();
+                entry.0 += c.size_bytes;
+                entry.1 += 1;
+            }
+        }
+        QuickCleanRequirements {
+            is_elevated,
+            rules: by_rule
+                .into_iter()
+                .map(
+                    |(rule_id, (admin_bytes, admin_items))| RuleAdminRequirement {
+                        rule_id,
+                        admin_bytes,
+                        admin_items,
+                    },
+                )
+                .collect(),
+        }
+    })
+    .await
+    .map_err(ipc_error)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -2068,6 +2223,7 @@ pub fn run() {
             launch_uninstaller,
             get_maintenance_tasks,
             execute_emergency_rescue,
+            get_quick_clean_requirements,
             scan_privacy_data,
             clean_privacy_data,
             close_running_browsers,

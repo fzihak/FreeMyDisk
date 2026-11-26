@@ -204,6 +204,54 @@ pub struct EmergencyRescueSummary {
     pub actions_performed: Vec<String>,
 }
 
+/// How one Emergency Rescue step ended.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RescueStepStatus {
+    Done,
+    Skipped,
+    Failed,
+}
+
+/// Result of one Emergency Rescue step, shown to the user as one line.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RescueStepOutcome {
+    /// Stable step id: `recycle_bin`, `temp_files`, `hibernation` or `wsl`.
+    pub step: String,
+    pub status: RescueStepStatus,
+    pub bytes_reclaimed: u64,
+    pub message: String,
+}
+
+impl RescueStepOutcome {
+    pub fn done(step: &str, bytes_reclaimed: u64, message: impl Into<String>) -> Self {
+        Self {
+            step: step.to_string(),
+            status: RescueStepStatus::Done,
+            bytes_reclaimed,
+            message: message.into(),
+        }
+    }
+
+    pub fn skipped(step: &str, message: impl Into<String>) -> Self {
+        Self {
+            step: step.to_string(),
+            status: RescueStepStatus::Skipped,
+            bytes_reclaimed: 0,
+            message: message.into(),
+        }
+    }
+
+    pub fn failed(step: &str, message: impl Into<String>) -> Self {
+        Self {
+            step: step.to_string(),
+            status: RescueStepStatus::Failed,
+            bytes_reclaimed: 0,
+            message: message.into(),
+        }
+    }
+}
+
 pub trait PlatformSystemMaintenance: Send + Sync {
     fn execute_maintenance_task(&self, task: MaintenanceTaskKind) -> Result<String, PlatformError>;
     fn execute_emergency_rescue(&self) -> Result<EmergencyRescueSummary, PlatformError>;

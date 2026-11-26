@@ -1,5 +1,7 @@
 pub mod elevation_client;
+pub mod rescue;
 pub use elevation_client::{ElevatedClient, ElevatedRequest, ElevatedResponse};
+pub use rescue::{EmergencyRescueReport, RescueContext, RescueProgress};
 
 use freemydisk_platform::{
     get_platform, EmergencyRescueSummary, MaintenanceTaskKind, PlatformSystemMaintenance,
