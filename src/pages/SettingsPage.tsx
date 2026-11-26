@@ -20,6 +20,7 @@ import { useI18nStore, SUPPORTED_LANGUAGES } from "@/i18n";
 import { WinUICard, WinUISettingRow } from "@/components/winui/WinUICard";
 import { WinUIToggle } from "@/components/winui/WinUIToggle";
 import { WinUIButton } from "@/components/winui/WinUIButton";
+import { APP_VERSION } from "@/version";
 
 export const SettingsPage: React.FC = () => {
   const { locale, setLocale, t } = useI18nStore();
@@ -42,8 +43,9 @@ export const SettingsPage: React.FC = () => {
   const handleCheckUpdates = async () => {
     setManualCheckMsg(null);
     await checkForUpdates(false);
-    if (!updateAvailable) {
-      setManualCheckMsg(`You are using the latest version of FreeMyDisk (v${version || "1.0.0"}).`);
+    // Read fresh store state: the `updateAvailable` captured by this closure is stale after the await.
+    if (!useUpdaterStore.getState().updateAvailable) {
+      setManualCheckMsg(`You are using the latest version of FreeMyDisk (v${APP_VERSION}).`);
       setTimeout(() => setManualCheckMsg(null), 5000);
     }
   };
@@ -74,7 +76,7 @@ export const SettingsPage: React.FC = () => {
               {t.settings.title}
             </h1>
             <span className="px-1.5 py-0.2 rounded-[4px] text-[10px] font-ibm-mono bg-white/[0.06] text-[var(--text-secondary)] border border-[var(--border-subtle)]">
-              v{version || "1.0.0"}
+              v{APP_VERSION}
             </span>
           </div>
           <p className="text-xs text-[var(--text-secondary)] mt-0.5">
@@ -328,23 +330,15 @@ export const SettingsPage: React.FC = () => {
             </div>
           )}
 
-          {/* Developer & Project Credits Card */}
+          {/* Project Info Card */}
           <div className="p-3.5 rounded-lg bg-white/[0.02] border border-[var(--border-subtle)] space-y-3">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#0078d4] to-[#60cdff] flex items-center justify-center text-white font-bold text-xs shadow-sm">
-                  FZ
-                </div>
+                <img src="/logo.png" alt="FreeMyDisk" className="w-8 h-8 object-contain select-none" />
                 <div>
                   <div className="text-xs font-semibold text-[var(--text-primary)] flex items-center gap-1.5">
-                    <span>Created & Developed by</span>
-                    <button
-                      onClick={() => handleOpenLink("https://github.com/fzihak")}
-                      className="text-[#0078d4] hover:underline cursor-pointer font-bold inline-flex items-center gap-0.5"
-                    >
-                      Foysal Zihak (@fzihak)
-                      <Open20Regular className="w-3 h-3" />
-                    </button>
+                    <span>FreeMyDisk</span>
+                    <span className="font-ibm-mono text-[10px] font-normal text-[var(--text-secondary)]">v{APP_VERSION}</span>
                   </div>
                   <div className="text-[11px] text-[var(--text-muted)]">
                     Official Open-Source Project • Public Repository on GitHub

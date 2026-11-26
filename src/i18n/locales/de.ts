@@ -527,7 +527,6 @@ export const de: TranslationSchema = {
   },
   "layout": {
     "physicalRam": "Physischer RAM",
-    "developedBy": "Von Foysal Zihak",
     "walSafeguard": "SQLite WAL Rollback-Schutz aktiv",
     "goToDashboard": "Zum Dashboard",
     "collapseSidebar": "Seitenleiste einklappen",

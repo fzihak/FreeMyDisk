@@ -103,7 +103,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({ title = "FreeMyDisk" }) => {
             window.open("https://github.com/fzihak/FreeMyDisk", "_blank");
           }
         }}
-        title="FreeMyDisk by Foysal Zihak on GitHub"
+        title="FreeMyDisk on GitHub"
         className="flex items-center gap-1.5 px-2 py-1 rounded-[4px] text-[11px] font-medium bg-white/[0.04] hover:bg-white/[0.08] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border-subtle)] mr-1.5 transition-all cursor-pointer"
       >
         <svg className="w-3.5 h-3.5 fill-current opacity-80" viewBox="0 0 24 24">

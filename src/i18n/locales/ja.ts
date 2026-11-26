@@ -527,7 +527,6 @@ export const ja: TranslationSchema = {
   },
   "layout": {
     "physicalRam": "物理RAM",
-    "developedBy": "開発者: Foysal Zihak",
     "walSafeguard": "SQLite WALロールバック保護が有効",
     "goToDashboard": "ダッシュボードへ移動",
     "collapseSidebar": "サイドバーを折りたたむ",

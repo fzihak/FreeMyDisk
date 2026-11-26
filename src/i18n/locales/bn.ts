@@ -527,7 +527,6 @@ export const bn: TranslationSchema = {
   },
   "layout": {
     "physicalRam": "ফিজিক্যাল র‍্যাম",
-    "developedBy": "ডেভেলপ করেছেন ফয়সাল জিহাক",
     "walSafeguard": "SQLite WAL রোলব্যাক সুরক্ষা সক্রিয়",
     "goToDashboard": "ড্যাশবোর্ডে যান",
     "collapseSidebar": "সাইডবার ছোট করুন",

@@ -527,7 +527,6 @@ export const ko: TranslationSchema = {
   },
   "layout": {
     "physicalRam": "물리 메모리",
-    "developedBy": "개발자: Foysal Zihak",
     "walSafeguard": "SQLite WAL 롤백 보호 활성화됨",
     "goToDashboard": "대시보드로 이동",
     "collapseSidebar": "사이드바 접기",

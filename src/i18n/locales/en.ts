@@ -527,7 +527,6 @@ export const en: TranslationSchema = {
   },
   "layout": {
     "physicalRam": "Physical RAM",
-    "developedBy": "By Foysal Zihak",
     "walSafeguard": "SQLite Write-Ahead Log Rollback Safeguard Active",
     "goToDashboard": "Go to Dashboard",
     "collapseSidebar": "Collapse Sidebar",

@@ -527,7 +527,6 @@ export const ptBR: TranslationSchema = {
   },
   "layout": {
     "physicalRam": "RAM física",
-    "developedBy": "Por Foysal Zihak",
     "walSafeguard": "Salvaguarda de reversão SQLite WAL ativa",
     "goToDashboard": "Ir para o painel",
     "collapseSidebar": "Recolher barra lateral",

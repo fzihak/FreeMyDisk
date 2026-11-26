@@ -527,7 +527,6 @@ export const zhCN: TranslationSchema = {
   },
   "layout": {
     "physicalRam": "物理内存",
-    "developedBy": "由 Foysal Zihak 开发",
     "walSafeguard": "SQLite预写日志回滚保护已激活",
     "goToDashboard": "前往仪表盘",
     "collapseSidebar": "折叠侧边栏",
