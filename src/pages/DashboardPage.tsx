@@ -138,6 +138,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
   const [binFiles, setBinFiles] = useState<number | null>(null);
   // Bytes really on disk in the bin folders, including leftovers Windows no longer counts.
   const [binDiskBytes, setBinDiskBytes] = useState<number>(0);
+  const [emptyingAsAdmin, setEmptyingAsAdmin] = useState(false);
 
   const [emergencyModalOpen, setEmergencyModalOpen] = useState(false);
   const [rescuing, setRescuing] = useState(false);
@@ -462,6 +463,22 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
     }
   };
 
+  /** Removes bin files only an administrator may delete (asks via UAC). */
+  const handleEmptyBinAsAdmin = async () => {
+    setEmptyingAsAdmin(true);
+    try {
+      const left = await invoke<{ files: number; bytes: number }>("empty_recycle_bin_elevated");
+      setBinFiles(left.files);
+      setBinDiskBytes(left.bytes);
+      toast.success(t.dashboard.rescueActionTrash, t.dashboard.binAdminDone);
+      loadInitialData();
+    } catch (e) {
+      toast.error(t.common.error, String(e));
+    } finally {
+      setEmptyingAsAdmin(false);
+    }
+  };
+
   const highImpactStartups = useMemo(() => {
     return startupItems.filter((item) => item.enabled && item.impact.toLowerCase() === "high").length;
   }, [startupItems]);
@@ -511,6 +528,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
 
   const binBytes = Math.max(recycleBin?.total_bytes ?? 0, binDiskBytes);
   const binEmpty = binBytes === 0 && !binFiles;
+  // Files left after Windows thinks the bin is empty: they need administrator rights.
+  const binNeedsAdmin = !emptyingBin && (recycleBin?.item_count ?? 0) === 0 && (binFiles ?? 0) > 0;
 
   return (
     <Page>
@@ -707,6 +726,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
             <div className="text-xs text-[var(--text-muted)]">
               {binEmpty
                 ? t.dashboard.binIsEmpty
+                : binNeedsAdmin
+                ? fill(t.dashboard.binNeedsAdmin, { files: (binFiles ?? 0).toLocaleString() })
                 : binFiles && binFiles > (recycleBin?.item_count ?? 0)
                 ? fill(t.dashboard.recycleItemsFiles, {
                     count: recycleBin?.item_count ?? 0,
@@ -729,6 +750,17 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
             </div>
           )}
           <div className="mt-auto">
+            {binNeedsAdmin ? (
+              <WinUIButton
+                variant="standard"
+                size="sm"
+                disabled={emptyingAsAdmin}
+                onClick={handleEmptyBinAsAdmin}
+                icon={<ShieldCheckmark20Regular className="w-4 h-4" />}
+              >
+                {emptyingAsAdmin ? t.dashboard.emptyingBin : t.dashboard.emptyBinAsAdmin}
+              </WinUIButton>
+            ) : (
             <WinUIButton
               variant={confirmEmptyBin ? "danger" : "standard"}
               size="sm"
@@ -749,6 +781,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
                 ? t.dashboard.confirmEmptyBin
                 : t.dashboard.emptyBin}
             </WinUIButton>
+            )}
           </div>
         </Card>
 

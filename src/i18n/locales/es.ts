@@ -186,7 +186,10 @@ export const es: TranslationSchema = {
     "readyToClean": "ready to clean",
     "confirmEmptyBin": "Click again to empty",
     "recycleItemsFiles": "{count} items · {files} files",
-    "binFilesProgress": "{done} of {total} files deleted"
+    "binFilesProgress": "{done} of {total} files deleted",
+    "binNeedsAdmin": "{files} files need administrator rights",
+    "emptyBinAsAdmin": "Remove as administrator",
+    "binAdminDone": "Removed the files that needed administrator rights."
   },
   "cleanup": {
     "title": "Limpieza profunda de sistema y cachés",

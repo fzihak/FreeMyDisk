@@ -1905,6 +1905,38 @@ async fn get_recycle_bin_contents() -> Result<RecycleBinContents, String> {
     .map_err(ipc_error)
 }
 
+/// Removes Recycle Bin files that only an administrator may delete (for
+/// example folders whose permissions were locked down by an installer). Runs
+/// the elevated helper, which shows the Windows UAC prompt. Returns what is left.
+#[tauri::command]
+async fn empty_recycle_bin_elevated() -> Result<RecycleBinContents, String> {
+    tauri::async_runtime::spawn_blocking(|| {
+        #[cfg(target_os = "windows")]
+        {
+            use freemydisk_core::system_maintenance::ElevatedClient;
+            use freemydisk_platform::windows::recycle_bin;
+            let sid = recycle_bin::current_user_sid()
+                .ok_or_else(|| "Could not read the current user's SID".to_string())?;
+            let response = ElevatedClient::execute_action("empty_user_recycle_bin", &sid)
+                .map_err(ipc_error)?;
+            let left = recycle_bin::contents();
+            if !response.success && left.files > 0 {
+                return Err(response.message);
+            }
+            Ok(RecycleBinContents {
+                files: left.files,
+                bytes: left.bytes,
+            })
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            Err("Not supported on this platform".to_string())
+        }
+    })
+    .await
+    .map_err(ipc_error)?
+}
+
 #[tauri::command]
 async fn scan_privacy_data(app: tauri::AppHandle) -> Result<PrivacyScanResult, String> {
     let res = tauri::async_runtime::spawn_blocking(move || {
@@ -2281,6 +2313,7 @@ pub fn run() {
             get_maintenance_tasks,
             execute_emergency_rescue,
             get_recycle_bin_contents,
+            empty_recycle_bin_elevated,
             get_quick_clean_requirements,
             scan_privacy_data,
             clean_privacy_data,

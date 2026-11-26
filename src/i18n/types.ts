@@ -232,6 +232,9 @@ export interface TranslationSchema {
     confirmEmptyBin: string;
     recycleItemsFiles: string;
     binFilesProgress: string;
+    binNeedsAdmin: string;
+    emptyBinAsAdmin: string;
+    binAdminDone: string;
   };
   cleanup: {
     title: string;
