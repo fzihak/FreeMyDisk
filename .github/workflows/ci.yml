@@ -17,7 +17,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, macos-latest, ubuntu-latest]
+        # FreeMyDisk ships for Windows only for now. Add macos-latest and
+        # ubuntu-latest back here when those platforms are supported.
+        os: [windows-latest]
 
     steps:
       - name: Checkout Repository
@@ -54,12 +56,6 @@ jobs:
 
       - name: Build Frontend Assets
         run: pnpm build
-
-      - name: Install System Dependencies (Linux)
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev build-essential
 
       - name: Install Rust Toolchain
         uses: dtolnay/rust-toolchain@stable
