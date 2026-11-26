@@ -135,6 +135,9 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
   const [recycleBin, setRecycleBin] = useState<RecycleBinStatus | null>(null);
   const [emptyingBin, setEmptyingBin] = useState(false);
   const [confirmEmptyBin, setConfirmEmptyBin] = useState(false);
+  const [binFiles, setBinFiles] = useState<number | null>(null);
+  // Bytes really on disk in the bin folders, including leftovers Windows no longer counts.
+  const [binDiskBytes, setBinDiskBytes] = useState<number>(0);
 
   const [emergencyModalOpen, setEmergencyModalOpen] = useState(false);
   const [rescuing, setRescuing] = useState(false);
@@ -188,6 +191,12 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
       if (vit) setVitals(vit);
       if (startups) setStartupItems(startups);
       if (rbin) setRecycleBin(rbin);
+      invoke<{ files: number; bytes: number }>("get_recycle_bin_contents")
+        .then((c) => {
+          setBinFiles(c.files);
+          setBinDiskBytes(c.bytes);
+        })
+        .catch(() => setBinFiles(null));
     } catch (e) {
       console.error("Failed to load dashboard data:", e);
     }
@@ -267,6 +276,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
 
   const cleanupProgress = useScanProgress("cleanup");
   const rescueProgress = useScanProgress("rescue");
+  const binProgress = useScanProgress("recycle_bin");
   const { initProgressListener, resetProgress } = useScanProgressStore();
 
   useEffect(() => {
@@ -433,6 +443,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
   );
 
   const handleEmptyRecycleBin = async () => {
+    resetProgress("recycle_bin");
     setEmptyingBin(true);
     try {
       const reclaimed = await invoke<number>("empty_recycle_bin");
@@ -441,6 +452,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
         `${formatBytes(reclaimed)} ${t.dashboard.reclaimedNotice}`
       );
       setRecycleBin({ total_bytes: 0, item_count: 0 });
+      setBinFiles(0);
+      setBinDiskBytes(0);
       loadInitialData();
     } catch (e) {
       toast.error(t.common.error, String(e));
@@ -496,7 +509,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
     { id: "optimization", title: t.nav.optimization, desc: t.dashboard.optimizerDesc, icon: <Gauge20Regular /> },
   ];
 
-  const binEmpty = !recycleBin || recycleBin.total_bytes === 0;
+  const binBytes = Math.max(recycleBin?.total_bytes ?? 0, binDiskBytes);
+  const binEmpty = binBytes === 0 && !binFiles;
 
   return (
     <Page>
@@ -688,14 +702,32 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
           </div>
           <div>
             <div className="text-2xl font-semibold font-ibm-mono">
-              {formatBytes(recycleBin?.total_bytes ?? 0)}
+              {formatBytes(binBytes)}
             </div>
             <div className="text-xs text-[var(--text-muted)]">
               {binEmpty
                 ? t.dashboard.binIsEmpty
+                : binFiles && binFiles > (recycleBin?.item_count ?? 0)
+                ? fill(t.dashboard.recycleItemsFiles, {
+                    count: recycleBin?.item_count ?? 0,
+                    files: binFiles.toLocaleString(),
+                  })
                 : fill(t.dashboard.recycleItems, { count: recycleBin?.item_count ?? 0 })}
             </div>
           </div>
+          {emptyingBin && (
+            <div className="space-y-1">
+              <ProgressBar value={Math.max(1, binProgress.percent)} tone="danger" />
+              <div className="text-xs text-[var(--text-muted)] font-ibm-mono">
+                {Number(binProgress.currentPath) > 0
+                  ? fill(t.dashboard.binFilesProgress, {
+                      done: binProgress.itemsScanned.toLocaleString(),
+                      total: Number(binProgress.currentPath).toLocaleString(),
+                    })
+                  : t.dashboard.emptyingBin}
+              </div>
+            </div>
+          )}
           <div className="mt-auto">
             <WinUIButton
               variant={confirmEmptyBin ? "danger" : "standard"}

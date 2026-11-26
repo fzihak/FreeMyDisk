@@ -20,7 +20,9 @@ export type ScanTypeKey =
   | "heavy_folders"
   | "projects"
   | "disposal"
-  | "privacy";
+  | "privacy"
+  | "rescue"
+  | "recycle_bin";
 
 interface ScanProgressStore {
   progressByScanType: Record<string, AppScanProgress>;

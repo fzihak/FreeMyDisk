@@ -788,9 +788,6 @@ fn recycle_bin_path() -> PathBuf {
 #[cfg(target_os = "windows")]
 fn empty_recycle_bin_journaled(journal: &CrashRecoveryJournal) -> Option<DisposalItemResult> {
     use freemydisk_platform::windows::maintenance::WindowsSystemMaintenanceHandler;
-    use windows_sys::Win32::UI::Shell::{
-        SHEmptyRecycleBinW, SHERB_NOCONFIRMATION, SHERB_NOPROGRESSUI, SHERB_NOSOUND,
-    };
 
     let path = recycle_bin_path();
     let session_id = format!("recycle-bin-{}", uuid::Uuid::new_v4());
@@ -801,13 +798,13 @@ fn empty_recycle_bin_journaled(journal: &CrashRecoveryJournal) -> Option<Disposa
     let before = WindowsSystemMaintenanceHandler::query_recycle_bin()
         .map(|(b, _)| b)
         .unwrap_or(0);
-    let flags = SHERB_NOCONFIRMATION | SHERB_NOPROGRESSUI | SHERB_NOSOUND;
-    let hresult = unsafe { SHEmptyRecycleBinW(std::ptr::null_mut(), std::ptr::null(), flags) };
+    let outcome = freemydisk_platform::windows::recycle_bin::empty_fast(|_| {});
     let after = WindowsSystemMaintenanceHandler::query_recycle_bin()
         .map(|(b, _)| b)
         .unwrap_or(before);
     let freed = before.saturating_sub(after);
-    let success = hresult >= 0;
+    let success = outcome.is_ok() && after == 0;
+    let hresult: i32 = if success { 0 } else { -1 };
 
     if let Some(id) = journal_id {
         let _ = if success {
@@ -1827,6 +1824,7 @@ async fn get_recycle_bin_status(
 #[tauri::command]
 #[allow(non_snake_case)]
 async fn empty_recycle_bin(
+    app: tauri::AppHandle,
     drive: Option<String>,
     drivePath: Option<String>,
 ) -> Result<u64, String> {
@@ -1835,8 +1833,39 @@ async fn empty_recycle_bin(
         #[cfg(target_os = "windows")]
         {
             use freemydisk_platform::windows::maintenance::WindowsSystemMaintenanceHandler;
-            WindowsSystemMaintenanceHandler::empty_recycle_bin_for_drive(target.as_deref())
-                .map_err(ipc_error)
+            use freemydisk_platform::windows::recycle_bin;
+            if target.is_some() {
+                return WindowsSystemMaintenanceHandler::empty_recycle_bin_for_drive(
+                    target.as_deref(),
+                )
+                .map_err(ipc_error);
+            }
+            let emit = |p: recycle_bin::EmptyProgress, done: bool| {
+                let percent = if done {
+                    100
+                } else {
+                    (p.files_deleted * 100)
+                        .checked_div(p.files_total)
+                        .unwrap_or(1)
+                        .clamp(1, 99)
+                };
+                let _ = app.emit(
+                    "scan-progress",
+                    AppScanProgress {
+                        scan_type: "recycle_bin".to_string(),
+                        stage: "emptying".to_string(),
+                        percent: percent as u8,
+                        items_scanned: p.files_deleted,
+                        // Total file count, so the UI can show "N of M files".
+                        current_path: p.files_total.to_string(),
+                        bytes_found: p.bytes_deleted,
+                        is_complete: done,
+                    },
+                );
+            };
+            let result = recycle_bin::empty_fast(|p| emit(p, false));
+            emit(recycle_bin::EmptyProgress::default(), true);
+            result.map(|o| o.bytes_freed).map_err(ipc_error)
         }
         #[cfg(not(target_os = "windows"))]
         {
@@ -1846,6 +1875,34 @@ async fn empty_recycle_bin(
     })
     .await
     .map_err(ipc_error)?
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RecycleBinContents {
+    pub files: u64,
+    pub bytes: u64,
+}
+
+/// Real number of files in the current user's Recycle Bin. The shell's item
+/// count treats a deleted folder as one item however many files it holds.
+#[tauri::command]
+async fn get_recycle_bin_contents() -> Result<RecycleBinContents, String> {
+    tauri::async_runtime::spawn_blocking(|| {
+        #[cfg(target_os = "windows")]
+        {
+            let c = freemydisk_platform::windows::recycle_bin::contents();
+            RecycleBinContents {
+                files: c.files,
+                bytes: c.bytes,
+            }
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            RecycleBinContents { files: 0, bytes: 0 }
+        }
+    })
+    .await
+    .map_err(ipc_error)
 }
 
 #[tauri::command]
@@ -2223,6 +2280,7 @@ pub fn run() {
             launch_uninstaller,
             get_maintenance_tasks,
             execute_emergency_rescue,
+            get_recycle_bin_contents,
             get_quick_clean_requirements,
             scan_privacy_data,
             clean_privacy_data,

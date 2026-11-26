@@ -230,6 +230,8 @@ export interface TranslationSchema {
     emergencyRescueShort: string;
     readyToClean: string;
     confirmEmptyBin: string;
+    recycleItemsFiles: string;
+    binFilesProgress: string;
   };
   cleanup: {
     title: string;

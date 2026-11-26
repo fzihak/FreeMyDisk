@@ -184,7 +184,9 @@ export const de: TranslationSchema = {
     "freeSpaceValue": "{size} free",
     "emergencyRescueShort": "Emergency rescue",
     "readyToClean": "ready to clean",
-    "confirmEmptyBin": "Click again to empty"
+    "confirmEmptyBin": "Click again to empty",
+    "recycleItemsFiles": "{count} items · {files} files",
+    "binFilesProgress": "{done} of {total} files deleted"
   },
   "cleanup": {
     "title": "Tiefenbereinigung",
