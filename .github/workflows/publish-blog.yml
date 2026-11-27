@@ -1,0 +1,46 @@
+name: Blog
+
+# Articles in blog/ are rendered by the FreeMyDisk website (a separate, private
+# Vercel project). Pull requests are validated; merges to main rebuild the site.
+on:
+  pull_request:
+    paths: ["blog/**", ".github/scripts/check-articles.mjs", ".github/workflows/publish-blog.yml"]
+  push:
+    branches: [main]
+    paths: ["blog/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: blog-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Check articles
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - run: node .github/scripts/check-articles.mjs
+
+  publish:
+    name: Rebuild website
+    needs: check
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Vercel deploy hook
+        env:
+          HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK }}
+        run: |
+          if [ -z "$HOOK" ]; then
+            echo "::warning::VERCEL_DEPLOY_HOOK secret is not set; the website was not rebuilt."
+            exit 0
+          fi
+          curl --fail --silent --show-error -X POST "$HOOK" > /dev/null
+          echo "Website rebuild started."
