@@ -1,0 +1,28 @@
+title: "[Idea] "
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Ideas start here so the community can shape them. Want a specific app's cache cleaned? The [cleanup rule request](https://github.com/fzihak/FreeMyDisk/issues/new?template=cleanup_rule.yml) form is faster.
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What is hard, slow or missing today? Describe the problem before the solution.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: Your idea
+      description: How could FreeMyDisk solve it?
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety
+      options:
+        - label: This idea keeps FreeMyDisk's safety rules (Recycle Bin first, no silent permanent deletion, no telemetry).
+          required: true

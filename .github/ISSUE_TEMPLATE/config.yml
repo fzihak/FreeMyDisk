@@ -3,3 +3,12 @@ contact_links:
   - name: Download the latest version
     url: https://github.com/fzihak/FreeMyDisk/releases/latest
     about: Check whether the issue is already fixed in the newest release.
+  - name: Ask a question
+    url: https://github.com/fzihak/FreeMyDisk/discussions/categories/q-a
+    about: How-to questions and help go to Discussions, not issues.
+  - name: Share an idea
+    url: https://github.com/fzihak/FreeMyDisk/discussions/categories/ideas
+    about: Talk through a feature idea with the community before it becomes an issue.
+  - name: Read the documentation
+    url: https://github.com/fzihak/FreeMyDisk/wiki
+    about: Installation, every tool, the CLI, cleanup rules and troubleshooting.
