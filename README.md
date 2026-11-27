@@ -62,7 +62,7 @@ No mystery "registry issues found!". Every item shows what it is, which app owns
 <td width="50%" valign="top">
 
 ### 🔒 Private and open
-**No accounts, no ads, no telemetry.** The only network request is the optional update check against this repository. Every release is built in public CI and **signed**; every installer carries a **build-provenance attestation**.
+**No accounts, no ads, no telemetry.** The only network request is the optional update check against this repository. Updates are **signed**, and the app verifies every download against its built-in key before it installs.
 
 </td>
 </tr>
@@ -133,10 +133,10 @@ Most cleaners ask you to trust them. FreeMyDisk is built so that a bug, a crash 
 <summary><b>Verify your download</b></summary>
 <br />
 
-Every installer is built by GitHub Actions from this repository and carries a signed build-provenance attestation:
+Compare the installer's SHA-256 with the value listed in the [release notes](https://github.com/fzihak/FreeMyDisk/releases/latest):
 
 ```powershell
-gh attestation verify .\FreeMyDisk_1.1.0_x64-setup.exe --repo fzihak/FreeMyDisk
+Get-FileHash .\FreeMyDisk-Setup-x64.exe -Algorithm SHA256
 ```
 
 </details>
@@ -236,7 +236,7 @@ Needs Rust (stable), Node.js 20+, pnpm 9+ and the Visual Studio C++ build tools.
 
 ## 🤝 Contributing
 
-Bug reports, rules and translations are all very welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md), or [open an issue](https://github.com/fzihak/FreeMyDisk/issues/new).
+Bug reports, rules and translations are all very welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md), or [open an issue](https://github.com/fzihak/FreeMyDisk/issues/new). Questions and ideas go to [Discussions](https://github.com/fzihak/FreeMyDisk/discussions), and the full documentation lives in the [Wiki](https://github.com/fzihak/FreeMyDisk/wiki).
 
 If FreeMyDisk freed some space for you, a star helps other people find it:
 

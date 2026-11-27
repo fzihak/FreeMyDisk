@@ -1,0 +1,33 @@
+title: "[Q&A] "
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for asking! Please check the [documentation](https://github.com/fzihak/FreeMyDisk/wiki) and [FAQ](https://github.com/fzihak/FreeMyDisk/wiki/FAQ) first. Found a bug instead? [Open a bug report](https://github.com/fzihak/FreeMyDisk/issues/new?template=bug_report.yml).
+  - type: textarea
+    id: question
+    attributes:
+      label: Your question
+      description: What do you want to do, and what happened when you tried?
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: FreeMyDisk version
+      description: Settings → About
+      placeholder: "1.0.0"
+  - type: dropdown
+    id: windows
+    attributes:
+      label: Windows version
+      options:
+        - Windows 11
+        - Windows 10
+        - Other
+  - type: textarea
+    id: extra
+    attributes:
+      label: Screenshots or extra details
+      description: Please blur personal file names and user folders.
